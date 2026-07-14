@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFormLayout,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
@@ -22,7 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from .cover import load_cover
-from .editor import save_metadata
+from .editor import save_song_metadata
 from .scanner import scan_folder
 from .song import Song
 
@@ -40,10 +41,9 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("MusicTagStudio")
-        self.resize(1200, 680)
+        self.resize(1280, 720)
 
         self.folder: str | None = DEFAULT_MUSIC_FOLDER
-        self.current_file: str | None = None
         self.current_cover: QPixmap | None = None
         self.songs: list[Song] = []
 
@@ -70,18 +70,30 @@ class MainWindow(QMainWindow):
         self.scan_button.clicked.connect(self.scan_music)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(5)
+        self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels(
             [
+                "Track",
                 "Titel",
                 "Künstler",
                 "Album",
+                "Disc",
                 "Jahr",
                 "Datei",
             ]
         )
 
-        self.table.cellClicked.connect(self.load_song)
+        self.table.currentCellChanged.connect(
+            self.load_current_song
+        )
+
+        self.table.setSelectionBehavior(
+            QTableWidget.SelectionBehavior.SelectRows
+        )
+
+        self.table.setSelectionMode(
+            QTableWidget.SelectionMode.SingleSelection
+        )
 
         self.table.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -92,7 +104,7 @@ class MainWindow(QMainWindow):
 
         header.setSectionResizeMode(
             0,
-            QHeaderView.ResizeMode.Stretch,
+            QHeaderView.ResizeMode.ResizeToContents,
         )
         header.setSectionResizeMode(
             1,
@@ -104,14 +116,22 @@ class MainWindow(QMainWindow):
         )
         header.setSectionResizeMode(
             3,
-            QHeaderView.ResizeMode.ResizeToContents,
+            QHeaderView.ResizeMode.Stretch,
         )
         header.setSectionResizeMode(
             4,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            5,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            6,
             QHeaderView.ResizeMode.Interactive,
         )
 
-        self.table.setColumnWidth(4, 240)
+        self.table.setColumnWidth(6, 240)
 
         left_layout.addWidget(self.folder_label)
         left_layout.addWidget(self.select_button)
@@ -121,7 +141,7 @@ class MainWindow(QMainWindow):
         # Rechte Seite: Cover und Tag-Editor
 
         right_widget = QWidget()
-        right_widget.setMinimumWidth(320)
+        right_widget.setMinimumWidth(360)
 
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(12, 12, 12, 12)
@@ -158,24 +178,48 @@ class MainWindow(QMainWindow):
 
         self.title_edit = QLineEdit()
         self.artist_edit = QLineEdit()
+        self.album_artist_edit = QLineEdit()
         self.album_edit = QLineEdit()
+        self.genre_edit = QLineEdit()
         self.year_edit = QLineEdit()
 
-        for field in (
-            self.title_edit,
-            self.artist_edit,
-            self.album_edit,
-            self.year_edit,
-        ):
-            field.setSizePolicy(
-                QSizePolicy.Policy.Expanding,
-                QSizePolicy.Policy.Fixed,
-            )
+        self.track_edit = QLineEdit()
+        self.total_tracks_edit = QLineEdit()
+
+        self.disc_edit = QLineEdit()
+        self.total_discs_edit = QLineEdit()
 
         form_layout.addRow("Titel:", self.title_edit)
         form_layout.addRow("Künstler:", self.artist_edit)
+        form_layout.addRow(
+            "Albumkünstler:",
+            self.album_artist_edit,
+        )
         form_layout.addRow("Album:", self.album_edit)
+        form_layout.addRow("Genre:", self.genre_edit)
         form_layout.addRow("Jahr:", self.year_edit)
+
+        track_widget = QWidget()
+        track_layout = QHBoxLayout(track_widget)
+        track_layout.setContentsMargins(0, 0, 0, 0)
+        track_layout.setSpacing(6)
+
+        track_layout.addWidget(self.track_edit)
+        track_layout.addWidget(QLabel("/"))
+        track_layout.addWidget(self.total_tracks_edit)
+
+        form_layout.addRow("Track:", track_widget)
+
+        disc_widget = QWidget()
+        disc_layout = QHBoxLayout(disc_widget)
+        disc_layout.setContentsMargins(0, 0, 0, 0)
+        disc_layout.setSpacing(6)
+
+        disc_layout.addWidget(self.disc_edit)
+        disc_layout.addWidget(QLabel("/"))
+        disc_layout.addWidget(self.total_discs_edit)
+
+        form_layout.addRow("Disc:", disc_widget)
 
         self.save_button = QPushButton("Änderungen speichern")
         self.save_button.clicked.connect(self.save_song)
@@ -193,7 +237,7 @@ class MainWindow(QMainWindow):
 
         self.splitter.setStretchFactor(0, 3)
         self.splitter.setStretchFactor(1, 1)
-        self.splitter.setSizes([850, 350])
+        self.splitter.setSizes([900, 380])
 
         self.splitter.setCollapsible(0, False)
         self.splitter.setCollapsible(1, False)
@@ -240,52 +284,42 @@ class MainWindow(QMainWindow):
             )
             return
 
-        self.current_file = None
-        self.current_cover = None
-
         self.clear_editor()
 
         self.table.clearContents()
         self.table.setRowCount(len(self.songs))
 
         for row, song in enumerate(self.songs):
-            self.table.setItem(
-                row,
-                0,
-                QTableWidgetItem(song.title),
-            )
-            self.table.setItem(
-                row,
-                1,
-                QTableWidgetItem(song.artist),
-            )
-            self.table.setItem(
-                row,
-                2,
-                QTableWidgetItem(song.album),
-            )
-            self.table.setItem(
-                row,
-                3,
-                QTableWidgetItem(song.year),
-            )
-            self.table.setItem(
-                row,
-                4,
-                QTableWidgetItem(song.path),
-            )
+            self.update_table_row(row, song)
 
-    def load_song(self, row: int, column: int):
-        if row < 0 or row >= len(self.songs):
+        if self.songs:
+            self.table.setCurrentCell(0, 0)
+            self.table.setFocus()
+
+    def load_current_song(
+        self,
+        current_row: int,
+        current_column: int,
+        previous_row: int,
+        previous_column: int,
+    ):
+        if current_row < 0 or current_row >= len(self.songs):
             return
 
-        song = self.songs[row]
-        self.current_file = song.path
+        song = self.songs[current_row]
 
         self.title_edit.setText(song.title)
         self.artist_edit.setText(song.artist)
+        self.album_artist_edit.setText(song.album_artist)
         self.album_edit.setText(song.album)
+        self.genre_edit.setText(song.genre)
         self.year_edit.setText(song.year)
+
+        self.track_edit.setText(song.track)
+        self.total_tracks_edit.setText(song.total_tracks)
+
+        self.disc_edit.setText(song.disc)
+        self.total_discs_edit.setText(song.total_discs)
 
         try:
             cover_data = load_cover(song.path)
@@ -298,6 +332,83 @@ class MainWindow(QMainWindow):
             return
 
         self.show_cover(cover_data)
+
+    def save_song(self):
+        row = self.table.currentRow()
+
+        if row < 0 or row >= len(self.songs):
+            QMessageBox.warning(
+                self,
+                "Fehler",
+                "Keine Datei ausgewählt.",
+            )
+            return
+
+        song = self.songs[row]
+
+        song.title = self.title_edit.text()
+        song.artist = self.artist_edit.text()
+        song.album_artist = self.album_artist_edit.text()
+        song.album = self.album_edit.text()
+        song.genre = self.genre_edit.text()
+        song.year = self.year_edit.text()
+
+        song.track = self.track_edit.text()
+        song.total_tracks = self.total_tracks_edit.text()
+
+        song.disc = self.disc_edit.text()
+        song.total_discs = self.total_discs_edit.text()
+
+        try:
+            save_song_metadata(song.path, song)
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Speichern fehlgeschlagen",
+                (
+                    "Die Metadaten konnten nicht gespeichert werden:"
+                    f"\n\n{error}"
+                ),
+            )
+            return
+
+        self.update_table_row(row, song)
+
+        QMessageBox.information(
+            self,
+            "Gespeichert",
+            "Metadaten wurden gespeichert.",
+        )
+
+        self.table.setFocus()
+
+    def update_table_row(self, row: int, song: Song):
+        track_text = song.track
+
+        if song.total_tracks:
+            track_text = f"{song.track}/{song.total_tracks}"
+
+        disc_text = song.disc
+
+        if song.total_discs:
+            disc_text = f"{song.disc}/{song.total_discs}"
+
+        values = [
+            track_text,
+            song.title,
+            song.artist,
+            song.album,
+            disc_text,
+            song.year,
+            song.path,
+        ]
+
+        for column, value in enumerate(values):
+            self.table.setItem(
+                row,
+                column,
+                QTableWidgetItem(value),
+            )
 
     def show_cover(self, cover_data: bytes | None):
         if not cover_data:
@@ -317,16 +428,9 @@ class MainWindow(QMainWindow):
             return
 
         self.current_cover = pixmap
-        self.update_cover_display()
 
-    def update_cover_display(self):
-        if self.current_cover is None:
-            return
-
-        available_size = self.cover_label.contentsRect().size()
-
-        scaled_cover = self.current_cover.scaled(
-            available_size,
+        scaled_cover = pixmap.scaled(
+            self.cover_label.contentsRect().size(),
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
@@ -337,86 +441,20 @@ class MainWindow(QMainWindow):
     def clear_editor(self):
         self.title_edit.clear()
         self.artist_edit.clear()
+        self.album_artist_edit.clear()
         self.album_edit.clear()
+        self.genre_edit.clear()
         self.year_edit.clear()
+
+        self.track_edit.clear()
+        self.total_tracks_edit.clear()
+
+        self.disc_edit.clear()
+        self.total_discs_edit.clear()
 
         self.current_cover = None
         self.cover_label.clear()
         self.cover_label.setText("Kein Cover vorhanden")
-
-    def save_song(self):
-        row = self.table.currentRow()
-
-        if (
-            self.current_file is None
-            or row < 0
-            or row >= len(self.songs)
-        ):
-            QMessageBox.warning(
-                self,
-                "Fehler",
-                "Keine Datei ausgewählt.",
-            )
-            return
-
-        title = self.title_edit.text()
-        artist = self.artist_edit.text()
-        album = self.album_edit.text()
-        year = self.year_edit.text()
-
-        try:
-            save_metadata(
-                self.current_file,
-                title,
-                artist,
-                album,
-                year,
-            )
-        except Exception as error:
-            QMessageBox.critical(
-                self,
-                "Speichern fehlgeschlagen",
-                (
-                    "Die Metadaten konnten nicht gespeichert werden:"
-                    f"\n\n{error}"
-                ),
-            )
-            return
-
-        # Auch das Song-Objekt im Arbeitsspeicher aktualisieren.
-        song = self.songs[row]
-
-        song.title = title
-        song.artist = artist
-        song.album = album
-        song.year = year
-
-        self.table.setItem(
-            row,
-            0,
-            QTableWidgetItem(song.title),
-        )
-        self.table.setItem(
-            row,
-            1,
-            QTableWidgetItem(song.artist),
-        )
-        self.table.setItem(
-            row,
-            2,
-            QTableWidgetItem(song.album),
-        )
-        self.table.setItem(
-            row,
-            3,
-            QTableWidgetItem(song.year),
-        )
-
-        QMessageBox.information(
-            self,
-            "Gespeichert",
-            "Metadaten wurden gespeichert.",
-        )
 
 
 def main():
