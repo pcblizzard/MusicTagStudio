@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0
+
+- Coverquellen mit Ampelstatus, Tooltips und dauerhafter Auswahl
+- Apple Music und Cover Art Archive als offizielle Coverquellen
+- Master-Cover in bestmöglicher Qualität im Albumordner
+- 1000-px-JPEG mit Qualität 100 für eingebettete Cover
+- 400-px-JPEG mit Qualität 80 im konfigurierbaren übergeordneten Künstlerordner
+- Cover-Einbettung für FLAC, MP3, Ogg Vorbis, Opus und M4A/MP4
+- Allgemeiner Audioscan statt ausschließlich FLAC
+- Mehrfachauswahl zeigt Gesamttracks bei vollständiger Albumauswahl korrekt
+- Auswahlstatus zeigt Titel- und Albumanzahl
+- Editorbereich besitzt eine feste Breite und wächst nicht mehr mit Feldinhalten
+
+
+
 ## 0.5.0
 
 - Feldgenaue Quellenwahl auch in der Batch-Vergleichsansicht

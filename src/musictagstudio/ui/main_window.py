@@ -47,6 +47,8 @@ from ..batch_comparison_logic import BatchSongProposal
 from .batch_dialog import BatchComparisonDialog
 from .comparison_dialog import ComparisonDialog
 from .settings_dialog import SettingsDialog
+from .cover_dialog import CoverSelectionDialog
+from ..cover_management.manager import CoverManager
 
 
 DEFAULT_MUSIC_FOLDER = (
@@ -104,7 +106,7 @@ class MainWindow(QMainWindow):
         self.select_button.clicked.connect(self.select_folder)
 
         self.scan_button = QPushButton(
-            "FLAC-Dateien scannen"
+            "Audiodateien scannen"
         )
         self.scan_button.clicked.connect(self.scan_music)
 
@@ -126,8 +128,13 @@ class MainWindow(QMainWindow):
         )
         self.batch_button.setEnabled(False)
 
+        self.cover_button = QPushButton("Cover für Auswahl verwalten")
+        self.cover_button.clicked.connect(self.manage_cover)
+        self.cover_button.setEnabled(False)
+
         provider_buttons.addWidget(self.proposal_button)
         provider_buttons.addWidget(self.batch_button)
+        provider_buttons.addWidget(self.cover_button)
 
         self.table_fields = (
             "track",
@@ -199,7 +206,8 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.table)
 
         right_widget = QWidget()
-        right_widget.setMinimumWidth(390)
+        right_widget.setFixedWidth(420)
+        right_widget.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         right_layout = QVBoxLayout(right_widget)
 
         self.selection_label = QLabel(
@@ -312,8 +320,10 @@ class MainWindow(QMainWindow):
         )
         self.splitter.addWidget(left_widget)
         self.splitter.addWidget(right_widget)
-        self.splitter.setStretchFactor(0, 3)
-        self.splitter.setStretchFactor(1, 1)
+        self.splitter.setStretchFactor(0, 1)
+        self.splitter.setStretchFactor(1, 0)
+        self.splitter.setCollapsible(0, False)
+        self.splitter.setCollapsible(1, False)
         self.splitter.setSizes([1080, 420])
 
         container_layout.addWidget(self.splitter)
@@ -405,6 +415,7 @@ class MainWindow(QMainWindow):
         enabled = bool(self.songs)
         self.proposal_button.setEnabled(enabled)
         self.batch_button.setEnabled(enabled)
+        self.cover_button.setEnabled(enabled)
 
         if enabled:
             self.table.selectRow(0)
@@ -467,56 +478,48 @@ class MainWindow(QMainWindow):
         self.update_dirty_state()
 
         self.selection_label.setText(
-            "1 Titel ausgewählt"
+            f"1 Titel · {song.album or 'ohne Album'}"
         )
         self.show_cover(load_cover(song.path))
 
         self.proposal_button.setEnabled(True)
 
     def display_multiple_songs(self, rows: list[int]):
-        selected_songs = [
-            self.songs[row]
-            for row in rows
-        ]
-
+        selected_songs = [self.songs[row] for row in rows]
         self.current_row = rows[-1]
         self.loading_editor = True
         self.original_values = {}
         self.batch_touched_fields.clear()
         self.batch_original_values = {}
 
+        album_keys = {
+            ((song.album_artist or song.artist).casefold(), song.album.casefold())
+            for song in selected_songs
+        }
+        same_album = len(album_keys) == 1
+
         for name, field in self.editor_fields.items():
-            values = [
-                str(getattr(song, name, "") or "")
-                for song in selected_songs
-            ]
-            common_value = (
-                values[0]
-                if all(value == values[0] for value in values)
-                else None
-            )
+            values = [str(getattr(song, name, "") or "") for song in selected_songs]
+            common_value = values[0] if values and all(value == values[0] for value in values) else None
+
+            # Bei einer vollständigen Albumauswahl ist die Gesamtzahl der Tracks
+            # die Anzahl der ausgewählten Titel, auch wenn ältere Tags abweichen.
+            if name == "total_tracks" and same_album and len(rows) == len(self.songs):
+                common_value = str(len(rows))
 
             self.batch_original_values[name] = common_value
-
             if common_value is None:
-                field.clear()
-                field.setPlaceholderText(
-                    MIXED_VALUE_PLACEHOLDER
-                )
+                field.clear(); field.setPlaceholderText(MIXED_VALUE_PLACEHOLDER)
             else:
-                field.setPlaceholderText("")
-                field.setText(common_value)
-
+                field.setPlaceholderText(""); field.setText(common_value)
             field.setStyleSheet(INPUT_NORMAL)
 
         self.loading_editor = False
         self.has_unsaved_changes = False
-
-        self.selection_label.setText(
-            f"{len(rows)} Titel ausgewählt"
-        )
+        album_count = len(album_keys)
+        album_word = "Album" if album_count == 1 else "Alben"
+        self.selection_label.setText(f"{len(rows)} Titel · {album_count} {album_word}")
         self.show_multiple_selection_cover(rows)
-
         self.proposal_button.setEnabled(False)
         self.update_save_button()
 
@@ -555,6 +558,39 @@ class MainWindow(QMainWindow):
             return
 
         self.show_cover(common_cover.data)
+
+    def manage_cover(self):
+        rows = self.selected_rows()
+        if not rows:
+            return
+        songs = [self.songs[row] for row in rows]
+        album_keys = {((song.album_artist or song.artist).casefold(), song.album.casefold()) for song in songs}
+        if len(album_keys) != 1:
+            QMessageBox.warning(self, "Mehrere Alben", "Bitte wähle für die Cover-Verarbeitung nur Titel desselben Albums aus.")
+            return
+        settings = load_settings()
+        manager = CoverManager(settings)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            candidates = manager.search(songs[0])
+        finally:
+            QApplication.restoreOverrideCursor()
+        candidates = [c for c in candidates if min(c.width, c.height) >= settings.minimum_cover_size]
+        if not candidates:
+            QMessageBox.information(self, "Kein Cover gefunden", "Keine unterstützte Coverquelle lieferte ein Cover in der eingestellten Mindestauflösung.")
+            return
+        dialog = CoverSelectionDialog(candidates, self)
+        if dialog.exec() != dialog.DialogCode.Accepted or dialog.selected_candidate is None:
+            return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            result = manager.apply(dialog.selected_candidate, songs)
+        except Exception as error:
+            QMessageBox.critical(self, "Cover-Verarbeitung fehlgeschlagen", str(error)); return
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.refresh_active_editor()
+        QMessageBox.information(self, "Cover gespeichert", f"Master: {result.master_path}\n\n400-px-Cover: {result.folder_cover_path}\n\nIn {result.embedded_files} Audiodateien eingebettet.")
 
     def mark_field_edited(self, field_name: str):
         if self.loading_editor:

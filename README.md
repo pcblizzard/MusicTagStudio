@@ -1,23 +1,18 @@
 # MusicTagStudio
 
-MusicTagStudio ist ein sicherer, vorschauorientierter FLAC-Tagger mit austauschbaren Metadatenquellen.
+MusicTagStudio ist ein vorsichtiger, vorschauorientierter Metadaten-Editor für FLAC, MP3, Ogg Vorbis, Opus und M4A/MP4.
 
 ## Start
 
 ```powershell
 python -m pip install -e .
+python -m pytest
 python -m musictagstudio.main
 ```
 
-## Tests
+## Cover-Workflow
 
-```powershell
-python -m pytest
-```
-
-## Grundsätze
-
-- Apple Music ist die Hauptquelle für Titel-, Album- und Trackdaten.
-- MusicBrainz ergänzt insbesondere ISRC und weitere fehlende Angaben.
-- Kein Provider schreibt direkt in Dateien.
-- Vor jeder Änderung gibt es eine Vergleichsansicht.
+- Master im Albumordner: `Albumkünstler - Album.front.<ext>`
+- Eingebettet: 1000 px, JPEG, Qualität 100
+- Künstlerordner: `Albumkünstler - Album_400px.jpg`, 400 px, Qualität 80
+- Coverquellen und Zielordner-Ebene werden unter **Einstellungen → Optionen** gespeichert.

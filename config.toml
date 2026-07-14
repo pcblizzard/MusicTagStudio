@@ -11,3 +11,17 @@ preview_before_writing = true
 
 [normalization]
 feature_handling = "artist_only"
+
+[cover_sources]
+selected = "apple_music"
+fallback_enabled = true
+minimum_size = 1000
+
+[cover_output]
+master_pattern = "{album_artist} - {album}.front.{ext}"
+embedded_size = 1000
+embedded_quality = 100
+folder_size = 400
+folder_quality = 80
+folder_pattern = "{album_artist} - {album}_400px.jpg"
+artist_folder_levels_up = 2
