@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.6.3
+
+### Neu
+
+- Neuer Hauptmenüpunkt „Audio-Analyse“ neben „Einstellungen“
+- Automatische Erkennung von ffmpeg und ffprobe
+- Technische Analyse von Codec, Container, Abtastrate, Bittiefe, Kanälen, Bitrate und Dauer
+- Lautheitsanalyse mit LUFS, Loudness Range und True Peak
+- Vorsichtiger Clipping-Hinweis bei True Peak nahe oder über 0 dBTP
+- ReplayGain Track Gain und Track Peak
+- Optionales gemeinsames Album-ReplayGain
+- Albumvergleich mit Erkennung technischer Ausreißer
+- Fortschrittsanzeige und Abbruchmöglichkeit
+- ReplayGain-Tags für FLAC, MP3, Ogg Vorbis, Opus und M4A/MP4
+- Vorhandene ReplayGain-Tags werden nur nach Bestätigung überschrieben
+
+
+
 ## v0.6.2
 
 ### Neu

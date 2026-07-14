@@ -49,6 +49,7 @@ from .comparison_dialog import ComparisonDialog
 from .settings_dialog import SettingsDialog
 from .cover_dialog import CoverSelectionDialog
 from .direct_album_dialog import DirectAlbumDialog
+from .audio_analysis_dialog import AudioAnalysisDialog
 from ..cover_management.manager import CoverManager
 
 
@@ -348,6 +349,17 @@ class MainWindow(QMainWindow):
         self.update_optional_columns()
 
     def create_menu(self):
+        analysis_menu = self.menuBar().addMenu(
+            "Audio-Analyse"
+        )
+
+        analysis_action = analysis_menu.addAction(
+            "Analyse öffnen …"
+        )
+        analysis_action.triggered.connect(
+            self.open_audio_analysis
+        )
+
         settings_menu = self.menuBar().addMenu(
             "Einstellungen"
         )
@@ -358,6 +370,21 @@ class MainWindow(QMainWindow):
         settings_action.triggered.connect(
             self.open_settings
         )
+
+    def open_audio_analysis(self):
+        selected_rows = self.selected_rows()
+        selected_songs = [
+            self.songs[row]
+            for row in selected_rows
+            if 0 <= row < len(self.songs)
+        ]
+
+        dialog = AudioAnalysisDialog(
+            selected_songs,
+            self.songs,
+            self,
+        )
+        dialog.exec()
 
     def open_settings(self):
         current_settings = load_settings()
