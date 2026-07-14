@@ -106,8 +106,14 @@ class CoverSelectionDialog(QDialog):
         self.direct_button = QPushButton(
             "Direkt laden"
         )
+        self.refresh_button = QPushButton(
+            "Online neu suchen"
+        )
         self.direct_button.clicked.connect(
             self._start_direct_search
+        )
+        self.refresh_button.clicked.connect(
+            self._start_refresh_search
         )
 
         direct_layout.addWidget(
@@ -116,6 +122,9 @@ class CoverSelectionDialog(QDialog):
         )
         direct_layout.addWidget(
             self.direct_button,
+        )
+        direct_layout.addWidget(
+            self.refresh_button,
         )
         layout.addLayout(direct_layout)
 
@@ -152,8 +161,20 @@ class CoverSelectionDialog(QDialog):
             self.list,
             1,
         )
-        body.addWidget(
-            self.preview,
+        right_side = QVBoxLayout()
+        right_side.addWidget(self.preview)
+        self.quality_label = QLabel(
+            "Noch kein Cover ausgewählt."
+        )
+        self.quality_label.setWordWrap(True)
+        self.quality_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        right_side.addWidget(
+            self.quality_label
+        )
+        body.addLayout(
+            right_side,
             1,
         )
         layout.addLayout(body)
@@ -184,6 +205,12 @@ class CoverSelectionDialog(QDialog):
 
         self._start_search(None)
 
+    def _start_refresh_search(self):
+        self._start_search(
+            None,
+            force_refresh=True,
+        )
+
     def _start_direct_search(self):
         try:
             reference = parse_album_reference(
@@ -195,10 +222,18 @@ class CoverSelectionDialog(QDialog):
             )
             return
 
-        self._start_search(reference)
+        self._start_search(
+            reference,
+            force_refresh=True,
+        )
 
-    def _start_search(self, reference):
+    def _start_search(
+        self,
+        reference,
+        force_refresh: bool = False,
+    ):
         self.direct_button.setEnabled(False)
+        self.refresh_button.setEnabled(False)
         self.status_label.setText(
             "Coverquellen werden parallel durchsucht …"
         )
@@ -214,6 +249,7 @@ class CoverSelectionDialog(QDialog):
             self.manager.search_candidates,
             self.song,
             reference,
+            force_refresh,
         )
         worker.signals.finished.connect(
             self._search_finished
@@ -228,6 +264,7 @@ class CoverSelectionDialog(QDialog):
         result,
     ):
         self.direct_button.setEnabled(True)
+        self.refresh_button.setEnabled(True)
         self.candidates = list(result)
 
         if not self.candidates:
@@ -268,6 +305,7 @@ class CoverSelectionDialog(QDialog):
         message: str,
     ):
         self.direct_button.setEnabled(True)
+        self.refresh_button.setEnabled(True)
         self.status_label.setText(
             f"Cover-Suche fehlgeschlagen: {message}"
         )
@@ -286,10 +324,14 @@ class CoverSelectionDialog(QDialog):
             return
 
         candidate = self.candidates[row]
+        self._update_quality_label(
+            candidate
+        )
 
         if candidate.data is not None:
             self._show_preview_data(
-                candidate.data
+                candidate.data,
+                candidate,
             )
             return
 
@@ -312,7 +354,10 @@ class CoverSelectionDialog(QDialog):
             ):
                 return
 
-            self._show_preview_data(data)
+            self._show_preview_data(
+                data,
+                candidate,
+            )
 
         worker.signals.finished.connect(
             show_if_current
@@ -328,6 +373,7 @@ class CoverSelectionDialog(QDialog):
     def _show_preview_data(
         self,
         data: bytes,
+        candidate: CoverCandidate,
     ):
         pixmap = QPixmap()
 
@@ -337,12 +383,87 @@ class CoverSelectionDialog(QDialog):
             )
             return
 
+        self._update_quality_label(
+            candidate,
+            preview_size=len(data),
+            preview_width=pixmap.width(),
+            preview_height=pixmap.height(),
+        )
+
         self.preview.setPixmap(
             pixmap.scaled(
                 self.preview.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
+        )
+
+    def _update_quality_label(
+        self,
+        candidate: CoverCandidate,
+        *,
+        preview_size: int | None = None,
+        preview_width: int | None = None,
+        preview_height: int | None = None,
+    ):
+        source = candidate.source_label
+        original_dimensions = (
+            candidate.dimensions
+        )
+        original_format = (
+            candidate.mime
+            or "wird beim Originaldownload ermittelt"
+        )
+        original_size = (
+            candidate.file_size_text
+            if candidate.file_size
+            else "wird beim Originaldownload ermittelt"
+        )
+        shape = (
+            "quadratisch"
+            if (
+                candidate.width
+                and candidate.width
+                == candidate.height
+            )
+            else (
+                "nicht quadratisch"
+                if candidate.width
+                and candidate.height
+                else "noch nicht bekannt"
+            )
+        )
+
+        lines = [
+            f"Quelle: {source}",
+            f"Originalauflösung: {original_dimensions}",
+            f"Originalformat: {original_format}",
+            f"Originalgröße: {original_size}",
+            f"Seitenverhältnis: {shape}",
+            f"Bewertung: {candidate.score}",
+        ]
+
+        if (
+            preview_size is not None
+            and preview_width is not None
+            and preview_height is not None
+        ):
+            lines.extend(
+                [
+                    "",
+                    (
+                        "Geladene Vorschau: "
+                        f"{preview_width} × {preview_height}"
+                    ),
+                    (
+                        "Vorschaugröße: "
+                        f"{preview_size / 1024:.1f} KB"
+                    ),
+                ]
+            )
+
+        self.quality_label.setText(
+            "\n".join(lines)
         )
 
     def _accept(self):

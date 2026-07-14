@@ -16,6 +16,7 @@ feature_handling = "artist_only"
 selected = "apple_music"
 fallback_enabled = true
 minimum_size = 1000
+cache_max_age_days = 30
 
 [cover_output]
 master_pattern = "{album_artist} - {album}.front.{ext}"

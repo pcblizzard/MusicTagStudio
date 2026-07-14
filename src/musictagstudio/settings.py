@@ -23,6 +23,7 @@ class AppSettings:
     folder_cover_size:int=400
     folder_cover_quality:int=80
     artist_folder_levels_up:int=2
+    cover_cache_max_age_days:int=30
 
 def load_settings(config_path:str|Path="config.toml")->AppSettings:
     path=Path(config_path)
@@ -38,7 +39,7 @@ def load_settings(config_path:str|Path="config.toml")->AppSettings:
     if cp is None or cp.status!="supported": selected_cover="apple_music"
     feature=str(normalization.get("feature_handling","artist_only")); feature=feature if feature in {"artist_only","title_and_artist","source"} else "artist_only"
     return AppSettings(theme=theme,selected_provider=selected,enrich_missing_fields=bool(providers.get("enrich_missing_fields",True)),apple_country=str(providers.get("apple_country","DE")).upper(),preview_before_writing=bool(behavior.get("preview_before_writing",True)),feature_handling=feature,
-        selected_cover_source=selected_cover,cover_fallback_enabled=bool(cover.get("fallback_enabled",True)),minimum_cover_size=int(cover.get("minimum_size",1000)),embedded_cover_size=int(output.get("embedded_size",1000)),embedded_cover_quality=int(output.get("embedded_quality",100)),folder_cover_size=int(output.get("folder_size",400)),folder_cover_quality=int(output.get("folder_quality",80)),artist_folder_levels_up=int(output.get("artist_folder_levels_up",2)))
+        selected_cover_source=selected_cover,cover_fallback_enabled=bool(cover.get("fallback_enabled",True)),minimum_cover_size=int(cover.get("minimum_size",1000)),embedded_cover_size=int(output.get("embedded_size",1000)),embedded_cover_quality=int(output.get("embedded_quality",100)),folder_cover_size=int(output.get("folder_size",400)),folder_cover_quality=int(output.get("folder_quality",80)),artist_folder_levels_up=int(output.get("artist_folder_levels_up",2)),cover_cache_max_age_days=int(cover.get("cache_max_age_days",30)))
 
 def save_settings(settings:AppSettings,config_path:str|Path="config.toml")->None:
     content=(
@@ -50,7 +51,8 @@ def save_settings(settings:AppSettings,config_path:str|Path="config.toml")->None
         "[normalization]\n" + f'feature_handling = "{settings.feature_handling}"\n\n' +
         "[cover_sources]\n" + f'selected = "{settings.selected_cover_source}"\n' +
         f'fallback_enabled = {str(settings.cover_fallback_enabled).lower()}\n' +
-        f'minimum_size = {settings.minimum_cover_size}\n\n' +
+        f'minimum_size = {settings.minimum_cover_size}\n' +
+        f'cache_max_age_days = {settings.cover_cache_max_age_days}\n\n' +
         "[cover_output]\n" + 'master_pattern = "{album_artist} - {album}.front.{ext}"\n' +
         f'embedded_size = {settings.embedded_cover_size}\n' +
         f'embedded_quality = {settings.embedded_cover_quality}\n' +

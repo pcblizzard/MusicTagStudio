@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 
+from .cache import CoverSearchCache
 from .image_tools import (
     extension_for_mime,
     inspect_image,
@@ -47,17 +48,23 @@ class CoverManager:
         settings: AppSettings,
     ):
         self.settings = settings
+        self.persistent_cache = CoverSearchCache(
+            max_age_days=(
+                settings.cover_cache_max_age_days
+            )
+        )
 
     def search_candidates(
         self,
         song: Song,
         direct_reference: DirectAlbumReference | None = None,
+        force_refresh: bool = False,
     ) -> list[CoverCandidate]:
         album_artist = (
             song.album_artist
             or song.artist
         )
-        cache_key = (
+        cache_key_parts = (
             song.album.casefold(),
             album_artist.casefold(),
             self.settings.apple_country,
@@ -75,18 +82,48 @@ class CoverManager:
             if direct_reference
             else "",
         )
+        cache_key = "|".join(
+            cache_key_parts
+        )
 
-        with self._cache_lock:
-            cached = self._search_cache.get(
+        local_candidates = (
+            self._local_master_candidates(
+                song
+            )
+        )
+
+        if not force_refresh:
+            with self._cache_lock:
+                cached = self._search_cache.get(
+                    cache_key
+                )
+
+            if cached is not None:
+                return self._deduplicate(
+                    [
+                        *local_candidates,
+                        *cached,
+                    ]
+                )
+
+            persistent = self.persistent_cache.get(
                 cache_key
             )
 
-        if cached is not None:
-            return list(cached)
+            if persistent is not None:
+                with self._cache_lock:
+                    self._search_cache[
+                        cache_key
+                    ] = tuple(persistent)
 
-        candidates = self._local_master_candidates(
-            song
-        )
+                return self._deduplicate(
+                    [
+                        *local_candidates,
+                        *persistent,
+                    ]
+                )
+
+        candidates = list(local_candidates)
 
         order = [
             self.settings.selected_cover_source
@@ -175,10 +212,21 @@ class CoverManager:
             )
         )
 
+        online_candidates = [
+            candidate
+            for candidate in candidates
+            if not candidate.is_local
+        ]
+
         with self._cache_lock:
             self._search_cache[
                 cache_key
-            ] = tuple(candidates)
+            ] = tuple(online_candidates)
+
+        self.persistent_cache.put(
+            cache_key,
+            online_candidates,
+        )
 
         return candidates
 
@@ -353,6 +401,7 @@ class CoverManager:
                     album=album,
                     artist=album_artist,
                     is_local=True,
+                    file_size=len(data),
                 )
             ]
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.6.2
+
+### Neu
+
+- Dauerhafter Cover-Suchcache im lokalen Benutzerverzeichnis
+- Suchergebnisse bleiben auch nach einem Programmneustart verfügbar
+- Cache speichert nur URLs, IDs und Bildmetadaten, keine Bilder oder Zugangsdaten
+- Zwischengespeicherte Ergebnisse verfallen standardmäßig nach 30 Tagen
+- Schaltfläche „Online neu suchen“ um den Cache bewusst zu umgehen
+- Erweiterte Qualitätsanzeige für Cover
+- Anzeige von Quelle, Auflösung, Format, Dateigröße, Seitenverhältnis und Bewertung
+- Vorschauauflösung und Vorschaugröße werden nach dem Laden angezeigt
+
+
+
 ## v0.6.1
 
 ### Neu
