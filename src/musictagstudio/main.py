@@ -22,8 +22,9 @@ from PySide6.QtWidgets import (
 )
 
 from .cover import load_cover
-from .editor import load_metadata, save_metadata
+from .editor import save_metadata
 from .scanner import scan_folder
+from .song import Song
 
 
 DEFAULT_MUSIC_FOLDER = (
@@ -44,6 +45,7 @@ class MainWindow(QMainWindow):
         self.folder: str | None = DEFAULT_MUSIC_FOLDER
         self.current_file: str | None = None
         self.current_cover: QPixmap | None = None
+        self.songs: list[Song] = []
 
         self.create_ui()
 
@@ -127,12 +129,7 @@ class MainWindow(QMainWindow):
 
         self.cover_label = QLabel("Kein Cover vorhanden")
         self.cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # Die Coverfläche bleibt immer gleich groß.
-        self.cover_label.setFixedSize(
-            COVER_SIZE,
-            COVER_SIZE,
-        )
+        self.cover_label.setFixedSize(COVER_SIZE, COVER_SIZE)
 
         self.cover_label.setStyleSheet(
             """
@@ -234,7 +231,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            songs = scan_folder(self.folder)
+            self.songs = scan_folder(self.folder)
         except Exception as error:
             QMessageBox.critical(
                 self,
@@ -249,59 +246,56 @@ class MainWindow(QMainWindow):
         self.clear_editor()
 
         self.table.clearContents()
-        self.table.setRowCount(len(songs))
+        self.table.setRowCount(len(self.songs))
 
-        for row, song in enumerate(songs):
+        for row, song in enumerate(self.songs):
             self.table.setItem(
                 row,
                 0,
-                QTableWidgetItem(song["title"]),
+                QTableWidgetItem(song.title),
             )
             self.table.setItem(
                 row,
                 1,
-                QTableWidgetItem(song["artist"]),
+                QTableWidgetItem(song.artist),
             )
             self.table.setItem(
                 row,
                 2,
-                QTableWidgetItem(song["album"]),
+                QTableWidgetItem(song.album),
             )
             self.table.setItem(
                 row,
                 3,
-                QTableWidgetItem(song["year"]),
+                QTableWidgetItem(song.year),
             )
             self.table.setItem(
                 row,
                 4,
-                QTableWidgetItem(song["path"]),
+                QTableWidgetItem(song.path),
             )
 
-    def load_song(self, row, column):
-        path_item = self.table.item(row, 4)
-
-        if path_item is None:
+    def load_song(self, row: int, column: int):
+        if row < 0 or row >= len(self.songs):
             return
 
-        filepath = path_item.text()
-        self.current_file = filepath
+        song = self.songs[row]
+        self.current_file = song.path
+
+        self.title_edit.setText(song.title)
+        self.artist_edit.setText(song.artist)
+        self.album_edit.setText(song.album)
+        self.year_edit.setText(song.year)
 
         try:
-            metadata = load_metadata(filepath)
-            cover_data = load_cover(filepath)
+            cover_data = load_cover(song.path)
         except Exception as error:
             QMessageBox.critical(
                 self,
-                "Datei konnte nicht gelesen werden",
+                "Cover konnte nicht gelesen werden",
                 str(error),
             )
             return
-
-        self.title_edit.setText(metadata["title"])
-        self.artist_edit.setText(metadata["artist"])
-        self.album_edit.setText(metadata["album"])
-        self.year_edit.setText(metadata["year"])
 
         self.show_cover(cover_data)
 
@@ -351,7 +345,13 @@ class MainWindow(QMainWindow):
         self.cover_label.setText("Kein Cover vorhanden")
 
     def save_song(self):
-        if not self.current_file:
+        row = self.table.currentRow()
+
+        if (
+            self.current_file is None
+            or row < 0
+            or row >= len(self.songs)
+        ):
             QMessageBox.warning(
                 self,
                 "Fehler",
@@ -359,13 +359,18 @@ class MainWindow(QMainWindow):
             )
             return
 
+        title = self.title_edit.text()
+        artist = self.artist_edit.text()
+        album = self.album_edit.text()
+        year = self.year_edit.text()
+
         try:
             save_metadata(
                 self.current_file,
-                self.title_edit.text(),
-                self.artist_edit.text(),
-                self.album_edit.text(),
-                self.year_edit.text(),
+                title,
+                artist,
+                album,
+                year,
             )
         except Exception as error:
             QMessageBox.critical(
@@ -378,29 +383,34 @@ class MainWindow(QMainWindow):
             )
             return
 
-        row = self.table.currentRow()
+        # Auch das Song-Objekt im Arbeitsspeicher aktualisieren.
+        song = self.songs[row]
 
-        if row >= 0:
-            self.table.setItem(
-                row,
-                0,
-                QTableWidgetItem(self.title_edit.text()),
-            )
-            self.table.setItem(
-                row,
-                1,
-                QTableWidgetItem(self.artist_edit.text()),
-            )
-            self.table.setItem(
-                row,
-                2,
-                QTableWidgetItem(self.album_edit.text()),
-            )
-            self.table.setItem(
-                row,
-                3,
-                QTableWidgetItem(self.year_edit.text()),
-            )
+        song.title = title
+        song.artist = artist
+        song.album = album
+        song.year = year
+
+        self.table.setItem(
+            row,
+            0,
+            QTableWidgetItem(song.title),
+        )
+        self.table.setItem(
+            row,
+            1,
+            QTableWidgetItem(song.artist),
+        )
+        self.table.setItem(
+            row,
+            2,
+            QTableWidgetItem(song.album),
+        )
+        self.table.setItem(
+            row,
+            3,
+            QTableWidgetItem(song.year),
+        )
 
         QMessageBox.information(
             self,

@@ -1,11 +1,28 @@
 from pathlib import Path
+
 from .metadata import read_metadata
+from .song import Song
 
 
-def scan_folder(folder):
-    files = []
+def scan_folder(folder: str | Path) -> list[Song]:
+    """Durchsucht einen Ordner und alle Unterordner nach FLAC-Dateien."""
+    folder_path = Path(folder)
 
-    for file in Path(folder).rglob("*.flac"):
-        files.append(read_metadata(str(file)))
+    if not folder_path.is_dir():
+        return []
 
-    return files
+    songs: list[Song] = []
+
+    flac_files = sorted(
+        folder_path.rglob("*.flac"),
+        key=lambda path: str(path).lower(),
+    )
+
+    for filepath in flac_files:
+        try:
+            songs.append(read_metadata(filepath))
+        except Exception as error:
+            print(f"Datei übersprungen: {filepath}")
+            print(f"Grund: {error}")
+
+    return songs

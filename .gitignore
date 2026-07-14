@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtuelle Umgebungen
+.venv/
+venv/
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
