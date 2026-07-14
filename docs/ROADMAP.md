@@ -73,3 +73,19 @@ weitere Absicherung des Cover-Workflows.
 v0.6.7 beginnt mit der Bibliotheksprüfung:
 doppelte ISRCs, fehlende Cover, unterschiedliche Albumwerte,
 fehlende ReplayGain-Tags und fehlerhafte Track-/Discnummern.
+
+
+## v0.6.7 ✅
+
+- Bibliotheksprüfung Teil 1
+- Doppelte ISRCs
+- Albumwert-Konsistenz
+- Track- und Discnummern
+- Cover-Konsistenz
+- ReplayGain-Vollständigkeit
+
+## Nächster Schwerpunkt
+
+v0.6.8 erweitert die Bibliotheksprüfung um Dateinamenschema,
+defekte Audiodateien, Ordnercover, Audioformat-Abweichungen und
+weitere technische Konsistenzprüfungen.

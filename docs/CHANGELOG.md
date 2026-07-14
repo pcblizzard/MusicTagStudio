@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.6.7.1
+
+### Korrektur der Tracknummernprüfung
+
+- Tracknummern werden jetzt pro Disc geprüft
+- Gleiche Tracknummern auf unterschiedlichen Discs sind zulässig
+- Doppelte Tracknummern werden einzeln gemeldet
+- Betroffene Dateien erscheinen vollständig in der Detailansicht
+- Lücken in der Nummerierung werden pro Disc ermittelt
+- Track-Gesamtzahlen werden pro Disc verglichen
+
+
+
+## v0.6.7
+
+### Bibliotheksprüfung Teil 1
+
+- Neuer Hauptmenüpunkt „Bibliotheksprüfung“
+- Prüfung markierter oder aller gescannten Titel
+- Erkennung doppelter ISRCs
+- Prüfung einheitlicher Albumwerte
+- Prüfung von Tracknummern, Discnummern und Gesamtzahlen
+- Erkennung fehlender und unterschiedlicher eingebetteter Cover
+- Erkennung fehlender ReplayGain-Tags
+- Filter nach Fehlern, Warnungen und Informationen
+- Detailansicht pro Hinweis
+- Erster bibliotheksweiter Gesundheitswert
+
+
+
 ## v0.6.6
 
 ### Coververwaltung verbessert

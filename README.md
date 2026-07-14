@@ -66,3 +66,27 @@ ReplayGain wird zunächst berechnet und nur nach ausdrücklicher Bestätigung in
 - Mehrere ausgewählte Alben können gemeinsam verarbeitet werden
 - Vorhandene Master-Cover werden ohne erneuten Download wiederverwendet
 - Fehler eines Albums stoppen die Verarbeitung der übrigen Alben nicht
+
+
+### Bibliotheksprüfung in v0.6.7
+
+Der neue Menüpunkt **Bibliotheksprüfung** kontrolliert markierte oder alle
+gescannten Titel auf:
+
+- doppelte ISRCs
+- uneinheitliche Albumkünstler, Alben, Genres, Jahre und Labels
+- fehlende, doppelte oder lückenhafte Tracknummern
+- uneinheitliche Disc- und Track-Gesamtzahlen
+- fehlende oder unterschiedliche eingebettete Cover
+- fehlende ReplayGain-Track- und Albumwerte
+
+Die Ergebnisse können nach Fehlern, Warnungen und Informationen gefiltert werden.
+
+
+### Korrektur in v0.6.7.1
+
+- Tracknummern werden jetzt pro Disc geprüft.
+- Gleiche Tracknummern auf unterschiedlichen Discs gelten nicht als Duplikat.
+- Doppelte Tracknummern werden einzeln und mit den betroffenen Dateien angezeigt.
+- Lücken werden pro Disc berechnet.
+- Die Detailansicht zeigt alle betroffenen Dateipfade.
