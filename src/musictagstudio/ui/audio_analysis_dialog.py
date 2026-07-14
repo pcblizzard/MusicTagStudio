@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import os
 from collections import defaultdict
+from concurrent.futures import (
+    ThreadPoolExecutor,
+    as_completed,
+)
 from pathlib import Path
+from threading import Event
 
 from PySide6.QtCore import (
     QObject,
@@ -19,6 +25,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QMessageBox,
+    QPlainTextEdit,
     QProgressBar,
     QPushButton,
     QTabWidget,
@@ -36,6 +43,9 @@ from ..audio_analysis.analyzer import (
     analyze_album_loudness,
     analyze_file,
 )
+from ..audio_analysis.cache import (
+    AudioAnalysisCache,
+)
 from ..audio_analysis.ffmpeg_tools import (
     find_ffmpeg,
 )
@@ -49,10 +59,25 @@ from ..audio_analysis.replaygain import (
 from ..models.song import Song
 
 
-WARNING_BACKGROUND = QColor(
-    92,
-    66,
+NORMAL_BACKGROUND = QColor(
+    43,
+    78,
+    55,
+)
+ELEVATED_BACKGROUND = QColor(
+    86,
+    78,
     38,
+)
+OVER_ZERO_BACKGROUND = QColor(
+    102,
+    67,
+    32,
+)
+CRITICAL_BACKGROUND = QColor(
+    112,
+    42,
+    42,
 )
 ERROR_BACKGROUND = QColor(
     100,
@@ -73,6 +98,7 @@ class AnalysisWorker(QObject):
         object,
         object,
     )
+    log_message = Signal(str)
     finished = Signal()
     failed = Signal(str)
 
@@ -81,6 +107,8 @@ class AnalysisWorker(QObject):
         songs: list[Song],
         installation: FFmpegInstallation,
         calculate_album_gain: bool,
+        max_workers: int,
+        force_refresh: bool,
     ):
         super().__init__()
         self.songs = songs
@@ -88,35 +116,139 @@ class AnalysisWorker(QObject):
         self.calculate_album_gain = (
             calculate_album_gain
         )
-        self.cancelled = False
+        self.max_workers = max(
+            1,
+            max_workers,
+        )
+        self.force_refresh = force_refresh
+        self.cancel_event = Event()
+        self.cache = AudioAnalysisCache()
 
     @Slot()
     def run(self):
         try:
             total = len(self.songs)
+            completed_count = 0
+            results_by_path: dict[
+                str,
+                AudioAnalysisResult,
+            ] = {}
 
-            for index, song in enumerate(
-                self.songs,
-                start=1,
-            ):
-                if self.cancelled:
+            self.log_message.emit(
+                (
+                    f"Starte Analyse mit "
+                    f"{self.max_workers} parallelen "
+                    "FFmpeg-Prozessen."
+                )
+            )
+
+            uncached_songs: list[Song] = []
+
+            for song in self.songs:
+                if self.cancel_event.is_set():
                     break
 
+                cached = (
+                    None
+                    if self.force_refresh
+                    else self.cache.get(
+                        song.path
+                    )
+                )
+
+                if cached is None:
+                    uncached_songs.append(song)
+                    continue
+
+                results_by_path[
+                    song.path
+                ] = cached
+                completed_count += 1
+                self.result_ready.emit(cached)
                 self.progress.emit(
-                    index - 1,
+                    completed_count,
                     total,
-                    Path(song.path).name,
+                    (
+                        f"Cache: "
+                        f"{Path(song.path).name}"
+                    ),
                 )
-                result = analyze_file(
-                    song.path,
-                    self.installation,
-                )
-                self.result_ready.emit(
-                    result
+                self.log_message.emit(
+                    (
+                        f"[CACHE] "
+                        f"{Path(song.path).name}"
+                    )
                 )
 
             if (
-                not self.cancelled
+                uncached_songs
+                and not self.cancel_event.is_set()
+            ):
+                with ThreadPoolExecutor(
+                    max_workers=self.max_workers
+                ) as executor:
+                    futures = {
+                        executor.submit(
+                            analyze_file,
+                            song.path,
+                            self.installation,
+                        ): song
+                        for song in uncached_songs
+                    }
+
+                    for future in as_completed(
+                        futures
+                    ):
+                        if self.cancel_event.is_set():
+                            for pending in futures:
+                                pending.cancel()
+                            break
+
+                        song = futures[future]
+
+                        try:
+                            result = future.result()
+                        except Exception as error:
+                            result = AudioAnalysisResult(
+                                path=song.path,
+                                error=str(error),
+                            )
+
+                        results_by_path[
+                            song.path
+                        ] = result
+                        completed_count += 1
+
+                        if not result.error:
+                            self.cache.put(result)
+                            status = peak_status_label(
+                                result.peak_status
+                            )
+                            self.log_message.emit(
+                                (
+                                    f"[OK] "
+                                    f"{Path(song.path).name}"
+                                    f" · {status}"
+                                )
+                            )
+                        else:
+                            self.log_message.emit(
+                                (
+                                    f"[FEHLER] "
+                                    f"{Path(song.path).name}"
+                                    f" · {result.error}"
+                                )
+                            )
+
+                        self.result_ready.emit(result)
+                        self.progress.emit(
+                            completed_count,
+                            total,
+                            Path(song.path).name,
+                        )
+
+            if (
+                not self.cancel_event.is_set()
                 and self.calculate_album_gain
             ):
                 grouped: dict[
@@ -132,23 +264,67 @@ class AnalysisWorker(QObject):
                     )
                     grouped[key].append(song)
 
-                for album_index, (
-                    key,
-                    album_songs,
-                ) in enumerate(
-                    grouped.items(),
-                    start=1,
+                for key, album_songs in (
+                    grouped.items()
                 ):
-                    if self.cancelled:
+                    if self.cancel_event.is_set():
                         break
 
+                    cached_album_values = [
+                        results_by_path.get(
+                            song.path
+                        )
+                        for song in album_songs
+                    ]
+                    album_gain_is_cached = (
+                        bool(cached_album_values)
+                        and all(
+                            result is not None
+                            and result.replaygain_album_gain_db
+                            is not None
+                            for result in cached_album_values
+                        )
+                    )
+
+                    if (
+                        album_gain_is_cached
+                        and not self.force_refresh
+                    ):
+                        first_result = (
+                            cached_album_values[0]
+                        )
+                        self.album_result_ready.emit(
+                            key,
+                            (
+                                first_result
+                                .replaygain_album_gain_db
+                            ),
+                            (
+                                first_result
+                                .replaygain_album_peak
+                            ),
+                        )
+                        self.log_message.emit(
+                            (
+                                "[CACHE] Album-ReplayGain: "
+                                f"{key[0]} – {key[1]}"
+                            )
+                        )
+                        continue
+
                     self.progress.emit(
-                        total,
+                        completed_count,
                         total,
                         (
                             "Album-ReplayGain: "
                             f"{key[0]} – {key[1]}"
                         ),
+                    )
+                    self.log_message.emit(
+                        (
+                            "[ALBUM] Berechne ReplayGain: "
+                            f"{key[0]} – {key[1]}"
+                        )
                     )
                     gain, peak = (
                         analyze_album_loudness(
@@ -168,7 +344,11 @@ class AnalysisWorker(QObject):
             self.progress.emit(
                 total,
                 total,
-                "Analyse abgeschlossen",
+                (
+                    "Analyse abgebrochen"
+                    if self.cancel_event.is_set()
+                    else "Analyse abgeschlossen"
+                ),
             )
             self.finished.emit()
         except Exception as error:
@@ -178,7 +358,7 @@ class AnalysisWorker(QObject):
 
     @Slot()
     def cancel(self):
-        self.cancelled = True
+        self.cancel_event.set()
 
 
 class AudioAnalysisDialog(QDialog):
@@ -201,13 +381,21 @@ class AudioAnalysisDialog(QDialog):
         self.worker: AnalysisWorker | None = None
 
         self.installation = find_ffmpeg()
+        self.max_workers = min(
+            4,
+            max(
+                1,
+                os.cpu_count()
+                or 1,
+            ),
+        )
 
         self.setWindowTitle(
             "Audio-Analyse"
         )
         self.resize(
-            1400,
-            760,
+            1500,
+            820,
         )
 
         layout = QVBoxLayout(self)
@@ -216,7 +404,9 @@ class AudioAnalysisDialog(QDialog):
             status_text = (
                 "FFmpeg gefunden: "
                 f"{self.installation.version}\n"
-                f"{self.installation.ffmpeg_path}"
+                f"{self.installation.ffmpeg_path}\n"
+                f"Parallele Analysen: "
+                f"{self.max_workers}"
             )
         else:
             status_text = (
@@ -247,6 +437,20 @@ class AudioAnalysisDialog(QDialog):
         )
         layout.addWidget(
             self.album_gain_checkbox
+        )
+
+        self.force_refresh_checkbox = QCheckBox(
+            "Analyse-Cache ignorieren und neu berechnen"
+        )
+        self.force_refresh_checkbox.setChecked(
+            False
+        )
+        self.force_refresh_checkbox.setToolTip(
+            "Unveränderte Dateien werden normalerweise aus dem "
+            "lokalen Analyse-Cache geladen."
+        )
+        layout.addWidget(
+            self.force_refresh_checkbox
         )
 
         button_widget = QWidget()
@@ -309,8 +513,14 @@ class AudioAnalysisDialog(QDialog):
         )
 
         self.tabs = QTabWidget()
-        self.track_table = self._create_track_table()
-        self.album_table = self._create_album_table()
+        self.track_table = (
+            self._create_track_table()
+        )
+        self.album_table = (
+            self._create_album_table()
+        )
+        self.log_output = QPlainTextEdit()
+        self.log_output.setReadOnly(True)
         self.tabs.addTab(
             self.track_table,
             "Titelanalyse",
@@ -318,6 +528,10 @@ class AudioAnalysisDialog(QDialog):
         self.tabs.addTab(
             self.album_table,
             "Albumvergleich",
+        )
+        self.tabs.addTab(
+            self.log_output,
+            "Verlauf",
         )
         layout.addWidget(
             self.tabs
@@ -366,7 +580,7 @@ class AudioAnalysisDialog(QDialog):
         self,
     ) -> QTableWidget:
         table = QTableWidget()
-        table.setColumnCount(15)
+        table.setColumnCount(16)
         table.setHorizontalHeaderLabels(
             [
                 "Datei",
@@ -379,11 +593,12 @@ class AudioAnalysisDialog(QDialog):
                 "LUFS",
                 "LRA",
                 "True Peak",
-                "Clipping",
+                "Peak-Hinweis",
                 "Track Gain",
                 "Track Peak",
                 "Album Gain",
                 "Album Peak",
+                "Quelle",
             ]
         )
         table.setEditTriggers(
@@ -402,7 +617,7 @@ class AudioAnalysisDialog(QDialog):
             QHeaderView.ResizeMode.Stretch,
         )
 
-        for column in range(1, 15):
+        for column in range(1, 16):
             header.setSectionResizeMode(
                 column,
                 QHeaderView.ResizeMode.ResizeToContents,
@@ -414,15 +629,20 @@ class AudioAnalysisDialog(QDialog):
         self,
     ) -> QTableWidget:
         table = QTableWidget()
-        table.setColumnCount(6)
+        table.setColumnCount(11)
         table.setHorizontalHeaderLabels(
             [
                 "Album",
                 "Titel",
                 "Mehrheit",
+                "Ø Bitrate",
+                "Ø LUFS",
+                "Album Gain",
+                "Album Peak",
                 "Technische Abweichungen",
-                "Clipping-Hinweise",
+                "Peak-Hinweise",
                 "Nicht analysiert",
+                "Gesundheit",
             ]
         )
         table.setEditTriggers(
@@ -438,7 +658,7 @@ class AudioAnalysisDialog(QDialog):
             QHeaderView.ResizeMode.Stretch,
         )
 
-        for column in range(1, 6):
+        for column in range(1, 11):
             header.setSectionResizeMode(
                 column,
                 QHeaderView.ResizeMode.ResizeToContents,
@@ -465,6 +685,7 @@ class AudioAnalysisDialog(QDialog):
         self.results.clear()
         self.track_table.setRowCount(0)
         self.album_table.setRowCount(0)
+        self.log_output.clear()
         self.progress.setMaximum(
             len(songs)
         )
@@ -480,6 +701,8 @@ class AudioAnalysisDialog(QDialog):
             songs,
             self.installation,
             self.album_gain_checkbox.isChecked(),
+            self.max_workers,
+            self.force_refresh_checkbox.isChecked(),
         )
         self.worker.moveToThread(
             self.thread
@@ -496,6 +719,9 @@ class AudioAnalysisDialog(QDialog):
         )
         self.worker.album_result_ready.connect(
             self.receive_album_result
+        )
+        self.worker.log_message.connect(
+            self.append_log
         )
         self.worker.finished.connect(
             self.analysis_finished
@@ -519,7 +745,7 @@ class AudioAnalysisDialog(QDialog):
         if self.worker is not None:
             self.worker.cancel()
             self.status_label.setText(
-                "Analyse wird nach der aktuellen Datei abgebrochen …"
+                "Analyse wird abgebrochen …"
             )
 
     def update_progress(
@@ -533,6 +759,14 @@ class AudioAnalysisDialog(QDialog):
         )
         self.progress.setValue(value)
         self.status_label.setText(
+            text
+        )
+
+    def append_log(
+        self,
+        text: str,
+    ):
+        self.log_output.appendPlainText(
             text
         )
 
@@ -565,6 +799,8 @@ class AudioAnalysisDialog(QDialog):
             )
         ]
 
+        cache = AudioAnalysisCache()
+
         for song in album_songs:
             result = self.results.get(
                 song.path
@@ -573,16 +809,19 @@ class AudioAnalysisDialog(QDialog):
             if result is None:
                 continue
 
-            self.results[
-                song.path
-            ] = (
+            updated = (
                 result.with_album_replaygain(
                     gain,
                     peak,
                 )
             )
+            self.results[
+                song.path
+            ] = updated
+            cache.put(updated)
 
         self._refresh_track_table()
+        self._refresh_album_table()
 
     def analysis_finished(self):
         self.cancel_button.setEnabled(False)
@@ -666,10 +905,8 @@ class AudioAnalysisDialog(QDialog):
                     result.true_peak_db,
                     " dBTP",
                 ),
-                (
-                    "Ja"
-                    if result.clipping_warning
-                    else "Nein"
+                peak_status_label(
+                    result.peak_status
                 ),
                 _format_gain(
                     result.replaygain_track_gain_db
@@ -682,6 +919,11 @@ class AudioAnalysisDialog(QDialog):
                 ),
                 _format_peak(
                     result.replaygain_album_peak
+                ),
+                (
+                    "Cache"
+                    if result.from_cache
+                    else "Neu"
                 ),
             ]
 
@@ -700,10 +942,18 @@ class AudioAnalysisDialog(QDialog):
                     item.setBackground(
                         ERROR_BACKGROUND
                     )
-                elif result.clipping_warning:
-                    item.setBackground(
-                        WARNING_BACKGROUND
+                elif column in {
+                    9,
+                    10,
+                }:
+                    color = peak_status_color(
+                        result.peak_status
                     )
+
+                    if color is not None:
+                        item.setBackground(
+                            color
+                        )
 
                 self.track_table.setItem(
                     row,
@@ -729,21 +979,38 @@ class AudioAnalysisDialog(QDialog):
                 signature_text(
                     summary.dominant_signature
                 ),
+                (
+                    f"{summary.average_bitrate / 1000:.0f} kbit/s"
+                    if summary.average_bitrate
+                    is not None
+                    else ""
+                ),
+                (
+                    f"{summary.average_lufs:.2f} LUFS"
+                    if summary.average_lufs
+                    is not None
+                    else ""
+                ),
+                _format_gain(
+                    summary.album_gain_db
+                ),
+                _format_peak(
+                    summary.album_peak
+                ),
                 str(
                     len(
                         summary.technical_outliers
                     )
                 ),
                 str(
-                    len(
-                        summary.clipping_files
-                    )
+                    summary.peak_warning_count
                 ),
                 str(
                     len(
                         summary.missing_analysis_files
                     )
                 ),
+                f"{summary.health_score} / 100",
             ]
 
             for column, value in enumerate(
@@ -753,9 +1020,22 @@ class AudioAnalysisDialog(QDialog):
                     value
                 )
 
-                if summary.has_warnings:
+                if column == 10:
                     item.setBackground(
-                        WARNING_BACKGROUND
+                        health_score_color(
+                            summary.health_score
+                        )
+                    )
+                elif (
+                    summary.has_warnings
+                    and column in {
+                        7,
+                        8,
+                        9,
+                    }
+                ):
+                    item.setBackground(
+                        ELEVATED_BACKGROUND
                     )
 
                 tooltip_lines: list[str] = []
@@ -768,11 +1048,27 @@ class AudioAnalysisDialog(QDialog):
                         )
                     )
 
-                if summary.clipping_files:
+                if summary.elevated_peak_files:
                     tooltip_lines.append(
-                        "Clipping-Hinweise:\n"
+                        "True Peak zwischen -1 und 0 dBTP:\n"
                         + "\n".join(
-                            summary.clipping_files
+                            summary.elevated_peak_files
+                        )
+                    )
+
+                if summary.over_zero_peak_files:
+                    tooltip_lines.append(
+                        "True Peak über 0 dBTP:\n"
+                        + "\n".join(
+                            summary.over_zero_peak_files
+                        )
+                    )
+
+                if summary.critical_peak_files:
+                    tooltip_lines.append(
+                        "True Peak über 2 dBTP:\n"
+                        + "\n".join(
+                            summary.critical_peak_files
                         )
                     )
 
@@ -896,6 +1192,47 @@ class AudioAnalysisDialog(QDialog):
             self.thread.wait(3000)
 
         event.accept()
+
+
+def peak_status_label(
+    status: str,
+) -> str:
+    return {
+        "normal": "Unauffällig",
+        "elevated": "Erhöht",
+        "over_zero": "Über 0 dBTP",
+        "critical": "Kritisch",
+        "unknown": "Unbekannt",
+    }.get(
+        status,
+        "Unbekannt",
+    )
+
+
+def peak_status_color(
+    status: str,
+) -> QColor | None:
+    return {
+        "normal": NORMAL_BACKGROUND,
+        "elevated": ELEVATED_BACKGROUND,
+        "over_zero": OVER_ZERO_BACKGROUND,
+        "critical": CRITICAL_BACKGROUND,
+    }.get(status)
+
+
+def health_score_color(
+    score: int,
+) -> QColor:
+    if score >= 90:
+        return NORMAL_BACKGROUND
+
+    if score >= 70:
+        return ELEVATED_BACKGROUND
+
+    if score >= 50:
+        return OVER_ZERO_BACKGROUND
+
+    return CRITICAL_BACKGROUND
 
 
 def _format_number(

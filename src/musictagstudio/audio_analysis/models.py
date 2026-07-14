@@ -41,7 +41,8 @@ class AudioAnalysisResult:
     replaygain_album_gain_db: float | None = None
     replaygain_album_peak: float | None = None
 
-    clipping_warning: bool = False
+    peak_status: str = "unknown"
+    from_cache: bool = False
     error: str = ""
 
     @property
@@ -98,6 +99,14 @@ class AudioAnalysisResult:
             self.channels,
         )
 
+    @property
+    def has_peak_warning(self) -> bool:
+        return self.peak_status in {
+            "elevated",
+            "over_zero",
+            "critical",
+        }
+
     def with_album_replaygain(
         self,
         gain_db: float | None,
@@ -109,6 +118,14 @@ class AudioAnalysisResult:
             replaygain_album_peak=peak,
         )
 
+    def as_cached(
+        self,
+    ) -> "AudioAnalysisResult":
+        return replace(
+            self,
+            from_cache=True,
+        )
+
 
 @dataclass(frozen=True)
 class AlbumAnalysisSummary:
@@ -116,14 +133,31 @@ class AlbumAnalysisSummary:
     display_name: str
     track_count: int
     dominant_signature: tuple[object, ...] | None
+    average_bitrate: float | None
+    average_lufs: float | None
+    album_gain_db: float | None
+    album_peak: float | None
     technical_outliers: tuple[str, ...]
-    clipping_files: tuple[str, ...]
+    elevated_peak_files: tuple[str, ...]
+    over_zero_peak_files: tuple[str, ...]
+    critical_peak_files: tuple[str, ...]
     missing_analysis_files: tuple[str, ...]
+    health_score: int
 
     @property
     def has_warnings(self) -> bool:
         return bool(
             self.technical_outliers
-            or self.clipping_files
+            or self.elevated_peak_files
+            or self.over_zero_peak_files
+            or self.critical_peak_files
             or self.missing_analysis_files
+        )
+
+    @property
+    def peak_warning_count(self) -> int:
+        return (
+            len(self.elevated_peak_files)
+            + len(self.over_zero_peak_files)
+            + len(self.critical_peak_files)
         )

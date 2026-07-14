@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.6.4
+
+### Neu und verbessert
+
+- Bis zu vier parallele FFmpeg-Analysen
+- Dauerhafter Analyse-Cache unter dem lokalen Benutzerprofil
+- Unveränderte Dateien werden bei späteren Durchläufen aus dem Cache geladen
+- Cache kann über „Analyse-Cache ignorieren“ bewusst umgangen werden
+- True-Peak-Einordnung: unauffällig, erhöht, über 0 dBTP und kritisch
+- Nur die True-Peak- und Hinweiszellen werden farblich markiert
+- Albumvergleich zeigt durchschnittliche Bitrate und durchschnittliche LUFS
+- Album Gain und Album Peak werden angezeigt
+- Erster Album-Gesundheitswert von 0 bis 100
+- Analyseverlauf mit Angaben zu Cache-Treffern, neuen Analysen und Fehlern
+- Album-ReplayGain wird ebenfalls im Analyse-Cache gespeichert
+
+
+
 ## v0.6.3
 
 ### Neu

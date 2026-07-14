@@ -34,3 +34,14 @@ Die Analyse umfasst derzeit:
 - technischer Albumvergleich mit Abweichungsanzeige
 
 ReplayGain wird zunächst berechnet und nur nach ausdrücklicher Bestätigung in die Dateien geschrieben.
+
+
+### Verbesserungen in v0.6.4
+
+- Vier parallele FFmpeg-Analysen auf geeigneten Systemen
+- Dauerhafter Analyse-Cache für unveränderte Dateien
+- Differenzierte True-Peak-Hinweise statt vollflächiger Warnzeilen
+- Durchschnittliche Album-Bitrate und durchschnittliche Album-Lautheit
+- Album-ReplayGain und Album-Peak in der Vergleichsansicht
+- Erster Album-Gesundheitswert
+- Analyseverlauf mit Cache-, Erfolgs- und Fehlermeldungen

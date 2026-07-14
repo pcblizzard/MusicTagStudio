@@ -25,3 +25,20 @@ Ohne feste Termine.
 - Stille am Anfang und Ende
 - Dauerhafter Analyse-Cache
 - Erweiterter Album-Gesundheitscheck
+
+
+## v0.6.4 ✅
+
+- Parallele Audioanalyse
+- Dauerhafter Analyse-Cache
+- Differenzierte True-Peak-Hinweise
+- Erweiterter Albumvergleich
+- Erster Album-Gesundheitswert
+- Analyseverlauf
+
+## Weitere 0.6.x-Schritte
+
+- Spektrale Analyse mit vorsichtiger Bewertung
+- Stille am Anfang und Ende
+- Gesundheitscheck um Metadaten und Cover erweitern
+- Einstellung für die Anzahl paralleler Analysen

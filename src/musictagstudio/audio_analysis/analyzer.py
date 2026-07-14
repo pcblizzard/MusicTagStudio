@@ -85,9 +85,8 @@ def analyze_file(
             "threshold_lufs": threshold,
             "replaygain_track_gain_db": track_gain,
             "replaygain_track_peak": track_peak,
-            "clipping_warning": (
-                true_peak_db is not None
-                and true_peak_db >= -0.01
+            "peak_status": classify_true_peak(
+                true_peak_db
             ),
         }
     )
@@ -331,6 +330,31 @@ def parse_loudnorm_output(
 
     return result
 
+
+
+def classify_true_peak(
+    true_peak_db: float | None,
+) -> str:
+    """
+    Vorsichtige Einordnung des gemessenen True Peak.
+
+    Ein positiver dBTP-Wert wird nicht als sicherer Beweis für bereits
+    hörbares Clipping bezeichnet. Er zeigt jedoch ein erhöhtes Risiko bei
+    Wandlung, Lautstärkeanpassung oder verlustbehafteter Kodierung.
+    """
+    if true_peak_db is None:
+        return "unknown"
+
+    if true_peak_db > 2.0:
+        return "critical"
+
+    if true_peak_db > 0.0:
+        return "over_zero"
+
+    if true_peak_db > -1.0:
+        return "elevated"
+
+    return "normal"
 
 def calculate_replaygain(
     integrated_lufs: float | None,
