@@ -27,18 +27,25 @@ from PySide6.QtWidgets import (
 
 from ..core.merger import apply_merged_metadata, song_values
 from ..models.song import Song
-from ..services.cover import load_cover
+from ..services.cover import (
+    covers_are_identical,
+    load_cover,
+    load_cover_info,
+)
 from ..services.metadata_io import save_song_metadata
 from ..services.proposal import build_proposal
 from ..services.scanner import scan_folder
+from ..settings import load_settings, save_settings
 from ..theme import (
     BUTTON_CHANGED,
     BUTTON_NORMAL,
     INPUT_CHANGED,
     INPUT_NORMAL,
+    apply_theme,
 )
 from .batch_dialog import BatchComparisonDialog
 from .comparison_dialog import ComparisonDialog
+from .settings_dialog import SettingsDialog
 
 
 DEFAULT_MUSIC_FOLDER = (
@@ -79,6 +86,7 @@ class MainWindow(QMainWindow):
         self.has_unsaved_changes = False
 
         self.create_ui()
+        self.create_menu()
 
     def create_ui(self):
         container = QWidget()
@@ -312,6 +320,39 @@ class MainWindow(QMainWindow):
 
         self.update_optional_columns()
 
+    def create_menu(self):
+        settings_menu = self.menuBar().addMenu(
+            "Einstellungen"
+        )
+
+        settings_action = settings_menu.addAction(
+            "Optionen …"
+        )
+        settings_action.triggered.connect(
+            self.open_settings
+        )
+
+    def open_settings(self):
+        current_settings = load_settings()
+        dialog = SettingsDialog(
+            current_settings,
+            self,
+        )
+
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+
+        new_settings = dialog.selected_settings()
+        save_settings(new_settings)
+
+        app = QApplication.instance()
+
+        if isinstance(app, QApplication):
+            apply_theme(
+                app,
+                new_settings.theme,
+            )
+
     def select_folder(self):
         if not self.confirm_pending_changes():
             return
@@ -473,13 +514,46 @@ class MainWindow(QMainWindow):
         self.selection_label.setText(
             f"{len(rows)} Titel ausgewählt"
         )
-        self.cover_label.clear()
-        self.cover_label.setText(
-            f"{len(rows)} Titel ausgewählt"
-        )
+        self.show_multiple_selection_cover(rows)
 
         self.proposal_button.setEnabled(False)
         self.update_save_button()
+
+    def show_multiple_selection_cover(
+        self,
+        rows: list[int],
+    ):
+        """
+        Zeigt bei einer Mehrfachauswahl das gemeinsame Cover.
+
+        Nur wenn sich Bilddaten oder technische Eigenschaften unterscheiden,
+        wird „Unterschiedliche Cover“ angezeigt. Eine Mischung aus Dateien
+        mit und ohne Cover gilt ebenfalls als Unterschied.
+        """
+        cover_infos = [
+            load_cover_info(self.songs[row].path)
+            for row in rows
+        ]
+
+        if not covers_are_identical(cover_infos):
+            self.current_cover = None
+            self.cover_label.clear()
+            self.cover_label.setText(
+                "Unterschiedliche Cover"
+            )
+            return
+
+        common_cover = cover_infos[0] if cover_infos else None
+
+        if common_cover is None:
+            self.current_cover = None
+            self.cover_label.clear()
+            self.cover_label.setText(
+                "Kein Cover vorhanden"
+            )
+            return
+
+        self.show_cover(common_cover.data)
 
     def mark_field_edited(self, field_name: str):
         if self.loading_editor:
@@ -507,11 +581,15 @@ class MainWindow(QMainWindow):
         finally:
             QApplication.restoreOverrideCursor()
 
+        settings = load_settings()
+
         dialog = ComparisonDialog(
             self.songs[row],
-            result.merged,
-            result.warnings,
-            self,
+            result.candidates,
+            primary_source=settings.selected_provider,
+            feature_handling=settings.feature_handling,
+            warnings=result.warnings,
+            parent=self,
         )
 
         if (
@@ -521,18 +599,13 @@ class MainWindow(QMainWindow):
         ):
             return
 
-        proposed = apply_merged_metadata(
-            self.songs[row],
-            result.merged,
-            dialog.selected_fields,
-        )
-
         self.loading_editor = True
-        values = song_values(proposed)
 
-        for name in dialog.selected_fields:
+        for name, value in (
+            dialog.selected_values.items()
+        ):
             self.editor_fields[name].setText(
-                values[name]
+                value
             )
 
         self.loading_editor = False

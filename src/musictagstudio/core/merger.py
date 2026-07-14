@@ -36,6 +36,7 @@ def merge_metadata(
     local_song: Song,
     candidates: list[MetadataCandidate],
     feature_handling: str = "artist_only",
+    primary_source: str = "apple_music",
 ) -> MergedMetadata:
     normalized = [
         normalize_candidate(candidate, feature_handling)
@@ -46,7 +47,11 @@ def merge_metadata(
     confidence = {name: 100 for name in EDITABLE_FIELDS}
 
     for field_name in EDITABLE_FIELDS:
-        chosen = _choose_candidate(field_name, normalized)
+        chosen = _choose_candidate(
+            field_name,
+            normalized,
+            primary_source,
+        )
         if chosen is None:
             continue
         candidate, value = chosen
@@ -73,24 +78,48 @@ def apply_merged_metadata(
 def _choose_candidate(
     field_name: str,
     candidates: list[MetadataCandidate],
+    primary_source: str,
 ) -> tuple[MetadataCandidate, str] | None:
     eligible = [
         candidate
         for candidate in candidates
         if candidate.confidence >= MIN_CONFIDENCE
-        and str(getattr(candidate, field_name, "") or "").strip()
+        and str(
+            getattr(
+                candidate,
+                field_name,
+                "",
+            )
+            or ""
+        ).strip()
     ]
+
     if not eligible:
         return None
 
-    def priority(candidate: MetadataCandidate) -> tuple[int, int]:
-        if field_name in APPLE_MASTER_FIELDS:
-            source_priority = 3 if candidate.source == "apple_music" else 2
-        elif field_name in MUSICBRAINZ_MASTER_FIELDS:
-            source_priority = 3 if candidate.source == "musicbrainz" else 2
-        else:
-            source_priority = 1
-        return source_priority, candidate.confidence
+    primary_candidates = [
+        candidate
+        for candidate in eligible
+        if candidate.source == primary_source
+    ]
 
-    chosen = max(eligible, key=priority)
-    return chosen, str(getattr(chosen, field_name)).strip()
+    candidate_pool = (
+        primary_candidates
+        if primary_candidates
+        else eligible
+    )
+
+    chosen = max(
+        candidate_pool,
+        key=lambda candidate: candidate.confidence,
+    )
+
+    return (
+        chosen,
+        str(
+            getattr(
+                chosen,
+                field_name,
+            )
+        ).strip(),
+    )

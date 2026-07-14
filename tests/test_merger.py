@@ -3,7 +3,7 @@ from musictagstudio.models.metadata import MetadataCandidate
 from musictagstudio.models.song import Song
 
 
-def test_apple_is_master_and_musicbrainz_supplements():
+def test_selected_provider_is_master_and_fallback_supplements():
     local = Song(title="Alt", artist="Main", album="Album", path="x.flac")
     apple = MetadataCandidate(
         source="apple_music",
@@ -27,11 +27,13 @@ def test_apple_is_master_and_musicbrainz_supplements():
     assert merged.values["title"] == "Neu"
     assert merged.values["artist"] == "Main, Guest"
     assert merged.sources["title"] == "apple_music"
-    assert merged.values["isrc"] == "DEABC1234567"
-    assert merged.sources["isrc"] == "musicbrainz"
+    assert merged.values["isrc"] == "APPLE"
+    assert merged.sources["isrc"] == "apple_music"
+    assert merged.values["label"] == "Label X"
+    assert merged.sources["label"] == "musicbrainz"
 
     updated = apply_merged_metadata(local, merged, {"title", "artist", "isrc"})
     assert updated.title == "Neu"
     assert updated.artist == "Main, Guest"
-    assert updated.isrc == "DEABC1234567"
+    assert updated.isrc == "APPLE"
     assert song_values(local)["title"] == "Alt"
