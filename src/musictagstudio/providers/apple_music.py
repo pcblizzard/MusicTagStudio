@@ -3,13 +3,12 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
-from dataclasses import dataclass
 from datetime import datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from ..normalizers import move_feature_artists
+from ..models.metadata import MetadataCandidate
 
 
 SEARCH_ENDPOINT = "https://itunes.apple.com/search"
@@ -18,41 +17,8 @@ DEFAULT_LIMIT = 50
 REQUEST_TIMEOUT_SECONDS = 15
 
 
-@dataclass(frozen=True)
-class AppleMusicResult:
-    title: str = ""
-    artist: str = ""
-    album_artist: str = ""
-    album: str = ""
-    genre: str = ""
-    release_date: str = ""
-    year: str = ""
-
-    track: str = ""
-    total_tracks: str = ""
-    disc: str = ""
-    total_discs: str = ""
-
-    duration_ms: int | None = None
-    track_id: int | None = None
-    collection_id: int | None = None
-    track_url: str = ""
-    artwork_url: str = ""
-
-    score: int = 0
-
-    @property
-    def duration_text(self) -> str:
-        if self.duration_ms is None:
-            return ""
-
-        seconds = max(0, self.duration_ms // 1000)
-        minutes, seconds = divmod(seconds, 60)
-        return f"{minutes}:{seconds:02d}"
-
-
 class AppleMusicProviderError(RuntimeError):
-    """Fehler beim Abrufen oder Verarbeiten von Apple-Music-Daten."""
+    pass
 
 
 def search_song(
@@ -62,25 +28,13 @@ def search_song(
     *,
     country: str = DEFAULT_COUNTRY,
     limit: int = DEFAULT_LIMIT,
-) -> list[AppleMusicResult]:
-    """
-    Sucht kostenfrei über die öffentliche iTunes Search API.
-
-    Die Ergebnisse werden lokal nach Titel, Künstler und Album bewertet.
-    Feature-Nennungen im Titel werden nach den MusicTagStudio-Regeln
-    in das Künstlerfeld verschoben. Es werden keine Tags geschrieben.
-    """
-    search_parts = [
-        part.strip()
-        for part in (artist, album, title)
-        if part.strip()
-    ]
-
-    if not search_parts:
+) -> list[MetadataCandidate]:
+    terms = [part.strip() for part in (artist, album, title) if part.strip()]
+    if not terms:
         return []
 
-    parameters = {
-        "term": " ".join(search_parts),
+    params = {
+        "term": " ".join(terms),
         "country": country.upper(),
         "media": "music",
         "entity": "song",
@@ -88,197 +42,87 @@ def search_song(
         "lang": "de_de",
         "version": 2,
     }
-
-    request_url = f"{SEARCH_ENDPOINT}?{urlencode(parameters)}"
     request = Request(
-        request_url,
-        headers={
-            "User-Agent": "MusicTagStudio/0.1",
-            "Accept": "application/json",
-        },
+        f"{SEARCH_ENDPOINT}?{urlencode(params)}",
+        headers={"User-Agent": "MusicTagStudio/0.3.0", "Accept": "application/json"},
     )
-
     try:
-        with urlopen(
-            request,
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        ) as response:
+        with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
             payload = json.load(response)
     except HTTPError as error:
-        raise AppleMusicProviderError(
-            f"Apple antwortete mit HTTP-Fehler {error.code}."
-        ) from error
+        raise AppleMusicProviderError(f"Apple antwortete mit HTTP-Fehler {error.code}.") from error
     except URLError as error:
-        raise AppleMusicProviderError(
-            f"Keine Verbindung zur Apple-Suche: {error.reason}"
-        ) from error
+        raise AppleMusicProviderError(f"Keine Verbindung zur Apple-Suche: {error.reason}") from error
     except (TimeoutError, json.JSONDecodeError) as error:
-        raise AppleMusicProviderError(
-            "Die Antwort der Apple-Suche konnte nicht verarbeitet werden."
-        ) from error
+        raise AppleMusicProviderError("Die Apple-Antwort konnte nicht verarbeitet werden.") from error
 
-    raw_results = payload.get("results", [])
-
-    results = [
-        _result_from_payload(
-            item,
-            wanted_title=title,
-            wanted_artist=artist,
-            wanted_album=album,
-        )
-        for item in raw_results
-        if item.get("wrapperType") == "track"
-        and item.get("kind") == "song"
-    ]
-
-    return sorted(
-        results,
-        key=lambda result: (
-            -result.score,
-            _number_or_large(result.disc),
-            _number_or_large(result.track),
-            result.title.casefold(),
-        ),
-    )
+    results: list[MetadataCandidate] = []
+    for item in payload.get("results", []):
+        if item.get("wrapperType") != "track" or item.get("kind") != "song":
+            continue
+        candidate = _candidate_from_item(item, title, artist, album)
+        results.append(candidate)
+    return sorted(results, key=lambda item: (-item.confidence, item.disc, item.track))
 
 
-def _result_from_payload(
+def _candidate_from_item(
     item: dict,
-    *,
     wanted_title: str,
     wanted_artist: str,
     wanted_album: str,
-) -> AppleMusicResult:
-    release_date = str(item.get("releaseDate", ""))
-    year = _extract_year(release_date)
-
-    raw_title = str(item.get("trackName", ""))
-    raw_artist = str(item.get("artistName", ""))
-
-    title, artist = move_feature_artists(
-        raw_title,
-        raw_artist,
-    )
-
+) -> MetadataCandidate:
+    title = str(item.get("trackName", ""))
+    artist = str(item.get("artistName", ""))
     album = str(item.get("collectionName", ""))
-    album_artist = str(
-        item.get("collectionArtistName")
-        or item.get("artistName")
-        or ""
-    )
-
-    score = _match_score(
-        wanted_title=wanted_title,
-        wanted_artist=wanted_artist,
-        wanted_album=wanted_album,
+    release_date = str(item.get("releaseDate", ""))
+    score = _match_score(wanted_title, wanted_artist, wanted_album, title, artist, album)
+    return MetadataCandidate(
+        source="apple_music",
+        confidence=score,
         title=title,
         artist=artist,
-        album=album,
-    )
-
-    duration_value = item.get("trackTimeMillis")
-    duration_ms = (
-        int(duration_value)
-        if isinstance(duration_value, (int, float))
-        else None
-    )
-
-    return AppleMusicResult(
-        title=title,
-        artist=artist,
-        album_artist=album_artist,
+        album_artist=str(item.get("collectionArtistName") or artist),
         album=album,
         genre=str(item.get("primaryGenreName", "")),
-        release_date=release_date,
-        year=year,
+        year=_extract_year(release_date),
         track=_string_number(item.get("trackNumber")),
         total_tracks=_string_number(item.get("trackCount")),
         disc=_string_number(item.get("discNumber")),
         total_discs=_string_number(item.get("discCount")),
-        duration_ms=duration_ms,
-        track_id=_optional_int(item.get("trackId")),
-        collection_id=_optional_int(item.get("collectionId")),
-        track_url=str(item.get("trackViewUrl", "")),
-        artwork_url=str(item.get("artworkUrl100", "")),
-        score=score,
+        duration_ms=_optional_int(item.get("trackTimeMillis")),
+        external_id=str(item.get("trackId", "")),
+        release_id=str(item.get("collectionId", "")),
     )
 
 
-def _match_score(
-    *,
-    wanted_title: str,
-    wanted_artist: str,
-    wanted_album: str,
-    title: str,
-    artist: str,
-    album: str,
-) -> int:
-    score = 0
-    score += _field_score(
-        wanted_title,
-        title,
-        exact=55,
-        contains=30,
+def _match_score(wt: str, wa: str, wal: str, title: str, artist: str, album: str) -> int:
+    return min(
+        100,
+        _field_score(wt, title, 55, 30)
+        + _field_score(wa, artist, 25, 14)
+        + _field_score(wal, album, 20, 12),
     )
-    score += _field_score(
-        wanted_artist,
-        artist,
-        exact=25,
-        contains=14,
-    )
-    score += _field_score(
-        wanted_album,
-        album,
-        exact=20,
-        contains=12,
-    )
-    return score
 
 
-def _field_score(
-    wanted: str,
-    actual: str,
-    *,
-    exact: int,
-    contains: int,
-) -> int:
-    wanted_normalized = _normalize(wanted)
-    actual_normalized = _normalize(actual)
-
-    if not wanted_normalized:
+def _field_score(wanted: str, actual: str, exact: int, contains: int) -> int:
+    wanted_n = _normalize(wanted)
+    actual_n = _normalize(actual)
+    if not wanted_n:
         return 0
-
-    if wanted_normalized == actual_normalized:
+    if wanted_n == actual_n:
         return exact
-
-    if (
-        wanted_normalized in actual_normalized
-        or actual_normalized in wanted_normalized
-    ):
+    if wanted_n in actual_n or actual_n in wanted_n:
         return contains
-
-    wanted_words = set(wanted_normalized.split())
-    actual_words = set(actual_normalized.split())
-
+    wanted_words = set(wanted_n.split())
+    actual_words = set(actual_n.split())
     if not wanted_words or not actual_words:
         return 0
-
-    overlap = len(wanted_words & actual_words)
-
-    return round(
-        contains
-        * overlap
-        / max(len(wanted_words), len(actual_words))
-    )
+    return round(contains * len(wanted_words & actual_words) / max(len(wanted_words), len(actual_words)))
 
 
 def _normalize(value: str) -> str:
     value = unicodedata.normalize("NFKD", value.casefold())
-    value = "".join(
-        character
-        for character in value
-        if not unicodedata.combining(character)
-    )
+    value = "".join(ch for ch in value if not unicodedata.combining(ch))
     value = re.sub(r"[^a-z0-9]+", " ", value)
     return " ".join(value.split())
 
@@ -286,10 +130,8 @@ def _normalize(value: str) -> str:
 def _extract_year(value: str) -> str:
     if not value:
         return ""
-
     try:
-        normalized_value = value.replace("Z", "+00:00")
-        return str(datetime.fromisoformat(normalized_value).year)
+        return str(datetime.fromisoformat(value.replace("Z", "+00:00")).year)
     except ValueError:
         match = re.match(r"^(\d{4})", value)
         return match.group(1) if match else ""
@@ -298,7 +140,6 @@ def _extract_year(value: str) -> str:
 def _string_number(value: object) -> str:
     if value in (None, ""):
         return ""
-
     try:
         return str(int(value))
     except (TypeError, ValueError):
@@ -310,10 +151,3 @@ def _optional_int(value: object) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-def _number_or_large(value: str) -> int:
-    try:
-        return int(value)
-    except ValueError:
-        return 999_999

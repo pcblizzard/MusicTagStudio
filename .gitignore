@@ -1,12 +1,8 @@
-# Python
 __pycache__/
 *.py[cod]
-*.pyo
-
-# Virtuelle Umgebungen
+*.egg-info/
+.pytest_cache/
 .venv/
 venv/
-
-# Betriebssystem
 .DS_Store
 Thumbs.db

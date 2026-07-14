@@ -1,0 +1,14 @@
+[appearance]
+theme = "automatic" # automatic, light, dark
+
+[providers]
+apple_music_enabled = true
+musicbrainz_enabled = true
+apple_country = "DE"
+
+[behavior]
+preview_before_writing = true
+
+[normalization]
+feature_handling = "artist_only" # artist_only, title_and_artist, source
+

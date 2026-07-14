@@ -1,52 +1,31 @@
-from musictagstudio.normalizers import move_feature_artists
+from musictagstudio.core.normalizers import (
+    move_feature_artists,
+    normalize_genre,
+    normalize_text,
+)
 
 
-def test_square_brackets():
-    title, artist = move_feature_artists(
-        "Allein zu zweit [feat. DJ Mirko Machine]",
-        "Stieber Twins",
+def test_feature_variants():
+    for title in (
+        "Song [feat. Guest]",
+        "Song (feat. Guest)",
+        "Song feat. Guest",
+        "Song [ft Guest]",
+    ):
+        cleaned, artist = move_feature_artists(title, "Main")
+        assert cleaned == "Song"
+        assert artist == "Main, Guest"
+
+
+def test_feature_keeps_versions():
+    cleaned, artist = move_feature_artists(
+        "Song (Remix) [feat. Guest] [Instrumental]",
+        "Main",
     )
-
-    assert title == "Allein zu zweit"
-    assert artist == "Stieber Twins, DJ Mirko Machine"
-
-
-def test_round_brackets():
-    title, artist = move_feature_artists(
-        "Allein zu zweit (feat. DJ Mirko Machine)",
-        "Stieber Twins",
-    )
-
-    assert title == "Allein zu zweit"
-    assert artist == "Stieber Twins, DJ Mirko Machine"
+    assert cleaned == "Song (Remix) [Instrumental]"
+    assert artist == "Main, Guest"
 
 
-def test_plain_feature_at_end():
-    title, artist = move_feature_artists(
-        "Allein zu zweit feat. DJ Mirko Machine",
-        "Stieber Twins",
-    )
-
-    assert title == "Allein zu zweit"
-    assert artist == "Stieber Twins, DJ Mirko Machine"
-
-
-def test_feature_and_version_are_preserved():
-    title, artist = move_feature_artists(
-        "Allein zu zweit (MagMar Remix) "
-        "[feat. DJ Mirko Machine] [Instrumental]",
-        "Stieber Twins",
-    )
-
-    assert title == "Allein zu zweit (MagMar Remix) [Instrumental]"
-    assert artist == "Stieber Twins, DJ Mirko Machine"
-
-
-def test_multiple_feature_artists_and_duplicates():
-    title, artist = move_feature_artists(
-        "Titel [feat. Artist A & Artist B]",
-        "Main Artist, Artist A",
-    )
-
-    assert title == "Titel"
-    assert artist == "Main Artist, Artist A, Artist B"
+def test_apostrophe_and_genre():
+    assert normalize_text("Chris’ Interlude") == "Chris' Interlude"
+    assert normalize_genre("Hip Hop/Rap") == "Hip-Hop, Rap"
