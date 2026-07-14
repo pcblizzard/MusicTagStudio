@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from ..cover_management.manager import CoverManager
 from ..cover_management.models import CoverCandidate
+from ..cover_management.comparison import compare_cover_candidates
 from ..direct_references import (
     DirectAlbumReferenceError,
     parse_album_reference,
@@ -173,6 +174,14 @@ class CoverSelectionDialog(QDialog):
         right_side.addWidget(
             self.quality_label
         )
+
+        self.comparison_label = QLabel(
+            "Für den Bildvergleich bitte ein Cover auswählen."
+        )
+        self.comparison_label.setWordWrap(True)
+        right_side.addWidget(
+            self.comparison_label
+        )
         body.addLayout(
             right_side,
             1,
@@ -293,11 +302,19 @@ class CoverSelectionDialog(QDialog):
                 QListWidgetItem(details)
             )
 
+        best = max(
+            self.candidates,
+            key=lambda candidate:
+            candidate.score,
+        )
         self.status_label.setText(
             f"{len(self.candidates)} Cover gefunden. "
-            "Vorschaubilder werden nur bei Auswahl geladen."
+            f"Empfehlung: {best.source_label} "
+            f"({best.score} Punkte)."
         )
-        self.list.setCurrentRow(0)
+        self.list.setCurrentRow(
+            self.candidates.index(best)
+        )
         self.ok_button.setEnabled(True)
 
     def _search_failed(
@@ -440,7 +457,12 @@ class CoverSelectionDialog(QDialog):
             f"Originalformat: {original_format}",
             f"Originalgröße: {original_size}",
             f"Seitenverhältnis: {shape}",
-            f"Bewertung: {candidate.score}",
+            f"Bewertung: {candidate.score} / 100",
+            (
+                f"MD5: {candidate.short_hash}"
+                if candidate.short_hash
+                else "MD5: wird beim Originaldownload berechnet"
+            ),
         ]
 
         if (
@@ -465,6 +487,33 @@ class CoverSelectionDialog(QDialog):
         self.quality_label.setText(
             "\n".join(lines)
         )
+
+        local_candidates = [
+            item
+            for item in self.candidates
+            if item.is_local
+        ]
+
+        if (
+            local_candidates
+            and candidate is not local_candidates[0]
+        ):
+            comparison = compare_cover_candidates(
+                local_candidates[0],
+                candidate,
+            )
+            self.comparison_label.setText(
+                "Vergleich mit vorhandenem Master-Cover:\n"
+                + comparison.description
+            )
+        elif candidate.is_local:
+            self.comparison_label.setText(
+                "Vorhandenes Master-Cover."
+            )
+        else:
+            self.comparison_label.setText(
+                "Kein vorhandenes Master-Cover zum Vergleichen."
+            )
 
     def _accept(self):
         row = self.list.currentRow()

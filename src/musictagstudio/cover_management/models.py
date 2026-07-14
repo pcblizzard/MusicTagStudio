@@ -19,6 +19,7 @@ class CoverCandidate:
     artist: str = ""
     is_local: bool = False
     file_size: int = 0
+    md5: str = ""
 
     @property
     def dimensions(self) -> str:
@@ -47,16 +48,30 @@ class CoverCandidate:
         return f"{size:.1f} {unit}"
 
     @property
+    def aspect_ratio_text(self) -> str:
+        if not self.width or not self.height:
+            return "unbekannt"
+
+        if self.width == self.height:
+            return "quadratisch"
+
+        return f"{self.width / self.height:.3f}:1"
+
+    @property
+    def short_hash(self) -> str:
+        if not self.md5:
+            return ""
+
+        return self.md5[:12]
+
+    @property
     def quality_summary(self) -> str:
-        shape = (
-            "quadratisch"
-            if self.width and self.width == self.height
-            else "nicht quadratisch"
-        )
         mime = self.mime or "Format unbekannt"
+
         return (
             f"{self.dimensions} · {mime} · "
-            f"{self.file_size_text} · {shape}"
+            f"{self.file_size_text} · "
+            f"{self.aspect_ratio_text}"
         )
 
     def with_data(
@@ -67,6 +82,7 @@ class CoverCandidate:
         height: int,
         mime: str,
         score: int | None = None,
+        md5: str = "",
     ) -> "CoverCandidate":
         return replace(
             self,
@@ -76,4 +92,5 @@ class CoverCandidate:
             mime=mime,
             score=self.score if score is None else score,
             file_size=len(data),
+            md5=md5,
         )

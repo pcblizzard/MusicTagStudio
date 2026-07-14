@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.6.6
+
+### Coververwaltung verbessert
+
+- Einheitliche Qualitätsbewertung für Cover
+- MD5-Hash wird für vollständig geladene Cover berechnet
+- Vergleich mit vorhandenem Master-Cover
+- Unterscheidung zwischen identischem Inhalt, gleicher Auflösung und abweichendem Bild
+- Beste Coverquelle wird automatisch empfohlen
+- Mehralbum-Batchverarbeitung
+- Vorhandene Master-Cover werden wiederverwendet
+- Fehlende Master-Cover werden automatisch gesucht
+- Fehler pro Album werden getrennt protokolliert
+
+
+
 ## v0.6.5
 
 ### Audioanalyse verfeinert

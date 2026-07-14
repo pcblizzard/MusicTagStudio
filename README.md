@@ -55,3 +55,14 @@ ReplayGain wird zunächst berechnet und nur nach ausdrücklicher Bestätigung in
 - Lesbareres Analyseprotokoll
 - Fortschrittsdialog beim Schreiben von ReplayGain-Tags
 - Einstellbare Anzahl paralleler FFmpeg-Analysen
+
+
+### Verbesserungen in v0.6.6
+
+- Qualitätsbewertung für Cover von 0 bis 100
+- MD5-Vergleich zwischen vorhandenem Master und Online-Covern
+- Anzeige identischer Inhalte, unterschiedlicher Auflösungen und abweichender Bilder
+- Automatische Empfehlung des besten Covers
+- Mehrere ausgewählte Alben können gemeinsam verarbeitet werden
+- Vorhandene Master-Cover werden ohne erneuten Download wiederverwendet
+- Fehler eines Albums stoppen die Verarbeitung der übrigen Alben nicht

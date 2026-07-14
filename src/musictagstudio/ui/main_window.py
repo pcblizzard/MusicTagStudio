@@ -50,6 +50,8 @@ from .settings_dialog import SettingsDialog
 from .cover_dialog import CoverSelectionDialog
 from .direct_album_dialog import DirectAlbumDialog
 from .audio_analysis_dialog import AudioAnalysisDialog
+from .batch_cover_dialog import BatchCoverDialog
+from ..cover_management.batch import build_album_cover_plans
 from ..cover_management.manager import CoverManager
 
 
@@ -624,17 +626,23 @@ class MainWindow(QMainWindow):
             for song in songs
         }
 
-        if len(album_keys) != 1:
-            QMessageBox.warning(
-                self,
-                "Mehrere Alben",
-                "Bitte wähle für die Cover-Verarbeitung "
-                "nur Titel desselben Albums aus.",
-            )
-            return
-
         settings = load_settings()
         manager = CoverManager(settings)
+
+        if len(album_keys) != 1:
+            plans = build_album_cover_plans(
+                manager,
+                songs,
+            )
+            dialog = BatchCoverDialog(
+                manager,
+                plans,
+                self,
+            )
+            dialog.exec()
+            self.refresh_active_editor()
+            return
+
         dialog = CoverSelectionDialog(
             manager,
             songs[0],

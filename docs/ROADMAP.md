@@ -58,3 +58,18 @@ Ohne feste Termine.
 v0.6.6 konzentriert sich auf die bestehende Coververwaltung:
 Qualitätsvergleich, Hashvergleich, konsistente Mehrfachverarbeitung und
 weitere Absicherung des Cover-Workflows.
+
+
+## v0.6.6 ✅
+
+- Cover-Qualitätsvergleich
+- MD5-Vergleich
+- Automatische Cover-Empfehlung
+- Mehralbum-Batchverarbeitung
+- Wiederverwendung vorhandener Master-Cover
+
+## Nächster Schwerpunkt
+
+v0.6.7 beginnt mit der Bibliotheksprüfung:
+doppelte ISRCs, fehlende Cover, unterschiedliche Albumwerte,
+fehlende ReplayGain-Tags und fehlerhafte Track-/Discnummern.

@@ -9,6 +9,7 @@ from pathlib import Path
 from threading import Lock
 
 from .cache import CoverSearchCache
+from .comparison import md5_bytes, quality_score
 from .image_tools import (
     extension_for_mime,
     inspect_image,
@@ -251,10 +252,18 @@ class CoverManager:
 
         data = download(candidate.url)
         width, height, mime = inspect_image(data)
-        score = (
-            candidate.score
-            + min(width, height) // 100
-            + (10 if width == height else 0)
+        source_bonus = (
+            5
+            if candidate.source
+            == self.settings.selected_cover_source
+            else 0
+        )
+        score = quality_score(
+            width=width,
+            height=height,
+            mime=mime,
+            file_size=len(data),
+            preferred_source_bonus=source_bonus,
         )
 
         return candidate.with_data(
@@ -263,6 +272,7 @@ class CoverManager:
             height=height,
             mime=mime,
             score=score,
+            md5=md5_bytes(data),
         )
 
     def apply(
@@ -349,6 +359,57 @@ class CoverManager:
             count,
         )
 
+    def find_existing_master(
+        self,
+        song: Song,
+    ) -> CoverCandidate | None:
+        candidates = self._local_master_candidates(
+            song
+        )
+
+        return (
+            candidates[0]
+            if candidates
+            else None
+        )
+
+    @staticmethod
+    def group_songs_by_album(
+        songs: list[Song],
+    ) -> dict[
+        tuple[str, str, str],
+        list[Song],
+    ]:
+        grouped: dict[
+            tuple[str, str, str],
+            list[Song],
+        ] = {}
+
+        for song in songs:
+            album_directory = str(
+                Path(song.path).parent.resolve()
+            )
+            album_artist = (
+                song.album_artist
+                or song.artist
+                or "Unbekannter Künstler"
+            )
+            album = (
+                song.album
+                or Path(song.path).parent.name
+            )
+            key = (
+                album_artist.casefold(),
+                album.casefold(),
+                album_directory.casefold(),
+            )
+            grouped.setdefault(
+                key,
+                [],
+            ).append(song)
+
+        return grouped
+
     def _local_master_candidates(
         self,
         song: Song,
@@ -402,6 +463,7 @@ class CoverManager:
                     artist=album_artist,
                     is_local=True,
                     file_size=len(data),
+                    md5=md5_bytes(data),
                 )
             ]
 
