@@ -1,18 +1,11 @@
 from pathlib import Path
+from .metadata import read_metadata
 
 
-def scan_music_folder(folder_path):
-    """
-    Durchsucht einen Ordner nach FLAC-Dateien.
+def scan_folder(folder):
+    files = []
 
-    Gibt eine Liste mit gefundenen Dateien zurück.
-    """
+    for file in Path(folder).rglob("*.flac"):
+        files.append(read_metadata(str(file)))
 
-    folder = Path(folder_path)
-
-    if not folder.exists():
-        return []
-
-    flac_files = list(folder.rglob("*.flac"))
-
-    return flac_files
+    return files
