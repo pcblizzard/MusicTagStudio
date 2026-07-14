@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.6.5
+
+### Audioanalyse verfeinert
+
+- True Peak bis einschließlich 1 dBTP gilt als unauffällig
+- Werte über 1 bis 2 dBTP werden als erhöht markiert
+- Werte über 2 dBTP werden als kritisch markiert
+- Gesundheitswert gewichtet leicht erhöhte Peaks deutlich zurückhaltender
+- Statistik zeigt Cache-Treffer, neu berechnete Titel, Gesamtdauer und Durchschnittszeit
+- Analyseverlauf wurde lesbarer gestaltet
+- Fortschrittsdialog beim Schreiben von ReplayGain-Tags
+- Anzahl paralleler Analysen ist unter Einstellungen → Audioanalyse wählbar
+- Analyse-Cache wurde wegen der neuen Peak-Einordnung versioniert
+
+
+
 ## v0.6.4
 
 ### Neu und verbessert

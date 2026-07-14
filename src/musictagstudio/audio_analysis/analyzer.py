@@ -336,11 +336,12 @@ def classify_true_peak(
     true_peak_db: float | None,
 ) -> str:
     """
-    Vorsichtige Einordnung des gemessenen True Peak.
+    Vorsichtige, alltagstaugliche Einordnung des gemessenen True Peak.
 
-    Ein positiver dBTP-Wert wird nicht als sicherer Beweis für bereits
-    hörbares Clipping bezeichnet. Er zeigt jedoch ein erhöhtes Risiko bei
-    Wandlung, Lautstärkeanpassung oder verlustbehafteter Kodierung.
+    Bis einschließlich 1 dBTP wird kein Warnstatus angezeigt. Werte über
+    1 bis einschließlich 2 dBTP erhalten einen Hinweis. Erst über 2 dBTP
+    wird der Wert als kritisch markiert. Die Einordnung ist ein Hinweis
+    und kein zweifelsfreier Nachweis für hörbares Clipping.
     """
     if true_peak_db is None:
         return "unknown"
@@ -348,10 +349,7 @@ def classify_true_peak(
     if true_peak_db > 2.0:
         return "critical"
 
-    if true_peak_db > 0.0:
-        return "over_zero"
-
-    if true_peak_db > -1.0:
+    if true_peak_db > 1.0:
         return "elevated"
 
     return "normal"

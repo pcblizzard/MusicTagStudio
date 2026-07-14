@@ -45,7 +45,7 @@ def test_album_average_metrics():
             integrated_lufs=-12.0,
             replaygain_album_gain_db=-7.0,
             replaygain_album_peak=1.1,
-            peak_status="over_zero",
+            peak_status="elevated",
         ),
     }
 
@@ -59,4 +59,4 @@ def test_album_average_metrics():
     assert summary.album_gain_db == -7.0
     assert summary.album_peak == 1.1
     assert summary.peak_warning_count == 1
-    assert summary.health_score < 100
+    assert summary.health_score == 99

@@ -42,3 +42,19 @@ Ohne feste Termine.
 - Stille am Anfang und Ende
 - Gesundheitscheck um Metadaten und Cover erweitern
 - Einstellung für die Anzahl paralleler Analysen
+
+
+## v0.6.5 ✅
+
+- Realistischere Peak-Bewertung
+- Neu gewichteter Gesundheitswert
+- Cache- und Zeitstatistik
+- ReplayGain-Fortschrittsdialog
+- Einstellbare Parallelisierung
+- Verbessertes Analyseprotokoll
+
+## Nächster Schwerpunkt
+
+v0.6.6 konzentriert sich auf die bestehende Coververwaltung:
+Qualitätsvergleich, Hashvergleich, konsistente Mehrfachverarbeitung und
+weitere Absicherung des Cover-Workflows.

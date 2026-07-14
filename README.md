@@ -45,3 +45,13 @@ ReplayGain wird zunächst berechnet und nur nach ausdrücklicher Bestätigung in
 - Album-ReplayGain und Album-Peak in der Vergleichsansicht
 - Erster Album-Gesundheitswert
 - Analyseverlauf mit Cache-, Erfolgs- und Fehlermeldungen
+
+
+### Verbesserungen in v0.6.5
+
+- Realistischere True-Peak-Einordnung: bis 1 dBTP unauffällig
+- Gesundheitswert wird bei leicht erhöhten Peaks deutlich weniger streng bewertet
+- Sichtbare Cache-, Neuberechnungs- und Zeitstatistik
+- Lesbareres Analyseprotokoll
+- Fortschrittsdialog beim Schreiben von ReplayGain-Tags
+- Einstellbare Anzahl paralleler FFmpeg-Analysen

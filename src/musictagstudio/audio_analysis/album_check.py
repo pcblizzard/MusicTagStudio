@@ -83,11 +83,6 @@ def group_results_by_album(
             for result in valid_results
             if result.peak_status == "elevated"
         ]
-        over_zero = [
-            result.path
-            for result in valid_results
-            if result.peak_status == "over_zero"
-        ]
         critical = [
             result.path
             for result in valid_results
@@ -107,8 +102,10 @@ def group_results_by_album(
         album_gains = [
             result.replaygain_album_gain_db
             for result in valid_results
-            if result.replaygain_album_gain_db
-            is not None
+            if (
+                result.replaygain_album_gain_db
+                is not None
+            )
         ]
         album_peaks = [
             result.replaygain_album_peak
@@ -120,7 +117,6 @@ def group_results_by_album(
         health_score = calculate_health_score(
             technical_outliers=len(outliers),
             elevated_peaks=len(elevated),
-            over_zero_peaks=len(over_zero),
             critical_peaks=len(critical),
             missing_files=len(missing),
         )
@@ -161,9 +157,7 @@ def group_results_by_album(
                 elevated_peak_files=tuple(
                     elevated
                 ),
-                over_zero_peak_files=tuple(
-                    over_zero
-                ),
+                over_zero_peak_files=(),
                 critical_peak_files=tuple(
                     critical
                 ),
@@ -185,11 +179,17 @@ def calculate_health_score(
     *,
     technical_outliers: int,
     elevated_peaks: int,
-    over_zero_peaks: int,
     critical_peaks: int,
     missing_files: int,
 ) -> int:
+    """
+    Transparente und bewusst zurückhaltende technische Bewertung.
+
+    Leicht erhöhte True-Peak-Werte sind bei modernen Veröffentlichungen
+    üblich und werden deshalb nur gering gewichtet.
+    """
     score = 100
+
     score -= min(
         30,
         technical_outliers * 8,
@@ -199,11 +199,7 @@ def calculate_health_score(
         elevated_peaks,
     )
     score -= min(
-        25,
-        over_zero_peaks * 2,
-    )
-    score -= min(
-        35,
+        30,
         critical_peaks * 6,
     )
     score -= min(

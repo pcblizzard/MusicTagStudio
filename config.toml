@@ -26,3 +26,6 @@ folder_size = 400
 folder_quality = 80
 folder_pattern = "{album_artist} - {album}_400px.jpg"
 artist_folder_levels_up = 2
+
+[audio_analysis]
+parallel_jobs = 0
