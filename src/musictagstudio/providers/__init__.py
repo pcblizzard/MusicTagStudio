@@ -1,0 +1,1 @@
+"""Austauschbare Metadatenanbieter für MusicTagStudio."""

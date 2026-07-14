@@ -16,6 +16,11 @@ class Song:
     disc: str = ""
     total_discs: str = ""
 
+    isrc: str = ""
+    label: str = ""
+    copyright: str = ""
+    composer: str = ""
+
     comment: str = ""
 
     path: str = ""

@@ -15,6 +15,20 @@ def get_first_tag(audio: FLAC, tag_name: str) -> str:
     return str(values[0])
 
 
+def get_first_available_tag(
+    audio: FLAC,
+    tag_names: tuple[str, ...],
+) -> str:
+    """Liest den ersten vorhandenen Tag aus mehreren möglichen Namen."""
+    for tag_name in tag_names:
+        value = get_first_tag(audio, tag_name)
+
+        if value:
+            return value
+
+    return ""
+
+
 def split_number(value: str) -> tuple[str, str]:
     """
     Zerlegt Werte wie '3/20' in Nummer und Gesamtzahl.
@@ -43,10 +57,26 @@ def read_metadata(filepath: str | Path) -> Song:
         get_first_tag(audio, "discnumber")
     )
 
+    label = get_first_available_tag(
+        audio,
+        (
+            "organization",
+            "label",
+            "publisher",
+        ),
+    )
+
     return Song(
         title=get_first_tag(audio, "title"),
         artist=get_first_tag(audio, "artist"),
-        album_artist=get_first_tag(audio, "albumartist"),
+        album_artist=get_first_available_tag(
+            audio,
+            (
+                "albumartist",
+                "album artist",
+                "album_artist",
+            ),
+        ),
         album=get_first_tag(audio, "album"),
         genre=get_first_tag(audio, "genre"),
         year=get_first_tag(audio, "date"),
@@ -54,6 +84,10 @@ def read_metadata(filepath: str | Path) -> Song:
         total_tracks=total_tracks,
         disc=disc,
         total_discs=total_discs,
+        isrc=get_first_tag(audio, "isrc"),
+        label=label,
+        copyright=get_first_tag(audio, "copyright"),
+        composer=get_first_tag(audio, "composer"),
         comment=get_first_tag(audio, "comment"),
         path=str(path),
     )

@@ -63,6 +63,12 @@ def save_song_metadata(filepath: str | Path, song: Song) -> None:
 
     set_tag(audio, "tracknumber", track_value)
     set_tag(audio, "discnumber", disc_value)
+
+    set_tag(audio, "isrc", song.isrc)
+    set_tag(audio, "organization", song.label)
+    set_tag(audio, "copyright", song.copyright)
+    set_tag(audio, "composer", song.composer)
+
     set_tag(audio, "comment", song.comment)
 
     audio.save()
