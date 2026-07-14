@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+- Feldgenaue Quellenwahl auch in der Batch-Vergleichsansicht
+- Getrennte Tabs für gemeinsame Albumwerte und individuelle Trackwerte
+- Bevorzugte Quelle wird als Standardempfehlung verwendet
+- Fehlende Werte können automatisch aus der anderen unterstützten Quelle ergänzt werden
+- Konflikte zwischen Apple Music und MusicBrainz werden sichtbar markiert
+- Gemeinsame Albumwerte können auf alle markierten Titel angewendet werden
+- Tracktitel, Künstler, Tracknummer, Discnummer, ISRC und Komponist bleiben individuell auswählbar
+- Nur tatsächlich ausgewählte Änderungen werden gespeichert
+
+
 ## 0.4.1
 
 - Vergleichsansicht zeigt Lokal, Apple Music und MusicBrainz nebeneinander

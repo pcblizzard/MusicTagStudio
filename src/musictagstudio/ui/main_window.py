@@ -43,6 +43,7 @@ from ..theme import (
     INPUT_NORMAL,
     apply_theme,
 )
+from ..batch_comparison_logic import BatchSongProposal
 from .batch_dialog import BatchComparisonDialog
 from .comparison_dialog import ComparisonDialog
 from .settings_dialog import SettingsDialog
@@ -632,7 +633,7 @@ class MainWindow(QMainWindow):
             Qt.WindowModality.WindowModal
         )
 
-        proposals: list[tuple[int, Song, object]] = []
+        proposals: list[BatchSongProposal] = []
 
         for position, row in enumerate(rows, start=1):
             progress.setValue(position - 1)
@@ -647,10 +648,11 @@ class MainWindow(QMainWindow):
 
             result = build_proposal(self.songs[row])
             proposals.append(
-                (
-                    row,
-                    self.songs[row],
-                    result.merged,
+                BatchSongProposal(
+                    song_row=row,
+                    song=self.songs[row],
+                    candidates=result.candidates,
+                    warnings=result.warnings,
                 )
             )
 
@@ -659,9 +661,13 @@ class MainWindow(QMainWindow):
         if not proposals:
             return
 
+        settings = load_settings()
+
         dialog = BatchComparisonDialog(
             proposals,
-            self,
+            primary_source=settings.selected_provider,
+            feature_handling=settings.feature_handling,
+            parent=self,
         )
 
         if dialog.exec() != dialog.DialogCode.Accepted:
@@ -670,17 +676,13 @@ class MainWindow(QMainWindow):
         saved = 0
         failed: list[str] = []
 
-        for dialog_row in dialog.selected_rows:
-            song_row, song, merged = proposals[dialog_row]
-            fields = set(
-                merged.changed_fields(
-                    song_values(song)
-                )
-            )
-            updated = apply_merged_metadata(
+        for song_row, updates in (
+            dialog.selected_updates.items()
+        ):
+            song = self.songs[song_row]
+            updated = replace(
                 song,
-                merged,
-                fields,
+                **updates,
             )
 
             try:
