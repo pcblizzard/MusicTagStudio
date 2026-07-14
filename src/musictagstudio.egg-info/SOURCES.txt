@@ -1,0 +1,13 @@
+LICENSE
+README.md
+pyproject.toml
+src/musictagstudio/__init__.py
+src/musictagstudio/editor.py
+src/musictagstudio/main.py
+src/musictagstudio/metadata.py
+src/musictagstudio/scanner.py
+src/musictagstudio.egg-info/PKG-INFO
+src/musictagstudio.egg-info/SOURCES.txt
+src/musictagstudio.egg-info/dependency_links.txt
+src/musictagstudio.egg-info/requires.txt
+src/musictagstudio.egg-info/top_level.txt

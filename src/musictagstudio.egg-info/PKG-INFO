@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: musictagstudio
+Version: 0.1.0
+Summary: A FLAC metadata editor
+Requires-Python: >=3.12
+License-File: LICENSE
+Requires-Dist: PySide6
+Requires-Dist: mutagen
+Dynamic: license-file

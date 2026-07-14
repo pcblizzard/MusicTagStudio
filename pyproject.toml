@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "musictagstudio"
+version = "0.1.0"
+description = "A FLAC metadata editor"
+requires-python = ">=3.12"
+
+dependencies = [
+    "PySide6",
+    "mutagen"
+]
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
