@@ -48,6 +48,7 @@ from .batch_dialog import BatchComparisonDialog
 from .comparison_dialog import ComparisonDialog
 from .settings_dialog import SettingsDialog
 from .cover_dialog import CoverSelectionDialog
+from .direct_album_dialog import DirectAlbumDialog
 from ..cover_management.manager import CoverManager
 
 
@@ -128,13 +129,28 @@ class MainWindow(QMainWindow):
         )
         self.batch_button.setEnabled(False)
 
-        self.cover_button = QPushButton("Cover für Auswahl verwalten")
-        self.cover_button.clicked.connect(self.manage_cover)
+        self.cover_button = QPushButton(
+            "Cover für Auswahl verwalten"
+        )
+        self.cover_button.clicked.connect(
+            self.manage_cover
+        )
         self.cover_button.setEnabled(False)
+
+        self.direct_album_button = QPushButton(
+            "Album-Link / ID laden"
+        )
+        self.direct_album_button.clicked.connect(
+            self.load_direct_album
+        )
+        self.direct_album_button.setEnabled(False)
 
         provider_buttons.addWidget(self.proposal_button)
         provider_buttons.addWidget(self.batch_button)
         provider_buttons.addWidget(self.cover_button)
+        provider_buttons.addWidget(
+            self.direct_album_button
+        )
 
         self.table_fields = (
             "track",
@@ -416,6 +432,7 @@ class MainWindow(QMainWindow):
         self.proposal_button.setEnabled(enabled)
         self.batch_button.setEnabled(enabled)
         self.cover_button.setEnabled(enabled)
+        self.direct_album_button.setEnabled(enabled)
 
         if enabled:
             self.table.selectRow(0)
@@ -561,36 +578,197 @@ class MainWindow(QMainWindow):
 
     def manage_cover(self):
         rows = self.selected_rows()
+
         if not rows:
             return
-        songs = [self.songs[row] for row in rows]
-        album_keys = {((song.album_artist or song.artist).casefold(), song.album.casefold()) for song in songs}
+
+        songs = [
+            self.songs[row]
+            for row in rows
+        ]
+        album_keys = {
+            (
+                (
+                    song.album_artist
+                    or song.artist
+                ).casefold(),
+                song.album.casefold(),
+            )
+            for song in songs
+        }
+
         if len(album_keys) != 1:
-            QMessageBox.warning(self, "Mehrere Alben", "Bitte wähle für die Cover-Verarbeitung nur Titel desselben Albums aus.")
+            QMessageBox.warning(
+                self,
+                "Mehrere Alben",
+                "Bitte wähle für die Cover-Verarbeitung "
+                "nur Titel desselben Albums aus.",
+            )
             return
+
         settings = load_settings()
         manager = CoverManager(settings)
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            candidates = manager.search(songs[0])
-        finally:
-            QApplication.restoreOverrideCursor()
-        candidates = [c for c in candidates if min(c.width, c.height) >= settings.minimum_cover_size]
-        if not candidates:
-            QMessageBox.information(self, "Kein Cover gefunden", "Keine unterstützte Coverquelle lieferte ein Cover in der eingestellten Mindestauflösung.")
+        dialog = CoverSelectionDialog(
+            manager,
+            songs[0],
+            self,
+        )
+
+        if (
+            dialog.exec()
+            != dialog.DialogCode.Accepted
+            or dialog.selected_candidate
+            is None
+        ):
             return
-        dialog = CoverSelectionDialog(candidates, self)
-        if dialog.exec() != dialog.DialogCode.Accepted or dialog.selected_candidate is None:
-            return
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+
+        QApplication.setOverrideCursor(
+            Qt.CursorShape.WaitCursor
+        )
+
         try:
-            result = manager.apply(dialog.selected_candidate, songs)
+            result = manager.apply(
+                dialog.selected_candidate,
+                songs,
+            )
         except Exception as error:
-            QMessageBox.critical(self, "Cover-Verarbeitung fehlgeschlagen", str(error)); return
+            QMessageBox.critical(
+                self,
+                "Cover-Verarbeitung fehlgeschlagen",
+                str(error),
+            )
+            return
         finally:
             QApplication.restoreOverrideCursor()
+
         self.refresh_active_editor()
-        QMessageBox.information(self, "Cover gespeichert", f"Master: {result.master_path}\n\n400-px-Cover: {result.folder_cover_path}\n\nIn {result.embedded_files} Audiodateien eingebettet.")
+
+        QMessageBox.information(
+            self,
+            "Cover gespeichert",
+            (
+                f"Master: {result.master_path}\n\n"
+                f"400-px-Cover: "
+                f"{result.folder_cover_path}\n\n"
+                f"In {result.embedded_files} "
+                "Audiodateien eingebettet."
+            ),
+        )
+
+    def load_direct_album(self):
+        rows = self.selected_rows()
+
+        if not rows:
+            return
+
+        songs = [
+            self.songs[row]
+            for row in rows
+        ]
+        settings = load_settings()
+        dialog = DirectAlbumDialog(
+            songs,
+            settings.apple_country,
+            self,
+        )
+
+        if (
+            dialog.exec()
+            != dialog.DialogCode.Accepted
+            or dialog.result is None
+        ):
+            return
+
+        proposals: list[
+            BatchSongProposal
+        ] = []
+
+        for local_index, track in (
+            dialog.matches.items()
+        ):
+            song_row = rows[local_index]
+            candidate = track.as_candidate(
+                dialog.result.provider
+            )
+
+            proposals.append(
+                BatchSongProposal(
+                    song_row=song_row,
+                    song=self.songs[song_row],
+                    candidates=[candidate],
+                    warnings=[],
+                )
+            )
+
+        if not proposals:
+            return
+
+        comparison = BatchComparisonDialog(
+            proposals,
+            primary_source=(
+                dialog.result.provider
+            ),
+            feature_handling=(
+                settings.feature_handling
+            ),
+            parent=self,
+        )
+
+        if (
+            comparison.exec()
+            != comparison.DialogCode.Accepted
+        ):
+            return
+
+        saved = 0
+        failed: list[str] = []
+
+        for song_row, updates in (
+            comparison.selected_updates.items()
+        ):
+            song = self.songs[song_row]
+            updated = replace(
+                song,
+                **updates,
+            )
+
+            try:
+                save_song_metadata(
+                    updated.path,
+                    updated,
+                )
+            except Exception as error:
+                failed.append(
+                    f"{song.title}: {error}"
+                )
+                continue
+
+            self.songs[song_row] = updated
+            self.update_table_row(
+                song_row,
+                updated,
+            )
+            saved += 1
+
+        self.update_optional_columns()
+        self.refresh_active_editor()
+
+        message = (
+            f"{saved} Titel wurden über den direkten "
+            "Album-Link aktualisiert."
+        )
+
+        if failed:
+            message += (
+                "\n\nFehler:\n"
+                + "\n".join(failed)
+            )
+
+        QMessageBox.information(
+            self,
+            "Direkte Albumabfrage abgeschlossen",
+            message,
+        )
 
     def mark_field_edited(self, field_name: str):
         if self.loading_editor:
