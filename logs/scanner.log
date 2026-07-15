@@ -1,0 +1,24 @@
+2026-07-15 09:19:15,929 | INFO | Scan gestartet: /tmp/pytest-of-oai/pytest-7/test_scan_reports_failures0 | 2 erkannte Datei(en)
+2026-07-15 09:19:15,929 | ERROR | Datei konnte nicht eingelesen werden: /tmp/pytest-of-oai/pytest-7/test_scan_reports_failures0/bad.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/src/musictagstudio/services/scanner.py", line 69, in scan_folder_detailed
+    read_metadata(filepath)
+    ~~~~~~~~~~~~~^^^^^^^^^^
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/tests/test_scan_diagnostics.py", line 15, in fake_read
+    raise ValueError("kaputt")
+ValueError: kaputt
+2026-07-15 09:19:15,934 | INFO | Scan beendet: 1 eingelesen, 1 übersprungen
+2026-07-15 09:34:55,343 | INFO | Scan gestartet: /tmp/pytest-of-oai/pytest-8/test_scan_reports_failures0 | 2 erkannte Datei(en)
+2026-07-15 09:34:55,344 | ERROR | Datei konnte nicht eingelesen werden: /tmp/pytest-of-oai/pytest-8/test_scan_reports_failures0/bad.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/src/musictagstudio/services/scanner.py", line 69, in scan_folder_detailed
+    read_metadata(filepath)
+    ~~~~~~~~~~~~~^^^^^^^^^^
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/tests/test_scan_diagnostics.py", line 15, in fake_read
+    raise ValueError("kaputt")
+ValueError: kaputt
+2026-07-15 09:34:55,349 | INFO | Scan beendet: 1 eingelesen, 1 übersprungen
+2026-07-15 11:38:31,268 | INFO | Scan gestartet: C:\Users\Michael\Music\Carmen Gomes Inc\Carmen Gomes Inc. - Stones in My Passway (2023)\WV | 15 erkannte Datei(en)
+2026-07-15 11:38:31,278 | INFO | Scan beendet: 15 eingelesen, 0 übersprungen
+2026-07-15 11:39:12,560 | INFO | Scan gestartet: C:\Users\Michael\Music\Clueso | 28 erkannte Datei(en)
+2026-07-15 11:39:12,595 | INFO | Scan beendet: 28 eingelesen, 0 übersprungen

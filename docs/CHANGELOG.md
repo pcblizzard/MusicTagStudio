@@ -1,5 +1,169 @@
 # Changelog
 
+## v0.6.8.3
+
+### WavPack-Cover korrigiert
+
+- Cover werden direkt aus APEv2 gelesen
+- `Cover Art (Front)` wird fallunabhängig erkannt
+- APEv2-Binärformat mit Dateiname und Null-Trennzeichen wird korrekt zerlegt
+- Kein WavPack-Audiostream-Parsing mehr für Cover
+- Fehlerhafte doppelte WavPack-Verzweigung in `embed_cover()` entfernt
+- WavPack-Cover können korrekt ersetzt und eingebettet werden
+- Fehlerdetails werden in `logs/wavpack.log` protokolliert
+
+
+
+## v0.6.8.2
+
+### WavPack-Leser weiter abgesichert
+
+- Dreistufiges Lesen über APEv2, Mutagen WavPack und ffprobe
+- ffprobe-Tags werden in das gemeinsame Song-Modell übertragen
+- DXD-WavPack-Dateien können auch bei einem Mutagen-Parserfehler gescannt werden
+- Schreibfehler werden nicht mehr verschluckt
+- Vollständige Tracebacks in `logs/wavpack.log`
+- Scanner protokolliert jede übersprungene Datei in `logs/scanner.log`
+- Scanmeldung verweist auf die technischen Logdateien
+
+
+
+## v0.6.8.1
+
+### WavPack-Scan robust gemacht
+
+- Direkter APEv2-Zugriff für `.wv`
+- Kein vollständiges Parsen des WavPack-Audiostreams zum Taglesen nötig
+- Unterstützung ungewöhnlicher DXD-WavPack-Dateien verbessert
+- Detaillierter Scanbericht mit übersprungenen Dateien und Fehlerursachen
+
+### Exakte Apple-Song-Links
+
+- Apple-Song-URLs werden von Album-URLs unterschieden
+- Offizieller ID-Lookup für einen einzelnen Apple-Music-Song
+- Exakte Song-ID kann einer einzelnen markierten Datei zugeordnet werden
+
+
+
+## v0.6.8.0
+
+### Metadatenquellen entkoppelt
+
+- Apple Music und MusicBrainz werden unabhängig voneinander abgefragt
+- Bevorzugte Quelle beeinflusst nur noch die Vorauswahl
+- Eigenes SourceProposal-Modell pro Anbieter
+- Quellenstatus und Kandidaten werden getrennt gespeichert
+- Ein fehlender Treffer einer Quelle unterdrückt keine andere Quelle
+
+### WavPack vollständig unterstützt
+
+- `.wv` in der zentralen Liste unterstützter Audioformate
+- APEv2-Metadaten lesen und schreiben
+- Cover Art (Front) lesen und einbetten
+- ReplayGain in APEv2 schreiben
+- Bibliotheksprüfung nutzt den zentralen Cover-Leser
+- Audioanalyse funktioniert über FFmpeg/ffprobe
+- FLAC-spezifische Formulierung im Batchdialog entfernt
+
+
+
+## v0.6.7.8
+
+### MusicBrainz-Fallback korrigiert
+
+- Nur erfolgreich zugeordnete Release-Tracks werden als aufgelöst markiert
+- Nicht zugeordnete Titel erhalten anschließend die titelweise MusicBrainz-Suche
+- Teilweise passende Releases blockieren nicht mehr die restlichen Titel
+- Zusätzlicher Hinweis bei nicht eindeutiger Release-Zuordnung
+
+
+
+## v0.6.7.7
+
+### Unvollständige Apple-Albumtracklisten abgesichert
+
+- Strenge Nachsuche fehlender Tracks innerhalb einer bekannten collectionId
+- Abgleich von collectionId, Discnummer und Tracknummer
+- Storeübergreifende Nachsuche im konfigurierten Store und im US-Store
+- Kein allgemeiner Song-Fallback mehr, sobald das Album sicher erkannt wurde
+- Falsche Ersatztreffer wie „Jedes Jahr“ für „Minimum“ werden dadurch ausgeschlossen
+- Apple-Song-IDs werden aus Album-Lookups übernommen
+- Aussagekräftige Warnung, falls ein Track auch albumgebunden nicht auffindbar ist
+
+
+
+## v0.6.7.6
+
+### Albumtracklisten für Apple Music und MusicBrainz stabilisiert
+
+- Apple-Tracklisten mehrerer Stores werden nach tatsächlicher Zuordnungsabdeckung verglichen
+- Vollständigste passende Apple-Trackliste wird verwendet
+- Kein Einzeltrack-Fallback nach erfolgreich erkannter Albumquelle
+- MusicBrainz-Release-Suche und vollständige Release-Trackliste im Batch
+- Globale MusicBrainz-Zuordnung statt exakter Einzelaufnahme-Suche
+- MusicBrainz-Anfragen der direkten Release-Abfrage werden rate-limitiert
+- Fehlende Quellwerte entstehen nur noch bei wirklich nicht sicher zuordenbaren Titeln
+
+
+
+## v0.6.7.5
+
+### Apple-Music-Batchzuordnung korrigiert
+
+- Offizielle Apple-Albumsuche für Batch-Vorschläge
+- Vollständige Trackliste wird über die offizielle Lookup-API geladen
+- Globale Zuordnung aller ausgewählten Dateien zur Albumtrackliste
+- Unabhängige, fehleranfällige Einzeltrack-Suche dient nur noch als Rückfalllösung
+- Unsichere Apple-Treffer werden nicht automatisch übernommen
+- Transparenter US-Store-Fallback, falls der konfigurierte Store keinen sicheren Albumtreffer liefert
+- `<leer>` aus der Mischwertanzeige entfernt
+- Fehlende Werte werden verständlich als `fehlt bei … Titel(n)` angezeigt
+
+
+
+## v0.6.7.4
+
+### Apple-Music-Trefferauswahl und Quellenanzeige korrigiert
+
+- Apple-Music-Suche berücksichtigt lokale Track- und Discnummer
+- Dateinamentitel wird als zusätzliches Signal verwendet
+- Audiodauer wird bei vorhandener Datei in die Bewertung einbezogen
+- Versionszusätze wie Remix und Instrumental werden stärker gewichtet
+- Normale Albumfassung wird bei gewünschtem Remix deutlich abgewertet
+- MusicBrainz-Mischwerte zeigen die konkreten Werte samt Häufigkeit
+- Gemischte Werte bleiben für albumweite Schreibvorgänge gesperrt
+
+
+
+## v0.6.7.3
+
+### Albumzuordnung vollständig neu aufgebaut
+
+- Globale Eins-zu-eins-Zuordnung über eine Bewertungsmatrix
+- Ungarischer Algorithmus bestimmt die insgesamt beste Zuordnung
+- Dateinamen werden zusätzlich zu vorhandenen Tags ausgewertet
+- Dreistellige Präfixe wie 109 werden als Disc 1 / Track 09 interpretiert
+- Lokale Titel, Dateinamentitel, Dauer und Reihenfolge fließen in die Bewertung ein
+- Falsche lokale Tracktags besitzen nur noch geringe Priorität
+- Zuordnungsmatrix ist vor dem Schreiben sichtbar
+- Jede Zuordnung kann manuell korrigiert werden
+- Doppelte und fehlende Zuordnungen blockieren den Metadatenvergleich
+- Sicherheit und Begründung werden pro Datei angezeigt
+
+
+
+## v0.6.7.2
+
+### Korrektur der direkten Albumzuordnung
+
+- Eindeutige Titelübereinstimmungen haben Vorrang vor lokalen Tracknummern
+- Falsch vorhandene Tracknummern blockieren nicht mehr die korrekte Zuordnung
+- Disc- und Tracknummer werden als zweite Zuordnungsstufe verwendet
+- Leichte Schreibvarianten werden als zusätzliche dritte Stufe berücksichtigt
+- Remix- und Instrumentalzusätze werden nicht entfernt
+
+
+
 ## v0.6.7.1
 
 ### Korrektur der Tracknummernprüfung

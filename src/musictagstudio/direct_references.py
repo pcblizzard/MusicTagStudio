@@ -42,7 +42,7 @@ def parse_album_reference(
 
     if not raw:
         raise DirectAlbumReferenceError(
-            "Bitte gib einen Album-Link oder eine ID ein."
+            "Bitte gib einen Album-/Song-Link oder eine ID ein."
         )
 
     if raw.isdigit():
@@ -82,10 +82,16 @@ def parse_album_reference(
                 "In der Apple-Music-URL wurde keine Album-ID gefunden."
             )
 
+        reference_type = (
+            "song"
+            if "song" in parts
+            else "album"
+        )
+
         return DirectAlbumReference(
             provider="apple_music",
             reference_id=reference_id,
-            reference_type="album",
+            reference_type=reference_type,
         )
 
     if host in MUSICBRAINZ_HOSTS:

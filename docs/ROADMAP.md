@@ -89,3 +89,70 @@ fehlende ReplayGain-Tags und fehlerhafte Track-/Discnummern.
 v0.6.8 erweitert die Bibliotheksprüfung um Dateinamenschema,
 defekte Audiodateien, Ordnercover, Audioformat-Abweichungen und
 weitere technische Konsistenzprüfungen.
+
+
+## v0.6.7.3 ✅
+
+- Neue globale Albumzuordnung
+- Bewertungsmatrix und Eins-zu-eins-Matching
+- Dateinamen- und Daueranalyse
+- Sichtbare, manuell korrigierbare Zuordnung
+
+
+## v0.6.7.4 ✅
+
+- Track- und versionsbewusste Apple-Music-Suche
+- Dateinamen- und Dauerbewertung in der normalen Batch-Suche
+- Sichtbare Verteilung gemischter MusicBrainz-Werte
+
+
+## v0.6.7.5 ✅
+
+- Albumweise Apple-Music-Batchabfrage
+- Globale Trackzuordnung im normalen Batch-Workflow
+- Mindestvertrauen für Einzeltrack-Treffer
+- Verständliche Anzeige fehlender Mischwerte
+
+
+## v0.6.7.6 ✅
+
+- Storeübergreifende Apple-Tracklistenwahl
+- Albumweises MusicBrainz-Matching
+- Kein unsicherer Einzeltrack-Fallback nach Albumauflösung
+
+
+## v0.6.7.7 ✅
+
+- Strikte Wiederherstellung fehlender Apple-Albumtracks
+- collectionId-, Disc- und Trackbindung
+- Kein falscher allgemeiner Ersatztreffer bei erkanntem Album
+
+
+## v0.6.7.8 ✅
+
+- MusicBrainz-Release-Matching mit titelweisem Fallback
+- Keine pauschale Sperre mehr für unaufgelöste Titel
+
+
+## v0.6.8.0 ✅
+
+- Vollständig unabhängige Apple-Music- und MusicBrainz-Ergebnisse
+- Eigenes Quellenmodell pro Anbieter
+- WavPack/APEv2 lesen und schreiben
+- WavPack-Cover und ReplayGain
+- WavPack in Scan, Analyse und Bibliotheksprüfung
+
+
+## v0.6.8.2 ✅
+
+- Mehrstufiger WavPack-Lesefallback
+- ffprobe-Metadatenfallback
+- Scanner- und WavPack-Diagnoseprotokolle
+- Vollständige Tracebacks für reale Dateifehler
+
+
+## v0.6.8.3 ✅
+
+- WavPack-Cover direkt über APEv2
+- Vorhandene Frontcover erkennen
+- WavPack-Cover korrekt ersetzen und einbetten

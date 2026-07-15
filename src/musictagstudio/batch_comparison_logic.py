@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 
 from .comparison_logic import (
     FieldComparison,
     build_field_comparisons,
 )
-from .models.metadata import MetadataCandidate
+from .models.metadata import (
+    MetadataCandidate,
+)
 from .models.song import Song
 
 
@@ -43,6 +46,7 @@ class BatchSongProposal:
 class CommonFieldComparison:
     field_name: str
     values: dict[str, str]
+    display_values: dict[str, str]
     default_source: str
     has_conflict: bool
     is_supplemented: bool
@@ -68,7 +72,9 @@ def build_common_field_comparisons(
         for proposal in proposals
     ]
 
-    result: list[CommonFieldComparison] = []
+    result: list[
+        CommonFieldComparison
+    ] = []
 
     for field_name in COMMON_FIELDS:
         comparisons = [
@@ -86,6 +92,7 @@ def build_common_field_comparisons(
             continue
 
         values: dict[str, str] = {}
+        display_values: dict[str, str] = {}
 
         for source_name in (
             "local",
@@ -93,13 +100,16 @@ def build_common_field_comparisons(
             "musicbrainz",
         ):
             source_values = [
-                comparison.values.get(
-                    source_name,
-                    "",
+                (
+                    comparison.values.get(
+                        source_name,
+                        "",
+                    )
+                    if comparison is not None
+                    else ""
                 )
-                for comparison in available
+                for comparison in comparisons
             ]
-
             non_empty = [
                 value
                 for value in source_values
@@ -108,29 +118,54 @@ def build_common_field_comparisons(
 
             if not non_empty:
                 values[source_name] = ""
-            elif all(
-                value == non_empty[0]
-                for value in non_empty
-            ) and len(non_empty) == len(proposals):
-                values[source_name] = non_empty[0]
+                display_values[source_name] = ""
+            elif (
+                all(
+                    value == non_empty[0]
+                    for value in non_empty
+                )
+                and len(non_empty)
+                == len(proposals)
+            ):
+                values[source_name] = (
+                    non_empty[0]
+                )
+                display_values[source_name] = (
+                    non_empty[0]
+                )
             else:
-                values[source_name] = "<verschiedene Werte>"
+                values[source_name] = (
+                    "<verschiedene Werte>"
+                )
+                display_values[source_name] = (
+                    _format_value_distribution(
+                        source_values
+                    )
+                )
 
-        default_source = _choose_batch_default_source(
-            values,
-            primary_source,
+        default_source = (
+            _choose_batch_default_source(
+                values,
+                primary_source,
+            )
         )
 
         distinct_provider_values = {
             value.casefold()
-            for source_name, value in values.items()
-            if source_name != "local"
-            and value
-            and value != "<verschiedene Werte>"
+            for source_name, value
+            in values.items()
+            if (
+                source_name != "local"
+                and value
+                and value
+                != "<verschiedene Werte>"
+            )
         }
 
         has_conflict = (
-            len(distinct_provider_values) > 1
+            len(
+                distinct_provider_values
+            ) > 1
             or any(
                 values.get(source_name)
                 == "<verschiedene Werte>"
@@ -158,9 +193,12 @@ def build_common_field_comparisons(
             CommonFieldComparison(
                 field_name=field_name,
                 values=values,
+                display_values=display_values,
                 default_source=default_source,
                 has_conflict=has_conflict,
-                is_supplemented=is_supplemented,
+                is_supplemented=(
+                    is_supplemented
+                ),
                 applies_to_rows=tuple(
                     proposal.song_row
                     for proposal in proposals
@@ -177,39 +215,105 @@ def build_track_field_comparisons(
     primary_source: str,
     feature_handling: str,
 ) -> list[FieldComparison]:
-    all_comparisons = build_field_comparisons(
-        proposal.song,
-        proposal.candidates,
-        primary_source=primary_source,
-        feature_handling=feature_handling,
+    all_comparisons = (
+        build_field_comparisons(
+            proposal.song,
+            proposal.candidates,
+            primary_source=primary_source,
+            feature_handling=feature_handling,
+        )
     )
 
     return [
         comparison
         for comparison in all_comparisons
-        if comparison.field_name in TRACK_FIELDS
+        if (
+            comparison.field_name
+            in TRACK_FIELDS
+        )
     ]
 
+
+def _format_value_distribution(
+    values: list[str],
+) -> str:
+    missing_count = sum(
+        not value
+        for value in values
+    )
+    counts = Counter(
+        value
+        for value in values
+        if value
+    )
+
+    if not counts:
+        return ""
+
+    ordered = sorted(
+        counts.items(),
+        key=lambda item: (
+            -item[1],
+            item[0].casefold(),
+        ),
+    )
+    shown = ordered[:6]
+    result = ", ".join(
+        (
+            f"{value} ({count}×)"
+        )
+        for value, count in shown
+    )
+
+    if len(ordered) > len(shown):
+        result += (
+            f", +{len(ordered) - len(shown)} weitere"
+        )
+
+    if missing_count:
+        noun = (
+            "Titel"
+            if missing_count == 1
+            else "Titeln"
+        )
+        result += (
+            f" · fehlt bei {missing_count} {noun}"
+        )
+
+    return result
 
 def _choose_batch_default_source(
     values: dict[str, str],
     primary_source: str,
 ) -> str:
-    if _usable(values.get(primary_source, "")):
+    if _usable(
+        values.get(
+            primary_source,
+            "",
+        )
+    ):
         return primary_source
 
     for source_name in (
         "apple_music",
         "musicbrainz",
     ):
-        if _usable(values.get(source_name, "")):
+        if _usable(
+            values.get(
+                source_name,
+                "",
+            )
+        ):
             return source_name
 
     return "local"
 
 
-def _usable(value: str) -> bool:
+def _usable(
+    value: str,
+) -> bool:
     return bool(
         value
-        and value != "<verschiedene Werte>"
+        and value
+        != "<verschiedene Werte>"
     )

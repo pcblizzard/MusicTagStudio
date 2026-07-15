@@ -90,7 +90,7 @@ class BatchComparisonDialog(QDialog):
             "Gemeinsame Albumwerte und individuelle Trackwerte "
             "können getrennt geprüft werden. "
             "Die ausgewählten Werte werden nach der Bestätigung "
-            "direkt in die FLAC-Dateien geschrieben."
+            "direkt in die ausgewählten Audiodateien geschrieben."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -208,7 +208,26 @@ class BatchComparisonDialog(QDialog):
                     source_name,
                     "",
                 )
-                item = QTableWidgetItem(value)
+                display_value = (
+                    comparison.display_values.get(
+                        source_name,
+                        value,
+                    )
+                )
+                item = QTableWidgetItem(
+                    display_value
+                )
+
+                if (
+                    value
+                    == "<verschiedene Werte>"
+                    and display_value
+                ):
+                    item.setToolTip(
+                        "Unterschiedliche Werte innerhalb "
+                        "der ausgewählten Titel:\n"
+                        + display_value
+                    )
 
                 if (
                     source_name

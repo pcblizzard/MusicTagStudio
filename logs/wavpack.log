@@ -1,0 +1,96 @@
+2026-07-15 09:19:15,961 | ERROR | Direkter APEv2-Leser fehlgeschlagen: /tmp/pytest-of-oai/pytest-7/test_wavpack_uses_ffprobe_when0/dxd.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/src/musictagstudio/services/metadata_io.py", line 391, in _read_wavpack_apev2
+    tags = APEv2(path)
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/tests/test_wavpack_ffprobe_fallback.py", line 14, in fail
+    raise IndexError(
+        "list index out of range"
+    )
+IndexError: list index out of range
+2026-07-15 09:19:15,964 | ERROR | Mutagen-WavPack-Leser fehlgeschlagen: /tmp/pytest-of-oai/pytest-7/test_wavpack_uses_ffprobe_when0/dxd.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/src/musictagstudio/services/metadata_io.py", line 404, in _read_wavpack_apev2
+    audio = WavPack(path)
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/tests/test_wavpack_ffprobe_fallback.py", line 14, in fail
+    raise IndexError(
+        "list index out of range"
+    )
+IndexError: list index out of range
+2026-07-15 09:19:15,967 | INFO | WavPack-Tags über ffprobe gelesen: /tmp/pytest-of-oai/pytest-7/test_wavpack_uses_ffprobe_when0/dxd.wv
+2026-07-15 09:19:15,970 | ERROR | Direkter APEv2-Leser fehlgeschlagen: /tmp/pytest-of-oai/pytest-7/test_ffprobe_tag_keys_are_case0/case.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/src/musictagstudio/services/metadata_io.py", line 391, in _read_wavpack_apev2
+    tags = APEv2(path)
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/tests/test_wavpack_ffprobe_fallback.py", line 72, in <lambda>
+    (_ for _ in ()).throw(
+    ~~~~~~~~~~~~~~~~~~~~~^
+        ValueError("no ape")
+        ^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/tests/test_wavpack_ffprobe_fallback.py", line 72, in <genexpr>
+    (_ for _ in ()).throw(
+ValueError: no ape
+2026-07-15 09:19:15,973 | ERROR | Mutagen-WavPack-Leser fehlgeschlagen: /tmp/pytest-of-oai/pytest-7/test_ffprobe_tag_keys_are_case0/case.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/src/musictagstudio/services/metadata_io.py", line 404, in _read_wavpack_apev2
+    audio = WavPack(path)
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/tests/test_wavpack_ffprobe_fallback.py", line 80, in <lambda>
+    (_ for _ in ()).throw(
+    ~~~~~~~~~~~~~~~~~~~~~^
+        ValueError("no wavpack")
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "/mnt/data/MusicTagStudio_v0.6.8.2/tests/test_wavpack_ffprobe_fallback.py", line 80, in <genexpr>
+    (_ for _ in ()).throw(
+ValueError: no wavpack
+2026-07-15 09:19:15,975 | INFO | WavPack-Tags über ffprobe gelesen: /tmp/pytest-of-oai/pytest-7/test_ffprobe_tag_keys_are_case0/case.wv
+2026-07-15 09:34:55,469 | ERROR | Direkter APEv2-Leser fehlgeschlagen: /tmp/pytest-of-oai/pytest-8/test_wavpack_uses_ffprobe_when0/dxd.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/src/musictagstudio/services/metadata_io.py", line 391, in _read_wavpack_apev2
+    tags = APEv2(path)
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/tests/test_wavpack_ffprobe_fallback.py", line 14, in fail
+    raise IndexError(
+        "list index out of range"
+    )
+IndexError: list index out of range
+2026-07-15 09:34:55,473 | ERROR | Mutagen-WavPack-Leser fehlgeschlagen: /tmp/pytest-of-oai/pytest-8/test_wavpack_uses_ffprobe_when0/dxd.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/src/musictagstudio/services/metadata_io.py", line 404, in _read_wavpack_apev2
+    audio = WavPack(path)
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/tests/test_wavpack_ffprobe_fallback.py", line 14, in fail
+    raise IndexError(
+        "list index out of range"
+    )
+IndexError: list index out of range
+2026-07-15 09:34:55,476 | INFO | WavPack-Tags über ffprobe gelesen: /tmp/pytest-of-oai/pytest-8/test_wavpack_uses_ffprobe_when0/dxd.wv
+2026-07-15 09:34:55,480 | ERROR | Direkter APEv2-Leser fehlgeschlagen: /tmp/pytest-of-oai/pytest-8/test_ffprobe_tag_keys_are_case0/case.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/src/musictagstudio/services/metadata_io.py", line 391, in _read_wavpack_apev2
+    tags = APEv2(path)
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/tests/test_wavpack_ffprobe_fallback.py", line 72, in <lambda>
+    (_ for _ in ()).throw(
+    ~~~~~~~~~~~~~~~~~~~~~^
+        ValueError("no ape")
+        ^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/tests/test_wavpack_ffprobe_fallback.py", line 72, in <genexpr>
+    (_ for _ in ()).throw(
+ValueError: no ape
+2026-07-15 09:34:55,483 | ERROR | Mutagen-WavPack-Leser fehlgeschlagen: /tmp/pytest-of-oai/pytest-8/test_ffprobe_tag_keys_are_case0/case.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/src/musictagstudio/services/metadata_io.py", line 404, in _read_wavpack_apev2
+    audio = WavPack(path)
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/tests/test_wavpack_ffprobe_fallback.py", line 80, in <lambda>
+    (_ for _ in ()).throw(
+    ~~~~~~~~~~~~~~~~~~~~~^
+        ValueError("no wavpack")
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "/mnt/data/MusicTagStudio_v0.6.8.3/tests/test_wavpack_ffprobe_fallback.py", line 80, in <genexpr>
+    (_ for _ in ()).throw(
+ValueError: no wavpack
+2026-07-15 09:34:55,485 | INFO | WavPack-Tags über ffprobe gelesen: /tmp/pytest-of-oai/pytest-8/test_ffprobe_tag_keys_are_case0/case.wv

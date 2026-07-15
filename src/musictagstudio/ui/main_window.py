@@ -33,8 +33,11 @@ from ..services.cover import (
     load_cover_info,
 )
 from ..services.metadata_io import save_song_metadata
-from ..services.proposal import build_proposal
-from ..services.scanner import scan_folder
+from ..services.proposal import (
+    build_batch_proposals,
+    build_proposal,
+)
+from ..services.scanner import scan_folder_detailed
 from ..settings import load_settings, save_settings
 from ..theme import (
     BUTTON_CHANGED,
@@ -142,7 +145,7 @@ class MainWindow(QMainWindow):
         self.cover_button.setEnabled(False)
 
         self.direct_album_button = QPushButton(
-            "Album-Link / ID laden"
+            "Album-/Song-Link oder ID laden"
         )
         self.direct_album_button.clicked.connect(
             self.load_direct_album
@@ -467,7 +470,53 @@ class MainWindow(QMainWindow):
             )
             return
 
-        self.songs = scan_folder(self.folder)
+        scan_result = scan_folder_detailed(
+            self.folder
+        )
+        self.songs = list(
+            scan_result.songs
+        )
+
+        if scan_result.failures:
+            details = "\n\n".join(
+                f"{failure.path}\n{failure.error}"
+                for failure
+                in scan_result.failures[:20]
+            )
+
+            if len(scan_result.failures) > 20:
+                details += (
+                    "\n\n"
+                    f"… und {len(scan_result.failures) - 20} "
+                    "weitere Datei(en)."
+                )
+
+            QMessageBox.warning(
+                self,
+                "Einige Audiodateien wurden übersprungen",
+                (
+                    f"Erkannt: {scan_result.detected_files}\n"
+                    f"Eingelesen: {scan_result.successful_files}\n"
+                    f"Übersprungen: {len(scan_result.failures)}"
+                    f"\n\n{details}"
+                    "\n\nVollständige technische Details stehen in "
+                    "logs/scanner.log und logs/wavpack.log."
+                ),
+            )
+        elif (
+            scan_result.detected_files == 0
+        ):
+            QMessageBox.information(
+                self,
+                "Keine Audiodateien gefunden",
+                (
+                    "Im gewählten Ordner wurden keine "
+                    "unterstützten Audiodateien gefunden.\n\n"
+                    "Unterstützte Endungen:\n"
+                    ".flac, .wv, .mp3, .ogg, .oga, "
+                    ".opus, .m4a und .mp4"
+                ),
+            )
         self.current_row = -1
         self.active_rows = []
         self.previous_rows = []
@@ -909,25 +958,51 @@ class MainWindow(QMainWindow):
             Qt.WindowModality.WindowModal
         )
 
-        proposals: list[BatchSongProposal] = []
+        selected_songs = [
+            self.songs[row]
+            for row in rows
+        ]
 
-        for position, row in enumerate(rows, start=1):
-            progress.setValue(position - 1)
+        def update_progress(
+            position: int,
+            total: int,
+            title: str,
+        ):
+            progress.setMaximum(
+                max(1, total)
+            )
+            progress.setValue(position)
             progress.setLabelText(
-                f"{position}/{len(rows)}: "
-                f"{self.songs[row].title}"
+                f"{min(position + 1, total)}/{total}: "
+                f"{title}"
             )
             QApplication.processEvents()
 
-            if progress.wasCanceled():
-                break
+        results = build_batch_proposals(
+            selected_songs,
+            progress_callback=(
+                update_progress
+            ),
+            cancel_callback=(
+                progress.wasCanceled
+            ),
+        )
 
-            result = build_proposal(self.songs[row])
+        proposals: list[
+            BatchSongProposal
+        ] = []
+
+        for row, result in zip(
+            rows,
+            results,
+        ):
             proposals.append(
                 BatchSongProposal(
                     song_row=row,
                     song=self.songs[row],
-                    candidates=result.candidates,
+                    candidates=(
+                        result.candidates
+                    ),
                     warnings=result.warnings,
                 )
             )

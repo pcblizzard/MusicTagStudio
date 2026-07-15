@@ -6,12 +6,15 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
+from mutagen.apev2 import APEBinaryValue, APEv2
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import APIC, ID3, ID3NoHeaderError
 from mutagen.mp4 import MP4, MP4Cover
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 from PIL import Image
+
+from ..diagnostics import get_diagnostic_logger
 
 
 @dataclass(frozen=True)
@@ -51,6 +54,11 @@ def load_cover_info(filepath: str | Path) -> CoverInfo | None:
         if not audio.pictures: return None
         p=audio.pictures[0]; data=bytes(p.data)
         return CoverInfo(data,str(p.mime or ""),int(p.width or 0),int(p.height or 0),int(p.depth or 0),int(p.colors or 0),int(p.type),hashlib.md5(data,usedforsecurity=False).hexdigest())
+    if suffix == ".wv":
+        return _load_wavpack_cover(
+            path
+        )
+
     if suffix==".mp3":
         try: tags=ID3(path)
         except ID3NoHeaderError: return None
@@ -72,6 +80,13 @@ def embed_cover(filepath: str | Path, jpeg_data: bytes) -> None:
     path=Path(filepath); suffix=path.suffix.lower(); info=image_info(jpeg_data,"image/jpeg")
     if suffix==".flac":
         audio=FLAC(path); audio.clear_pictures(); p=Picture(); p.type=3; p.mime="image/jpeg"; p.desc="Front cover"; p.width=info.width; p.height=info.height; p.depth=24; p.data=jpeg_data; audio.add_picture(p); audio.save(); return
+    if suffix == ".wv":
+        _embed_wavpack_cover(
+            path,
+            jpeg_data,
+        )
+        return
+
     if suffix==".mp3":
         try: tags=ID3(path)
         except ID3NoHeaderError: tags=ID3()
@@ -85,6 +100,156 @@ def embed_cover(filepath: str | Path, jpeg_data: bytes) -> None:
         if audio.tags is None: audio.add_tags()
         audio.tags["covr"]=[MP4Cover(jpeg_data,imageformat=MP4Cover.FORMAT_JPEG)]; audio.save(); return
     raise ValueError(f"Cover-Einbettung für {suffix} wird nicht unterstützt.")
+
+
+
+def _load_wavpack_cover(
+    path: Path,
+) -> CoverInfo | None:
+    """Liest das Frontcover direkt aus dem APEv2-Tag."""
+    logger = get_diagnostic_logger(
+        "wavpack"
+    )
+
+    try:
+        tags = APEv2(path)
+    except Exception as error:
+        logger.exception(
+            "APEv2-Cover konnte nicht gelesen werden: %s",
+            path,
+        )
+        raise RuntimeError(
+            "Das eingebettete WavPack-Cover konnte nicht gelesen werden. "
+            "Details stehen in logs/wavpack.log."
+        ) from error
+
+    value = _find_ape_cover_value(
+        tags
+    )
+
+    if value is None:
+        return None
+
+    try:
+        raw = bytes(value)
+        data, filename = _split_ape_cover_payload(
+            raw
+        )
+
+        if not data:
+            return None
+
+        return image_info(
+            data,
+            _mime_from_cover_filename(
+                filename
+            ),
+        )
+    except Exception as error:
+        logger.exception(
+            "APEv2-Coverdaten sind ungültig: %s",
+            path,
+        )
+        raise RuntimeError(
+            "Das eingebettete WavPack-Cover ist vorhanden, "
+            "konnte aber nicht verarbeitet werden. "
+            "Details stehen in logs/wavpack.log."
+        ) from error
+
+
+def _embed_wavpack_cover(
+    path: Path,
+    jpeg_data: bytes,
+) -> None:
+    """Schreibt ein JPEG als APEv2 Cover Art (Front)."""
+    logger = get_diagnostic_logger(
+        "wavpack"
+    )
+
+    try:
+        try:
+            tags = APEv2(path)
+        except Exception:
+            logger.exception(
+                "Bestehende APEv2-Tags konnten beim Cover-Schreiben "
+                "nicht geladen werden: %s",
+                path,
+            )
+            tags = APEv2()
+
+        for key in list(tags.keys()):
+            if str(key).casefold() in {
+                "cover art (front)",
+                "cover art (front cover)",
+                "cover art (frontcover)",
+            }:
+                del tags[key]
+
+        tags["Cover Art (Front)"] = APEBinaryValue(
+            b"cover.jpg\x00"
+            + jpeg_data
+        )
+        tags.save(path)
+    except Exception as error:
+        logger.exception(
+            "WavPack-Cover konnte nicht geschrieben werden: %s",
+            path,
+        )
+        raise RuntimeError(
+            "Das Cover konnte nicht in die WavPack-Datei eingebettet werden. "
+            "Details stehen in logs/wavpack.log."
+        ) from error
+
+
+def _find_ape_cover_value(
+    tags,
+):
+    accepted = {
+        "cover art (front)",
+        "cover art (front cover)",
+        "cover art (frontcover)",
+    }
+
+    for key in tags.keys():
+        if str(key).casefold() in accepted:
+            return tags.get(key)
+
+    return None
+
+
+def _split_ape_cover_payload(
+    raw: bytes,
+) -> tuple[bytes, str]:
+    separator = raw.find(
+        b"\x00"
+    )
+
+    if separator < 0:
+        return raw, ""
+
+    filename = raw[:separator].decode(
+        "utf-8",
+        errors="replace",
+    )
+
+    return (
+        raw[separator + 1:],
+        filename,
+    )
+
+
+def _mime_from_cover_filename(
+    filename: str,
+) -> str:
+    return {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+    }.get(
+        Path(filename).suffix.casefold(),
+        "",
+    )
 
 
 def covers_are_identical(covers: list[CoverInfo | None]) -> bool:

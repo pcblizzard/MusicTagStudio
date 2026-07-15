@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import unicodedata
+from dataclasses import dataclass
 import re
 import threading
 import time
@@ -12,7 +14,7 @@ from ..models.metadata import MetadataCandidate
 
 
 BASE_URL = "https://musicbrainz.org/ws/2"
-USER_AGENT = "MusicTagStudio/0.3.0 (https://github.com/pcblizzard/MusicTagStudio)"
+USER_AGENT = "MusicTagStudio/0.6.7.6 (https://github.com/pcblizzard/MusicTagStudio)"
 TIMEOUT_SECONDS = 20
 _MIN_REQUEST_INTERVAL = 1.05
 _request_lock = threading.Lock()
@@ -21,6 +23,255 @@ _last_request_time = 0.0
 
 class MusicBrainzProviderError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class MusicBrainzReleaseCandidate:
+    release_id: str
+    album: str
+    artist: str
+    track_count: int
+    year: str
+    status: str
+    country: str
+    confidence: int
+
+
+def search_release(
+    album: str,
+    artist: str = "",
+    *,
+    expected_track_count: int | None = None,
+    wanted_year: str = "",
+    limit: int = 25,
+) -> list[MusicBrainzReleaseCandidate]:
+    query_parts = [
+        f'release:"{_escape(album)}"'
+    ]
+
+    if artist.strip():
+        query_parts.append(
+            f'artist:"{_escape(artist)}"'
+        )
+
+    params = {
+        "query": " AND ".join(query_parts),
+        "fmt": "json",
+        "limit": max(1, min(limit, 100)),
+    }
+    payload = _request_json(
+        f"{BASE_URL}/release?{urlencode(params)}"
+    )
+    results: list[
+        MusicBrainzReleaseCandidate
+    ] = []
+
+    for release in payload.get(
+        "releases",
+        [],
+    ):
+        release_id = str(
+            release.get("id", "")
+        )
+
+        if not release_id:
+            continue
+
+        actual_album = str(
+            release.get("title", "")
+        )
+        actual_artist = _artist_credit(
+            release.get(
+                "artist-credit",
+                [],
+            )
+        )
+        track_count = (
+            _optional_int(
+                release.get(
+                    "track-count"
+                )
+            )
+            or 0
+        )
+        year = _year(
+            str(release.get("date", ""))
+        )
+        status = str(
+            release.get("status", "")
+        )
+        search_score = (
+            _optional_int(
+                release.get("score")
+            )
+            or 0
+        )
+        confidence = _release_match_score(
+            wanted_album=album,
+            wanted_artist=artist,
+            expected_track_count=(
+                expected_track_count
+            ),
+            wanted_year=wanted_year,
+            album=actual_album,
+            artist=actual_artist,
+            track_count=track_count,
+            year=year,
+            status=status,
+            search_score=search_score,
+        )
+
+        results.append(
+            MusicBrainzReleaseCandidate(
+                release_id=release_id,
+                album=actual_album,
+                artist=actual_artist,
+                track_count=track_count,
+                year=year,
+                status=status,
+                country=str(
+                    release.get(
+                        "country",
+                        "",
+                    )
+                ),
+                confidence=confidence,
+            )
+        )
+
+    return sorted(
+        results,
+        key=lambda item: (
+            -item.confidence,
+            abs(
+                (
+                    expected_track_count
+                    or item.track_count
+                )
+                - item.track_count
+            ),
+            item.year or "9999",
+        ),
+    )
+
+
+def _release_match_score(
+    *,
+    wanted_album: str,
+    wanted_artist: str,
+    expected_track_count: int | None,
+    wanted_year: str,
+    album: str,
+    artist: str,
+    track_count: int,
+    year: str,
+    status: str,
+    search_score: int,
+) -> int:
+    score = _text_match_score(
+        wanted_album,
+        album,
+        exact=55,
+        contains=32,
+    )
+    score += _text_match_score(
+        wanted_artist,
+        artist,
+        exact=22,
+        contains=12,
+    )
+
+    if (
+        expected_track_count is not None
+        and track_count > 0
+    ):
+        difference = abs(
+            expected_track_count
+            - track_count
+        )
+
+        if difference == 0:
+            score += 18
+        else:
+            score -= min(
+                24,
+                difference * 4,
+            )
+
+    if wanted_year and year:
+        if wanted_year == year:
+            score += 5
+        else:
+            score -= 2
+
+    if status.casefold() == "official":
+        score += 5
+
+    score += round(
+        max(0, min(100, search_score))
+        / 20
+    )
+
+    return max(0, min(100, score))
+
+
+def _text_match_score(
+    wanted: str,
+    actual: str,
+    *,
+    exact: int,
+    contains: int,
+) -> int:
+    wanted_n = _normalize_text(wanted)
+    actual_n = _normalize_text(actual)
+
+    if not wanted_n:
+        return 0
+
+    if wanted_n == actual_n:
+        return exact
+
+    if (
+        wanted_n in actual_n
+        or actual_n in wanted_n
+    ):
+        return contains
+
+    wanted_words = set(wanted_n.split())
+    actual_words = set(actual_n.split())
+
+    if not wanted_words or not actual_words:
+        return 0
+
+    return round(
+        contains
+        * len(wanted_words & actual_words)
+        / max(
+            len(wanted_words),
+            len(actual_words),
+        )
+    )
+
+
+def _normalize_text(value: str) -> str:
+    value = unicodedata.normalize(
+        "NFKD",
+        value.casefold(),
+    )
+    value = "".join(
+        character
+        for character in value
+        if not unicodedata.combining(
+            character
+        )
+    )
+    value = re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        value,
+    )
+
+    return " ".join(value.split())
 
 
 def search_song(

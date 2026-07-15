@@ -11,6 +11,7 @@ from mutagen.id3 import (
 from mutagen.mp4 import MP4
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
+from mutagen.wavpack import WavPack
 
 from .models import AudioAnalysisResult
 
@@ -36,6 +37,20 @@ def write_replaygain_tags(
         audio = FLAC(path)
         _write_vorbis(
             audio,
+            values,
+            overwrite=overwrite,
+        )
+        audio.save()
+        return
+
+    if suffix == ".wv":
+        audio = WavPack(path)
+
+        if audio.tags is None:
+            audio.add_tags()
+
+        _write_apev2(
+            audio.tags,
             values,
             overwrite=overwrite,
         )
@@ -145,6 +160,23 @@ def _write_vorbis(
             continue
 
         audio[key] = [value]
+
+
+
+def _write_apev2(
+    tags,
+    values: dict[str, str],
+    *,
+    overwrite: bool,
+) -> None:
+    for key, value in values.items():
+        if (
+            key in tags
+            and not overwrite
+        ):
+            continue
+
+        tags[key] = value
 
 
 def _write_mp3(

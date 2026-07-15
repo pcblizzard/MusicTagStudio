@@ -8,8 +8,11 @@ from PySide6.QtCore import (
     Slot,
 )
 from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -21,9 +24,10 @@ from PySide6.QtWidgets import (
 )
 
 from ..direct_album_lookup import (
+    AlbumMatchingResult,
     DirectAlbumLookupError,
+    build_album_matching_result,
     lookup_album,
-    match_album_tracks,
 )
 from ..direct_references import (
     DirectAlbumReferenceError,
@@ -76,23 +80,34 @@ class DirectAlbumDialog(QDialog):
         self.songs = songs
         self.apple_country = apple_country
         self.result = None
+        self.matching_result: (
+            AlbumMatchingResult | None
+        ) = None
         self.matches: dict = {}
         self.reference = None
-        self.thread_pool = QThreadPool.globalInstance()
+        self.track_combos: list[
+            QComboBox
+        ] = []
+        self.thread_pool = (
+            QThreadPool.globalInstance()
+        )
 
         self.setWindowTitle(
-            "Album über Anbieter-Link laden"
+            "Album oder Song über Anbieter-Link laden"
         )
-        self.resize(900, 600)
+        self.resize(
+            1250,
+            720,
+        )
 
         layout = QVBoxLayout(self)
 
         info = QLabel(
-            "Gib einen direkten Apple-Music-Albumlink beziehungsweise "
-            "eine Apple-Album-ID oder einen MusicBrainz-Release-Link "
-            "beziehungsweise eine MBID ein. "
-            "MusicTagStudio lädt genau dieses Album und ordnet die "
-            "lokalen Dateien anhand von Disc-, Tracknummer und Titel zu."
+            "MusicTagStudio erstellt zunächst eine vollständige "
+            "Eins-zu-eins-Zuordnung zwischen lokalen Dateien und "
+            "Albumtracks. Dateiname, Titel, Disc-/Tracknummer, Dauer "
+            "und Reihenfolge werden gemeinsam bewertet. Vor dem "
+            "Vergleich kannst du jede Zuordnung manuell ändern."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -100,10 +115,10 @@ class DirectAlbumDialog(QDialog):
         input_layout = QHBoxLayout()
         self.input_edit = QLineEdit()
         self.input_edit.setPlaceholderText(
-            "https://music.apple.com/album/.../1775980788"
+            "Apple-Music-Album-/Song-Link oder MusicBrainz-Release"
         )
         self.load_button = QPushButton(
-            "Album laden"
+            "Metadaten laden"
         )
         self.load_button.clicked.connect(
             self._load
@@ -120,23 +135,55 @@ class DirectAlbumDialog(QDialog):
         self.status_label = QLabel(
             "Noch kein Album geladen."
         )
+        self.status_label.setWordWrap(True)
         layout.addWidget(
             self.status_label
         )
 
         self.table = QTableWidget(
             len(songs),
-            5,
+            7,
         )
         self.table.setHorizontalHeaderLabels(
             [
                 "Lokale Datei",
                 "Lokaler Titel",
-                "Zugeordneter Titel",
-                "Track",
-                "Status",
+                "Lokaler Track",
+                "Zugeordneter Albumtrack",
+                "Quelltitel",
+                "Sicherheit",
+                "Begründung",
             ]
         )
+        self.table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self.table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.Stretch,
+        )
+        header.setSectionResizeMode(
+            4,
+            QHeaderView.ResizeMode.Stretch,
+        )
+
+        for column in (
+            1,
+            2,
+            3,
+            5,
+            6,
+        ):
+            header.setSectionResizeMode(
+                column,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
+
         layout.addWidget(
             self.table
         )
@@ -151,6 +198,13 @@ class DirectAlbumDialog(QDialog):
                 row,
                 1,
                 QTableWidgetItem(song.title),
+            )
+            self.table.setItem(
+                row,
+                2,
+                QTableWidgetItem(
+                    f"{song.disc or '1'}/{song.track}"
+                ),
             )
 
         buttons = QDialogButtonBox()
@@ -190,6 +244,21 @@ class DirectAlbumDialog(QDialog):
             )
             return
 
+        if (
+            reference.reference_type
+            == "song"
+            and len(self.songs) != 1
+        ):
+            QMessageBox.warning(
+                self,
+                "Song-Link benötigt eine Datei",
+                (
+                    "Bitte markiere genau eine lokale Datei, "
+                    "wenn du einen Apple-Music-Song-Link verwendest."
+                ),
+            )
+            return
+
         self.reference = reference
         self.load_button.setEnabled(False)
         self.compare_button.setEnabled(False)
@@ -209,65 +278,259 @@ class DirectAlbumDialog(QDialog):
         )
         self.thread_pool.start(worker)
 
-    def _loaded(self, result):
+    def _loaded(
+        self,
+        result,
+    ):
         self.load_button.setEnabled(True)
         self.result = result
-        self.matches = match_album_tracks(
-            self.songs,
-            result,
+        self.matching_result = (
+            build_album_matching_result(
+                self.songs,
+                result,
+            )
         )
+        automatic_by_local = {
+            match.local_index: match
+            for match
+            in self.matching_result.matches
+        }
 
-        for row, song in enumerate(self.songs):
-            track = self.matches.get(row)
+        self.track_combos.clear()
 
-            if track is None:
-                self.table.setItem(
-                    row,
-                    2,
-                    QTableWidgetItem(""),
+        for row, song in enumerate(
+            self.songs
+        ):
+            match = automatic_by_local.get(
+                row
+            )
+            combo = QComboBox()
+            combo.addItem(
+                "Nicht zuordnen",
+                -1,
+            )
+
+            for track_index, track in enumerate(
+                result.tracks
+            ):
+                combo.addItem(
+                    (
+                        f"Disc {track.disc or '1'} · "
+                        f"Track {track.track}: "
+                        f"{track.title}"
+                    ),
+                    track_index,
                 )
-                self.table.setItem(
-                    row,
-                    3,
-                    QTableWidgetItem(""),
+
+            if match is not None:
+                combo.setCurrentIndex(
+                    combo.findData(
+                        match.track_index
+                    )
                 )
+
+            combo.currentIndexChanged.connect(
+                self._manual_mapping_changed
+            )
+            self.track_combos.append(combo)
+            self.table.setCellWidget(
+                row,
+                3,
+                combo,
+            )
+
+            if match is None:
                 self.table.setItem(
                     row,
                     4,
+                    QTableWidgetItem(""),
+                )
+                self.table.setItem(
+                    row,
+                    5,
                     QTableWidgetItem(
-                        "Nicht eindeutig zugeordnet"
+                        "Nicht zugeordnet"
                     ),
+                )
+                self.table.setItem(
+                    row,
+                    6,
+                    QTableWidgetItem(""),
                 )
                 continue
 
             self.table.setItem(
                 row,
-                2,
-                QTableWidgetItem(track.title),
+                4,
+                QTableWidgetItem(
+                    match.track.title
+                ),
             )
             self.table.setItem(
                 row,
-                3,
+                5,
                 QTableWidgetItem(
-                    f"{track.disc}/{track.track}"
+                    match.confidence
                 ),
             )
+            self.table.setItem(
+                row,
+                6,
+                QTableWidgetItem(
+                    ", ".join(
+                        match.reasons
+                    )
+                ),
+            )
+
+        self._rebuild_manual_matches()
+
+        automatic_count = len(
+            self.matching_result.matches
+        )
+        ambiguous_count = len(
+            self.matching_result
+            .ambiguous_local_indexes
+        )
+
+        self.status_label.setText(
+            (
+                f"{result.album_artist} – {result.album}: "
+                f"{automatic_count} von {len(self.songs)} "
+                "Dateien automatisch zugeordnet. "
+                f"{ambiguous_count} Zuordnung(en) sollten "
+                "kontrolliert werden."
+            )
+        )
+
+    def _manual_mapping_changed(self):
+        if self.result is None:
+            return
+
+        sender = self.sender()
+
+        try:
+            row = self.track_combos.index(
+                sender
+            )
+        except ValueError:
+            return
+
+        track_index = sender.currentData()
+
+        if (
+            track_index is None
+            or track_index < 0
+        ):
+            self.table.setItem(
+                row,
+                4,
+                QTableWidgetItem(""),
+            )
+            self.table.setItem(
+                row,
+                5,
+                QTableWidgetItem(
+                    "Nicht zugeordnet"
+                ),
+            )
+        else:
+            track = self.result.tracks[
+                track_index
+            ]
             self.table.setItem(
                 row,
                 4,
                 QTableWidgetItem(
-                    "Zugeordnet"
+                    track.title
+                ),
+            )
+            self.table.setItem(
+                row,
+                5,
+                QTableWidgetItem(
+                    "Manuell bestätigt"
                 ),
             )
 
-        self.status_label.setText(
-            f"{result.album_artist} – {result.album}: "
-            f"{len(self.matches)} von {len(self.songs)} "
-            "lokalen Dateien wurden zugeordnet."
+        self._rebuild_manual_matches()
+
+    def _rebuild_manual_matches(self):
+        if self.result is None:
+            self.matches = {}
+            self.compare_button.setEnabled(
+                False
+            )
+            return
+
+        matches = {}
+        used_track_indexes = []
+        missing_rows = []
+
+        for row, combo in enumerate(
+            self.track_combos
+        ):
+            track_index = combo.currentData()
+
+            if (
+                track_index is None
+                or track_index < 0
+            ):
+                missing_rows.append(row)
+                continue
+
+            matches[row] = (
+                self.result.tracks[
+                    track_index
+                ]
+            )
+            used_track_indexes.append(
+                track_index
+            )
+
+        duplicates = {
+            track_index
+            for track_index
+            in used_track_indexes
+            if used_track_indexes.count(
+                track_index
+            ) > 1
+        }
+
+        self.matches = matches
+        complete = (
+            len(matches) == len(self.songs)
+            and not duplicates
         )
         self.compare_button.setEnabled(
-            bool(self.matches)
+            complete
         )
+
+        if duplicates:
+            duplicate_text = ", ".join(
+                str(
+                    self.result.tracks[
+                        index
+                    ].track
+                )
+                for index in sorted(
+                    duplicates
+                )
+            )
+            self.status_label.setText(
+                (
+                    "Eine Eins-zu-eins-Zuordnung ist erforderlich. "
+                    "Diese Albumtracks wurden mehrfach gewählt: "
+                    + duplicate_text
+                )
+            )
+        elif missing_rows:
+            self.status_label.setText(
+                (
+                    f"{len(missing_rows)} lokale Datei(en) "
+                    "sind noch nicht zugeordnet."
+                )
+            )
 
     def _failed(
         self,
@@ -281,8 +544,17 @@ class DirectAlbumDialog(QDialog):
     def _accept(self):
         if (
             self.result is None
-            or not self.matches
+            or len(self.matches)
+            != len(self.songs)
         ):
+            QMessageBox.warning(
+                self,
+                "Zuordnung unvollständig",
+                (
+                    "Vor dem Metadatenvergleich muss jede lokale "
+                    "Datei genau einem Albumtrack zugeordnet sein."
+                ),
+            )
             return
 
         self.accept()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
+from dataclasses import dataclass
 from datetime import datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -15,10 +16,245 @@ SEARCH_ENDPOINT = "https://itunes.apple.com/search"
 DEFAULT_COUNTRY = "DE"
 DEFAULT_LIMIT = 50
 REQUEST_TIMEOUT_SECONDS = 15
+MINIMUM_TRACK_CONFIDENCE = 65
+MINIMUM_ALBUM_CONFIDENCE = 70
+
+_VERSION_WORDS = {
+    "remix",
+    "mix",
+    "instrumental",
+    "live",
+    "edit",
+    "version",
+    "radio",
+    "acoustic",
+    "demo",
+    "remaster",
+    "remastered",
+    "mono",
+    "stereo",
+}
 
 
 class AppleMusicProviderError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class AppleAlbumCandidate:
+    collection_id: str
+    album: str
+    artist: str
+    track_count: int
+    year: str
+    country: str
+    confidence: int
+
+
+def search_album(
+    album: str,
+    artist: str = "",
+    *,
+    expected_track_count: int | None = None,
+    wanted_year: str = "",
+    country: str = DEFAULT_COUNTRY,
+    limit: int = 25,
+) -> list[AppleAlbumCandidate]:
+    terms = [
+        part.strip()
+        for part in (
+            artist,
+            album,
+        )
+        if part.strip()
+    ]
+
+    if not terms:
+        return []
+
+    params = {
+        "term": " ".join(terms),
+        "country": country.upper(),
+        "media": "music",
+        "entity": "album",
+        "limit": max(
+            1,
+            min(limit, 200),
+        ),
+        "lang": "de_de",
+        "version": 2,
+    }
+    request = Request(
+        f"{SEARCH_ENDPOINT}?{urlencode(params)}",
+        headers={
+            "User-Agent": "MusicTagStudio/0.6.7.7",
+            "Accept": "application/json",
+        },
+    )
+
+    try:
+        with urlopen(
+            request,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        ) as response:
+            payload = json.load(response)
+    except HTTPError as error:
+        raise AppleMusicProviderError(
+            f"Apple antwortete mit HTTP-Fehler {error.code}."
+        ) from error
+    except URLError as error:
+        raise AppleMusicProviderError(
+            "Keine Verbindung zur Apple-Suche: "
+            f"{error.reason}"
+        ) from error
+    except (
+        TimeoutError,
+        json.JSONDecodeError,
+    ) as error:
+        raise AppleMusicProviderError(
+            "Die Apple-Antwort konnte nicht verarbeitet werden."
+        ) from error
+
+    results: list[AppleAlbumCandidate] = []
+
+    for item in payload.get(
+        "results",
+        [],
+    ):
+        collection_id = str(
+            item.get(
+                "collectionId",
+                "",
+            )
+        )
+
+        if not collection_id:
+            continue
+
+        actual_album = str(
+            item.get(
+                "collectionName",
+                "",
+            )
+        )
+        actual_artist = str(
+            item.get(
+                "artistName",
+                "",
+            )
+        )
+        actual_track_count = (
+            _optional_int(
+                item.get(
+                    "trackCount"
+                )
+            )
+            or 0
+        )
+        actual_year = _extract_year(
+            str(
+                item.get(
+                    "releaseDate",
+                    "",
+                )
+            )
+        )
+        confidence = _album_match_score(
+            wanted_album=album,
+            wanted_artist=artist,
+            expected_track_count=(
+                expected_track_count
+            ),
+            wanted_year=wanted_year,
+            album=actual_album,
+            artist=actual_artist,
+            track_count=actual_track_count,
+            year=actual_year,
+        )
+
+        results.append(
+            AppleAlbumCandidate(
+                collection_id=collection_id,
+                album=actual_album,
+                artist=actual_artist,
+                track_count=actual_track_count,
+                year=actual_year,
+                country=country.upper(),
+                confidence=confidence,
+            )
+        )
+
+    return sorted(
+        results,
+        key=lambda item: (
+            -item.confidence,
+            abs(
+                (
+                    expected_track_count
+                    or item.track_count
+                )
+                - item.track_count
+            ),
+            item.album.casefold(),
+        ),
+    )
+
+
+def _album_match_score(
+    *,
+    wanted_album: str,
+    wanted_artist: str,
+    expected_track_count: int | None,
+    wanted_year: str,
+    album: str,
+    artist: str,
+    track_count: int,
+    year: str,
+) -> int:
+    score = _field_score(
+        wanted_album,
+        album,
+        exact=65,
+        contains=38,
+    )
+    score += _field_score(
+        wanted_artist,
+        artist,
+        exact=25,
+        contains=14,
+    )
+
+    if (
+        expected_track_count is not None
+        and track_count > 0
+    ):
+        difference = abs(
+            expected_track_count
+            - track_count
+        )
+
+        if difference == 0:
+            score += 15
+        else:
+            score -= min(
+                18,
+                difference * 3,
+            )
+
+    if (
+        wanted_year
+        and year
+        and wanted_year == year
+    ):
+        score += 5
+
+    return max(
+        0,
+        min(
+            100,
+            score,
+        ),
+    )
 
 
 def search_song(
@@ -26,10 +262,27 @@ def search_song(
     artist: str = "",
     album: str = "",
     *,
+    alternate_title: str = "",
+    wanted_track: str = "",
+    wanted_disc: str = "",
+    duration_ms: int | None = None,
     country: str = DEFAULT_COUNTRY,
     limit: int = DEFAULT_LIMIT,
 ) -> list[MetadataCandidate]:
-    terms = [part.strip() for part in (artist, album, title) if part.strip()]
+    query_title = _more_specific_title(
+        title,
+        alternate_title,
+    )
+    terms = [
+        part.strip()
+        for part in (
+            artist,
+            album,
+            query_title,
+        )
+        if part.strip()
+    ]
+
     if not terms:
         return []
 
@@ -38,116 +291,859 @@ def search_song(
         "country": country.upper(),
         "media": "music",
         "entity": "song",
-        "limit": max(1, min(limit, 200)),
+        "limit": max(
+            1,
+            min(limit, 200),
+        ),
         "lang": "de_de",
         "version": 2,
     }
     request = Request(
         f"{SEARCH_ENDPOINT}?{urlencode(params)}",
-        headers={"User-Agent": "MusicTagStudio/0.3.0", "Accept": "application/json"},
+        headers={
+            "User-Agent": "MusicTagStudio/0.6.7.7",
+            "Accept": "application/json",
+        },
     )
+
     try:
-        with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+        with urlopen(
+            request,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        ) as response:
             payload = json.load(response)
     except HTTPError as error:
-        raise AppleMusicProviderError(f"Apple antwortete mit HTTP-Fehler {error.code}.") from error
+        raise AppleMusicProviderError(
+            f"Apple antwortete mit HTTP-Fehler {error.code}."
+        ) from error
     except URLError as error:
-        raise AppleMusicProviderError(f"Keine Verbindung zur Apple-Suche: {error.reason}") from error
-    except (TimeoutError, json.JSONDecodeError) as error:
-        raise AppleMusicProviderError("Die Apple-Antwort konnte nicht verarbeitet werden.") from error
+        raise AppleMusicProviderError(
+            "Keine Verbindung zur Apple-Suche: "
+            f"{error.reason}"
+        ) from error
+    except (
+        TimeoutError,
+        json.JSONDecodeError,
+    ) as error:
+        raise AppleMusicProviderError(
+            "Die Apple-Antwort konnte nicht verarbeitet werden."
+        ) from error
 
     results: list[MetadataCandidate] = []
-    for item in payload.get("results", []):
-        if item.get("wrapperType") != "track" or item.get("kind") != "song":
+
+    for item in payload.get(
+        "results",
+        [],
+    ):
+        if (
+            item.get("wrapperType") != "track"
+            or item.get("kind") != "song"
+        ):
             continue
-        candidate = _candidate_from_item(item, title, artist, album)
+
+        candidate = _candidate_from_item(
+            item,
+            wanted_title=title,
+            alternate_title=alternate_title,
+            wanted_artist=artist,
+            wanted_album=album,
+            wanted_track=wanted_track,
+            wanted_disc=wanted_disc,
+            wanted_duration_ms=duration_ms,
+        )
         results.append(candidate)
-    return sorted(results, key=lambda item: (-item.confidence, item.disc, item.track))
+
+    return sorted(
+        results,
+        key=lambda item: (
+            -item.confidence,
+            _number_for_sort(item.disc),
+            _number_for_sort(item.track),
+        ),
+    )
+
+
+
+def search_song_in_album(
+    title: str,
+    artist: str,
+    album: str,
+    *,
+    collection_id: str,
+    alternate_title: str = "",
+    wanted_track: str = "",
+    wanted_disc: str = "",
+    duration_ms: int | None = None,
+    countries: tuple[str, ...] = ("DE", "US"),
+    limit: int = 100,
+) -> list[MetadataCandidate]:
+    """
+    Sucht einen Titel ausschließlich innerhalb eines bereits bekannten
+    Apple-Albums.
+
+    Die normale Song-Suche darf ähnliche Titel aus anderen Releases liefern.
+    Diese Funktion akzeptiert deshalb nur Ergebnisse, deren collectionId,
+    Tracknummer und Discnummer zum bekannten Album passen.
+    """
+    query_titles = []
+
+    for value in (
+        alternate_title,
+        title,
+    ):
+        value = value.strip()
+
+        if value and value not in query_titles:
+            query_titles.append(value)
+
+    query_variants: list[list[str]] = []
+
+    for query_title in query_titles:
+        for parts in (
+            [artist, query_title],
+            [query_title],
+            [artist, album, query_title],
+        ):
+            cleaned = [
+                part.strip()
+                for part in parts
+                if part.strip()
+            ]
+
+            if cleaned and cleaned not in query_variants:
+                query_variants.append(cleaned)
+
+    wanted_track_number = _optional_int(
+        wanted_track
+    )
+    wanted_disc_number = (
+        _optional_int(
+            wanted_disc
+        )
+        or 1
+    )
+    normalized_collection_id = str(
+        collection_id
+    ).strip()
+    results_by_id: dict[
+        str,
+        MetadataCandidate,
+    ] = {}
+
+    for country in _unique_countries(
+        countries
+    ):
+        for terms in query_variants:
+            payload = _search_payload(
+                terms,
+                country=country,
+                entity="song",
+                limit=limit,
+            )
+
+            for item in payload.get(
+                "results",
+                [],
+            ):
+                if (
+                    item.get("wrapperType") != "track"
+                    or item.get("kind") != "song"
+                ):
+                    continue
+
+                item_collection_id = str(
+                    item.get(
+                        "collectionId",
+                        "",
+                    )
+                )
+
+                if (
+                    not item_collection_id
+                    or item_collection_id
+                    != normalized_collection_id
+                ):
+                    continue
+
+                actual_track = _optional_int(
+                    item.get(
+                        "trackNumber"
+                    )
+                )
+                actual_disc = (
+                    _optional_int(
+                        item.get(
+                            "discNumber"
+                        )
+                    )
+                    or 1
+                )
+
+                if (
+                    wanted_track_number is not None
+                    and actual_track
+                    != wanted_track_number
+                ):
+                    continue
+
+                if (
+                    wanted_disc_number
+                    != actual_disc
+                ):
+                    continue
+
+                candidate = _candidate_from_item(
+                    item,
+                    wanted_title=title,
+                    alternate_title=(
+                        alternate_title
+                    ),
+                    wanted_artist=artist,
+                    wanted_album=album,
+                    wanted_track=(
+                        wanted_track
+                    ),
+                    wanted_disc=(
+                        wanted_disc
+                    ),
+                    wanted_duration_ms=(
+                        duration_ms
+                    ),
+                )
+
+                # collectionId + Disc + Track bilden innerhalb eines Albums
+                # eine eindeutige Position. Ein so bestätigter Treffer ist
+                # wesentlich verlässlicher als die allgemeine Suchwertung.
+                candidate = MetadataCandidate(
+                    source=candidate.source,
+                    confidence=100,
+                    title=candidate.title,
+                    artist=candidate.artist,
+                    album_artist=(
+                        candidate.album_artist
+                    ),
+                    album=candidate.album,
+                    genre=candidate.genre,
+                    year=candidate.year,
+                    track=candidate.track,
+                    total_tracks=(
+                        candidate.total_tracks
+                    ),
+                    disc=candidate.disc,
+                    total_discs=(
+                        candidate.total_discs
+                    ),
+                    isrc=candidate.isrc,
+                    label=candidate.label,
+                    copyright=(
+                        candidate.copyright
+                    ),
+                    composer=candidate.composer,
+                    duration_ms=(
+                        candidate.duration_ms
+                    ),
+                    external_id=(
+                        candidate.external_id
+                    ),
+                    release_id=(
+                        candidate.release_id
+                    ),
+                )
+                key = (
+                    candidate.external_id
+                    or (
+                        f"{candidate.release_id}:"
+                        f"{candidate.disc}:"
+                        f"{candidate.track}"
+                    )
+                )
+                results_by_id[key] = candidate
+
+    return sorted(
+        results_by_id.values(),
+        key=lambda candidate: (
+            -_strict_title_score(
+                title,
+                alternate_title,
+                candidate.title,
+            ),
+            abs(
+                (
+                    duration_ms
+                    or candidate.duration_ms
+                    or 0
+                )
+                - (
+                    candidate.duration_ms
+                    or duration_ms
+                    or 0
+                )
+            ),
+            candidate.title.casefold(),
+        ),
+    )
+
+
+def _strict_title_score(
+    title: str,
+    alternate_title: str,
+    actual_title: str,
+) -> int:
+    return max(
+        _title_score(
+            title,
+            actual_title,
+        ),
+        (
+            _title_score(
+                alternate_title,
+                actual_title,
+            )
+            if alternate_title.strip()
+            else -100
+        ),
+    )
+
+
+def _search_payload(
+    terms: list[str],
+    *,
+    country: str,
+    entity: str,
+    limit: int,
+) -> dict:
+    params = {
+        "term": " ".join(terms),
+        "country": country.upper(),
+        "media": "music",
+        "entity": entity,
+        "limit": max(
+            1,
+            min(limit, 200),
+        ),
+        "lang": "de_de",
+        "version": 2,
+    }
+    request = Request(
+        f"{SEARCH_ENDPOINT}?{urlencode(params)}",
+        headers={
+            "User-Agent": "MusicTagStudio/0.6.7.7",
+            "Accept": "application/json",
+        },
+    )
+
+    try:
+        with urlopen(
+            request,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        ) as response:
+            return json.load(response)
+    except HTTPError as error:
+        raise AppleMusicProviderError(
+            f"Apple antwortete mit HTTP-Fehler {error.code}."
+        ) from error
+    except URLError as error:
+        raise AppleMusicProviderError(
+            "Keine Verbindung zur Apple-Suche: "
+            f"{error.reason}"
+        ) from error
+    except (
+        TimeoutError,
+        json.JSONDecodeError,
+    ) as error:
+        raise AppleMusicProviderError(
+            "Die Apple-Antwort konnte nicht verarbeitet werden."
+        ) from error
+
+
+def _unique_countries(
+    countries: tuple[str, ...],
+) -> tuple[str, ...]:
+    result = []
+
+    for country in countries:
+        normalized = str(
+            country
+        ).strip().upper()
+
+        if (
+            normalized
+            and normalized not in result
+        ):
+            result.append(normalized)
+
+    return tuple(result)
 
 
 def _candidate_from_item(
     item: dict,
+    *,
     wanted_title: str,
+    alternate_title: str,
     wanted_artist: str,
     wanted_album: str,
+    wanted_track: str,
+    wanted_disc: str,
+    wanted_duration_ms: int | None,
 ) -> MetadataCandidate:
-    title = str(item.get("trackName", ""))
-    artist = str(item.get("artistName", ""))
-    album = str(item.get("collectionName", ""))
-    release_date = str(item.get("releaseDate", ""))
-    score = _match_score(wanted_title, wanted_artist, wanted_album, title, artist, album)
+    title = str(
+        item.get(
+            "trackName",
+            "",
+        )
+    )
+    artist = str(
+        item.get(
+            "artistName",
+            "",
+        )
+    )
+    album = str(
+        item.get(
+            "collectionName",
+            "",
+        )
+    )
+    release_date = str(
+        item.get(
+            "releaseDate",
+            "",
+        )
+    )
+    actual_track = _string_number(
+        item.get(
+            "trackNumber"
+        )
+    )
+    actual_disc = _string_number(
+        item.get(
+            "discNumber"
+        )
+    )
+    actual_duration_ms = _optional_int(
+        item.get(
+            "trackTimeMillis"
+        )
+    )
+
+    score = _match_score(
+        wanted_title=wanted_title,
+        alternate_title=alternate_title,
+        wanted_artist=wanted_artist,
+        wanted_album=wanted_album,
+        wanted_track=wanted_track,
+        wanted_disc=wanted_disc,
+        wanted_duration_ms=wanted_duration_ms,
+        title=title,
+        artist=artist,
+        album=album,
+        track=actual_track,
+        disc=actual_disc,
+        duration_ms=actual_duration_ms,
+    )
+
     return MetadataCandidate(
         source="apple_music",
         confidence=score,
         title=title,
         artist=artist,
-        album_artist=str(item.get("collectionArtistName") or artist),
+        album_artist=str(
+            item.get(
+                "collectionArtistName"
+            )
+            or artist
+        ),
         album=album,
-        genre=str(item.get("primaryGenreName", "")),
-        year=_extract_year(release_date),
-        track=_string_number(item.get("trackNumber")),
-        total_tracks=_string_number(item.get("trackCount")),
-        disc=_string_number(item.get("discNumber")),
-        total_discs=_string_number(item.get("discCount")),
-        duration_ms=_optional_int(item.get("trackTimeMillis")),
-        external_id=str(item.get("trackId", "")),
-        release_id=str(item.get("collectionId", "")),
+        genre=str(
+            item.get(
+                "primaryGenreName",
+                "",
+            )
+        ),
+        year=_extract_year(
+            release_date
+        ),
+        track=actual_track,
+        total_tracks=_string_number(
+            item.get(
+                "trackCount"
+            )
+        ),
+        disc=actual_disc,
+        total_discs=_string_number(
+            item.get(
+                "discCount"
+            )
+        ),
+        duration_ms=actual_duration_ms,
+        external_id=str(
+            item.get(
+                "trackId",
+                "",
+            )
+        ),
+        release_id=str(
+            item.get(
+                "collectionId",
+                "",
+            )
+        ),
     )
 
 
-def _match_score(wt: str, wa: str, wal: str, title: str, artist: str, album: str) -> int:
-    return min(
-        100,
-        _field_score(wt, title, 55, 30)
-        + _field_score(wa, artist, 25, 14)
-        + _field_score(wal, album, 20, 12),
+def _match_score(
+    *,
+    wanted_title: str,
+    alternate_title: str,
+    wanted_artist: str,
+    wanted_album: str,
+    wanted_track: str,
+    wanted_disc: str,
+    wanted_duration_ms: int | None,
+    title: str,
+    artist: str,
+    album: str,
+    track: str,
+    disc: str,
+    duration_ms: int | None,
+) -> int:
+    title_score = max(
+        _title_score(
+            wanted_title,
+            title,
+        ),
+        _title_score(
+            alternate_title,
+            title,
+        )
+        if alternate_title.strip()
+        else -100,
+    )
+    score = title_score
+
+    score += _field_score(
+        wanted_artist,
+        artist,
+        exact=20,
+        contains=11,
+    )
+    score += _field_score(
+        wanted_album,
+        album,
+        exact=15,
+        contains=8,
+    )
+
+    wanted_track_number = _optional_int(
+        wanted_track
+    )
+    actual_track_number = _optional_int(
+        track
+    )
+
+    if (
+        wanted_track_number is not None
+        and actual_track_number is not None
+    ):
+        if (
+            wanted_track_number
+            == actual_track_number
+        ):
+            score += 35
+        else:
+            score -= 25
+
+    wanted_disc_number = (
+        _optional_int(
+            wanted_disc
+        )
+        or 1
+    )
+    actual_disc_number = (
+        _optional_int(
+            disc
+        )
+        or 1
+    )
+
+    if wanted_disc_number == actual_disc_number:
+        score += 5
+    else:
+        score -= 15
+
+    if (
+        wanted_duration_ms is not None
+        and duration_ms is not None
+    ):
+        difference = abs(
+            wanted_duration_ms
+            - duration_ms
+        )
+
+        if difference <= 1500:
+            score += 25
+        elif difference <= 4000:
+            score += 15
+        elif difference <= 10000:
+            score += 5
+        elif difference >= 30000:
+            score -= 15
+
+    return max(
+        0,
+        min(
+            100,
+            score,
+        ),
     )
 
 
-def _field_score(wanted: str, actual: str, exact: int, contains: int) -> int:
+def _title_score(
+    wanted: str,
+    actual: str,
+) -> int:
     wanted_n = _normalize(wanted)
     actual_n = _normalize(actual)
+
     if not wanted_n:
         return 0
+
+    if wanted_n == actual_n:
+        return 70
+
+    wanted_words = set(
+        wanted_n.split()
+    )
+    actual_words = set(
+        actual_n.split()
+    )
+
+    if (
+        not wanted_words
+        or not actual_words
+    ):
+        return 0
+
+    wanted_versions = (
+        wanted_words
+        & _VERSION_WORDS
+    )
+    actual_versions = (
+        actual_words
+        & _VERSION_WORDS
+    )
+
+    # Ein ausdrücklich als Remix/Instrumental/etc. bezeichneter lokaler
+    # Titel darf nicht auf die normale Albumfassung zurückfallen.
+    if wanted_versions:
+        if not (
+            wanted_versions
+            <= actual_versions
+        ):
+            return -20
+
+        overlap = len(
+            wanted_words
+            & actual_words
+        ) / len(wanted_words)
+
+        if overlap >= 0.75:
+            return 65
+
+        return 50
+
+    if actual_versions:
+        # Der lokale Titel kann den Versionszusatz noch nicht enthalten.
+        # Das bleibt möglich, erhält aber weniger Gewicht als eine
+        # vollständige Übereinstimmung.
+        core_actual = (
+            actual_words
+            - actual_versions
+        )
+        overlap = len(
+            wanted_words
+            & core_actual
+        ) / max(
+            1,
+            len(wanted_words),
+        )
+
+        if overlap >= 0.9:
+            return 35
+
+    if (
+        wanted_n in actual_n
+        or actual_n in wanted_n
+    ):
+        return 45
+
+    overlap = len(
+        wanted_words
+        & actual_words
+    ) / max(
+        len(wanted_words),
+        len(actual_words),
+    )
+
+    return round(
+        35 * overlap
+    )
+
+
+def _field_score(
+    wanted: str,
+    actual: str,
+    *,
+    exact: int,
+    contains: int,
+) -> int:
+    wanted_n = _normalize(wanted)
+    actual_n = _normalize(actual)
+
+    if not wanted_n:
+        return 0
+
     if wanted_n == actual_n:
         return exact
-    if wanted_n in actual_n or actual_n in wanted_n:
+
+    if (
+        wanted_n in actual_n
+        or actual_n in wanted_n
+    ):
         return contains
-    wanted_words = set(wanted_n.split())
-    actual_words = set(actual_n.split())
-    if not wanted_words or not actual_words:
+
+    wanted_words = set(
+        wanted_n.split()
+    )
+    actual_words = set(
+        actual_n.split()
+    )
+
+    if (
+        not wanted_words
+        or not actual_words
+    ):
         return 0
-    return round(contains * len(wanted_words & actual_words) / max(len(wanted_words), len(actual_words)))
+
+    return round(
+        contains
+        * len(
+            wanted_words
+            & actual_words
+        )
+        / max(
+            len(wanted_words),
+            len(actual_words),
+        )
+    )
 
 
-def _normalize(value: str) -> str:
-    value = unicodedata.normalize("NFKD", value.casefold())
-    value = "".join(ch for ch in value if not unicodedata.combining(ch))
-    value = re.sub(r"[^a-z0-9]+", " ", value)
-    return " ".join(value.split())
+def _more_specific_title(
+    first: str,
+    second: str,
+) -> str:
+    first_words = _normalize(
+        first
+    ).split()
+    second_words = _normalize(
+        second
+    ).split()
+
+    if len(second_words) > len(first_words):
+        return second
+
+    return first
 
 
-def _extract_year(value: str) -> str:
+def _normalize(
+    value: str,
+) -> str:
+    value = unicodedata.normalize(
+        "NFKD",
+        value.casefold(),
+    )
+    value = "".join(
+        character
+        for character in value
+        if not unicodedata.combining(
+            character
+        )
+    )
+    value = re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        value,
+    )
+
+    return " ".join(
+        value.split()
+    )
+
+
+def _extract_year(
+    value: str,
+) -> str:
     if not value:
         return ""
+
     try:
-        return str(datetime.fromisoformat(value.replace("Z", "+00:00")).year)
+        return str(
+            datetime.fromisoformat(
+                value.replace(
+                    "Z",
+                    "+00:00",
+                )
+            ).year
+        )
     except ValueError:
-        match = re.match(r"^(\d{4})", value)
-        return match.group(1) if match else ""
+        match = re.match(
+            r"^(\d{4})",
+            value,
+        )
+
+        return (
+            match.group(1)
+            if match
+            else ""
+        )
 
 
-def _string_number(value: object) -> str:
-    if value in (None, ""):
+def _string_number(
+    value: object,
+) -> str:
+    if value in (
+        None,
+        "",
+    ):
         return ""
+
     try:
-        return str(int(value))
-    except (TypeError, ValueError):
+        return str(
+            int(value)
+        )
+    except (
+        TypeError,
+        ValueError,
+    ):
         return str(value)
 
 
-def _optional_int(value: object) -> int | None:
+def _optional_int(
+    value: object,
+) -> int | None:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except (
+        TypeError,
+        ValueError,
+    ):
         return None
+
+
+def _number_for_sort(
+    value: str,
+) -> int:
+    return (
+        _optional_int(value)
+        or 9999
+    )

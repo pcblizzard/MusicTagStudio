@@ -10,6 +10,7 @@ from .models import (
     LibraryIssue,
 )
 from ..models.song import Song
+from ..services.cover import load_cover_info
 
 
 REPLAYGAIN_TRACK_GAIN = "replaygain_track_gain"
@@ -597,64 +598,20 @@ def _check_replaygain(
 def _embedded_cover_signature(
     filepath: str,
 ) -> tuple[int, str] | None:
-    path = Path(filepath)
-
-    if not path.is_file():
-        return None
-
     try:
-        audio = MutagenFile(filepath)
+        info = load_cover_info(
+            filepath
+        )
     except Exception:
         return None
 
-    if audio is None:
+    if info is None:
         return None
 
-    pictures = getattr(
-        audio,
-        "pictures",
-        None,
+    return (
+        len(info.data),
+        info.md5,
     )
-
-    if pictures:
-        data = pictures[0].data
-        return (
-            len(data),
-            _md5(data),
-        )
-
-    tags = getattr(
-        audio,
-        "tags",
-        None,
-    )
-
-    if tags is None:
-        return None
-
-    for key in (
-        "APIC:",
-        "covr",
-        "metadata_block_picture",
-    ):
-        try:
-            value = tags.get(key)
-        except AttributeError:
-            value = None
-
-        if not value:
-            continue
-
-        raw = _cover_bytes(value)
-
-        if raw:
-            return (
-                len(raw),
-                _md5(raw),
-            )
-
-    return None
-
 
 def _audio_tags(
     filepath: str,
