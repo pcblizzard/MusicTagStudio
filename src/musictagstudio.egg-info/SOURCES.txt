@@ -72,10 +72,12 @@ tests/test_album_analysis.py
 tests/test_album_matching_matrix.py
 tests/test_album_summary_metrics.py
 tests/test_apple_album_search_ranking.py
+tests/test_apple_exact_lookup_recovery_v0684.py
 tests/test_apple_music_ranking_v0674.py
 tests/test_apple_search_in_album_filtering.py
 tests/test_apple_store_tracklist_selection.py
 tests/test_apple_strict_album_recovery.py
+tests/test_apple_version_synonyms_v0684.py
 tests/test_audio_analysis_cache.py
 tests/test_audio_analysis_parsing.py
 tests/test_audio_analysis_settings.py
@@ -118,6 +120,7 @@ tests/test_scan_diagnostics.py
 tests/test_settings.py
 tests/test_settings_v040.py
 tests/test_wavpack_ape_metadata.py
+tests/test_wavpack_cover_apev2.py
 tests/test_wavpack_direct_apev2.py
 tests/test_wavpack_ffprobe_fallback.py
 tests/test_wavpack_support.py

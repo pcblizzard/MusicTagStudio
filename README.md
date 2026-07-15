@@ -233,3 +233,15 @@ gelesen. Der WavPack-Audiostream wird dafür nicht mehr geparst.
 Außerdem wurde ein doppelter und fehlerhafter WavPack-Zweig in der
 Cover-Einbettung entfernt. Vorhandene Cover können nun erkannt,
 verglichen, ersetzt und erneut eingebettet werden.
+
+
+### Apple-Music-Korrekturen in v0.6.8.4
+
+- Fehlende Tracks eines erkannten Albums werden zuerst erneut über die
+  offizielle Lookup-API geladen.
+- Eingestellter Store und US-Store werden geprüft.
+- Exakter Abgleich nach Collection-ID, Discnummer und Tracknummer.
+- Search-API nur noch als letzter streng gefilterter Rückfall.
+- `limit=200` bei Album-Lookups.
+- Vollständiges Protokoll unter `logs/apple_music.log`.
+- `remastered` wird wie `remaster`, `remixed` wie `remix` behandelt.

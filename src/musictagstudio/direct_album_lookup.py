@@ -14,13 +14,14 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from .diagnostics import get_diagnostic_logger
 from .direct_references import DirectAlbumReference
 from .models.metadata import MetadataCandidate
 from .models.song import Song
 
 
 USER_AGENT = (
-    "MusicTagStudio/0.6.7.7 "
+    "MusicTagStudio/0.6.8.4 "
     "(https://github.com/pcblizzard/MusicTagStudio)"
 )
 TIMEOUT_SECONDS = 20
@@ -926,6 +927,102 @@ def _lookup_apple_song(
     )
 
 
+
+def find_apple_track_in_album(
+    collection_id: str,
+    track_number: int,
+    disc_number: int = 1,
+    *,
+    countries: tuple[str, ...] = ("DE", "US"),
+    lookup_func=None,
+) -> DirectAlbumTrack | None:
+    """
+    Sucht einen Track per offizieller Lookup-API innerhalb einer bekannten
+    Apple-Collection. Es findet kein Textabgleich statt.
+    """
+    logger = get_diagnostic_logger(
+        "apple_music"
+    )
+    lookup = (
+        lookup_func
+        or lookup_apple_album_by_id
+    )
+    unique_countries: list[str] = []
+
+    for country in countries:
+        normalized = str(
+            country
+        ).strip().upper()
+
+        if (
+            normalized
+            and normalized not in unique_countries
+        ):
+            unique_countries.append(
+                normalized
+            )
+
+    for country in unique_countries:
+        try:
+            result = lookup(
+                collection_id,
+                country=country,
+            )
+        except DirectAlbumLookupError as error:
+            logger.warning(
+                "Exakte Nachsuche fehlgeschlagen | Store=%s | "
+                "Collection-ID=%s | Disc=%s | Track=%s | %s",
+                country,
+                collection_id,
+                disc_number,
+                track_number,
+                error,
+            )
+            continue
+
+        for track in result.tracks:
+            actual_track = _as_int(
+                track.track
+            )
+            actual_disc = (
+                _as_int(
+                    track.disc
+                )
+                or 1
+            )
+
+            if (
+                actual_track == track_number
+                and actual_disc == disc_number
+            ):
+                logger.info(
+                    "Exakte Nachsuche gefunden | Store=%s | "
+                    "Collection-ID=%s | Disc=%s | Track=%s | "
+                    "Song-ID=%s | Titel=%s",
+                    country,
+                    collection_id,
+                    disc_number,
+                    track_number,
+                    track.external_id or "?",
+                    track.title,
+                )
+
+                return track
+
+        logger.warning(
+            "Exakte Nachsuche ohne Treffer | Store=%s | "
+            "Collection-ID=%s | Disc=%s | Track=%s | "
+            "geladene Titel=%d",
+            country,
+            collection_id,
+            disc_number,
+            track_number,
+            len(result.tracks),
+        )
+
+    return None
+
+
 def lookup_apple_album_by_id(
     album_id: str,
     *,
@@ -951,6 +1048,7 @@ def _lookup_apple_album(
                 "entity": "song",
                 "country": country,
                 "lang": "de_de",
+                "limit": 200,
             }
         )
     )
@@ -1015,6 +1113,30 @@ def _lookup_apple_album(
         )
         for item in track_items
     )
+
+    logger = get_diagnostic_logger(
+        "apple_music"
+    )
+    logger.info(
+        "Album-Lookup | Store=%s | Collection-ID=%s | "
+        "Album=%s | geladene Titel=%d",
+        country.upper(),
+        album_id,
+        album_name,
+        len(tracks),
+    )
+
+    for track in tracks:
+        logger.info(
+            "Track | Store=%s | Collection-ID=%s | Disc=%s | "
+            "Track=%s | Song-ID=%s | Titel=%s",
+            country.upper(),
+            album_id,
+            track.disc or "1",
+            track.track or "?",
+            track.external_id or "?",
+            track.title,
+        )
 
     return DirectAlbumResult(
         provider="apple_music",

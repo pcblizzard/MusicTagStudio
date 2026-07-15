@@ -13,6 +13,7 @@ from ..core.merger import merge_metadata
 from ..direct_album_lookup import (
     DirectAlbumLookupError,
     build_album_matching_result,
+    find_apple_track_in_album,
     lookup_apple_album_by_id,
     lookup_musicbrainz_release_by_id,
 )
@@ -575,6 +576,52 @@ def _add_album_aware_apple_candidates(
             song = group_songs[
                 local_index
             ]
+            wanted_track_number = (
+                _positive_int(
+                    song.track
+                )
+            )
+            wanted_disc_number = (
+                _positive_int(
+                    song.disc
+                )
+                or 1
+            )
+            exact_track = None
+
+            if (
+                wanted_track_number
+                is not None
+            ):
+                exact_track = (
+                    find_apple_track_in_album(
+                        selected_collection_id,
+                        wanted_track_number,
+                        wanted_disc_number,
+                        countries=(
+                            recovery_countries
+                        ),
+                        lookup_func=(
+                            lookup_apple_album_by_id
+                        ),
+                    )
+                )
+
+            if exact_track is not None:
+                candidates_by_index[
+                    indexes[local_index]
+                ].append(
+                    replace(
+                        exact_track.as_candidate(
+                            "apple_music"
+                        ),
+                        confidence=100,
+                        release_id=(
+                            selected_collection_id
+                        ),
+                    )
+                )
+                continue
 
             try:
                 recovered = (
@@ -632,8 +679,11 @@ def _add_album_aware_apple_candidates(
                         "Apple Music: Das Album wurde sicher erkannt, "
                         f"aber Disc {song.disc or '1'} / "
                         f"Track {song.track or '?'} konnte innerhalb "
-                        "dieser collectionId nicht über die offiziellen "
-                        "Search-/Lookup-Schnittstellen gefunden werden."
+                        f"der collectionId {selected_collection_id} "
+                        "weder über die Lookup-API im "
+                        "konfigurierten/US-Store noch über die streng "
+                        "gefilterte Search-API gefunden werden. "
+                        "Details stehen in logs/apple_music.log."
                     )
                 )
 
@@ -1170,6 +1220,25 @@ def _provider_order(
         ]
 
     return supported
+
+
+def _positive_int(
+    value,
+) -> int | None:
+    try:
+        number = int(value)
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return None
+
+    return (
+        number
+        if number > 0
+        else None
+    )
+
 
 def _append_group_warning(
     warnings_by_index: list[

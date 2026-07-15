@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.6.8.4
+
+### Apple-Music-Lookup verbessert
+
+- Fehlende Albumtracks werden zuerst per Lookup-API nachgeladen
+- Eingestellter Store und US-Store werden geprüft
+- Exakter Abgleich nach Collection-ID, Discnummer und Tracknummer
+- Search-API nur als letzter streng gefilterter Rückfall
+- `limit=200` für Apple-Album-Lookups
+- Vollständiges Trackprotokoll in `logs/apple_music.log`
+
+### Versionsnamen normalisiert
+
+- `remastered` entspricht `remaster`
+- `remixed` entspricht `remix`
+
+
+
 ## v0.6.8.3
 
 ### WavPack-Cover korrigiert

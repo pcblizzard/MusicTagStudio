@@ -18,7 +18,44 @@ Traceback (most recent call last):
     raise ValueError("kaputt")
 ValueError: kaputt
 2026-07-15 09:34:55,349 | INFO | Scan beendet: 1 eingelesen, 1 übersprungen
-2026-07-15 11:38:31,268 | INFO | Scan gestartet: C:\Users\Michael\Music\Carmen Gomes Inc\Carmen Gomes Inc. - Stones in My Passway (2023)\WV | 15 erkannte Datei(en)
-2026-07-15 11:38:31,278 | INFO | Scan beendet: 15 eingelesen, 0 übersprungen
-2026-07-15 11:39:12,560 | INFO | Scan gestartet: C:\Users\Michael\Music\Clueso | 28 erkannte Datei(en)
-2026-07-15 11:39:12,595 | INFO | Scan beendet: 28 eingelesen, 0 übersprungen
+2026-07-15 10:09:54,929 | INFO | Scan gestartet: /tmp/pytest-of-oai/pytest-9/test_scan_reports_failures0 | 2 erkannte Datei(en)
+2026-07-15 10:09:54,930 | ERROR | Datei konnte nicht eingelesen werden: /tmp/pytest-of-oai/pytest-9/test_scan_reports_failures0/bad.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.4/src/musictagstudio/services/scanner.py", line 69, in scan_folder_detailed
+    read_metadata(filepath)
+    ~~~~~~~~~~~~~^^^^^^^^^^
+  File "/mnt/data/MusicTagStudio_v0.6.8.4/tests/test_scan_diagnostics.py", line 15, in fake_read
+    raise ValueError("kaputt")
+ValueError: kaputt
+2026-07-15 10:09:54,934 | INFO | Scan beendet: 1 eingelesen, 1 übersprungen
+2026-07-15 10:11:22,632 | INFO | Scan gestartet: /tmp/pytest-of-oai/pytest-10/test_scan_reports_failures0 | 2 erkannte Datei(en)
+2026-07-15 10:11:22,632 | ERROR | Datei konnte nicht eingelesen werden: /tmp/pytest-of-oai/pytest-10/test_scan_reports_failures0/bad.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.4/src/musictagstudio/services/scanner.py", line 69, in scan_folder_detailed
+    read_metadata(filepath)
+    ~~~~~~~~~~~~~^^^^^^^^^^
+  File "/mnt/data/MusicTagStudio_v0.6.8.4/tests/test_scan_diagnostics.py", line 15, in fake_read
+    raise ValueError("kaputt")
+ValueError: kaputt
+2026-07-15 10:11:22,641 | INFO | Scan beendet: 1 eingelesen, 1 übersprungen
+2026-07-15 10:12:28,024 | INFO | Scan gestartet: /tmp/pytest-of-oai/pytest-11/test_scan_reports_failures0 | 2 erkannte Datei(en)
+2026-07-15 10:12:28,024 | ERROR | Datei konnte nicht eingelesen werden: /tmp/pytest-of-oai/pytest-11/test_scan_reports_failures0/bad.wv
+Traceback (most recent call last):
+  File "/mnt/data/MusicTagStudio_v0.6.8.4/src/musictagstudio/services/scanner.py", line 69, in scan_folder_detailed
+    read_metadata(filepath)
+    ~~~~~~~~~~~~~^^^^^^^^^^
+  File "/mnt/data/MusicTagStudio_v0.6.8.4/tests/test_scan_diagnostics.py", line 15, in fake_read
+    raise ValueError("kaputt")
+ValueError: kaputt
+2026-07-15 10:12:28,028 | INFO | Scan beendet: 1 eingelesen, 1 übersprungen
+2026-07-15 12:47:51,511 | INFO | Scan gestartet: C:\Users\Michael\AppData\Local\Temp\pytest-of-Michael\pytest-19\test_scan_reports_failures0 | 2 erkannte Datei(en)
+2026-07-15 12:47:51,511 | ERROR | Datei konnte nicht eingelesen werden: C:\Users\Michael\AppData\Local\Temp\pytest-of-Michael\pytest-19\test_scan_reports_failures0\bad.wv
+Traceback (most recent call last):
+  File "C:\Users\Michael\OneDrive\Documents\GitHub\MusicTagStudio\src\musictagstudio\services\scanner.py", line 69, in scan_folder_detailed
+    read_metadata(filepath)
+  File "C:\Users\Michael\OneDrive\Documents\GitHub\MusicTagStudio\tests\test_scan_diagnostics.py", line 15, in fake_read
+    raise ValueError("kaputt")
+ValueError: kaputt
+2026-07-15 12:47:51,513 | INFO | Scan beendet: 1 eingelesen, 1 übersprungen
+2026-07-15 12:48:46,735 | INFO | Scan gestartet: C:\Users\Michael\Music\Clueso | 28 erkannte Datei(en)
+2026-07-15 12:48:46,768 | INFO | Scan beendet: 28 eingelesen, 0 übersprungen

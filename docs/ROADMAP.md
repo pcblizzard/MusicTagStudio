@@ -156,3 +156,11 @@ weitere technische Konsistenzprüfungen.
 - WavPack-Cover direkt über APEv2
 - Vorhandene Frontcover erkennen
 - WavPack-Cover korrekt ersetzen und einbetten
+
+
+## v0.6.8.4 ✅
+
+- Lookup-basierte Wiederherstellung fehlender Apple-Tracks
+- Storeübergreifender Disc-/Trackabgleich
+- Apple-Music-Diagnoseprotokoll
+- Versionssynonyme für Remaster und Remix

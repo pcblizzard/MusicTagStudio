@@ -21,6 +21,7 @@ MINIMUM_ALBUM_CONFIDENCE = 70
 
 _VERSION_WORDS = {
     "remix",
+    "remixed",
     "mix",
     "instrumental",
     "live",
@@ -33,6 +34,11 @@ _VERSION_WORDS = {
     "remastered",
     "mono",
     "stereo",
+}
+
+_VERSION_SYNONYMS = {
+    "remastered": "remaster",
+    "remixed": "remix",
 }
 
 
@@ -87,7 +93,7 @@ def search_album(
     request = Request(
         f"{SEARCH_ENDPOINT}?{urlencode(params)}",
         headers={
-            "User-Agent": "MusicTagStudio/0.6.7.7",
+            "User-Agent": "MusicTagStudio/0.6.8.4",
             "Accept": "application/json",
         },
     )
@@ -301,7 +307,7 @@ def search_song(
     request = Request(
         f"{SEARCH_ENDPOINT}?{urlencode(params)}",
         headers={
-            "User-Agent": "MusicTagStudio/0.6.7.7",
+            "User-Agent": "MusicTagStudio/0.6.8.4",
             "Accept": "application/json",
         },
     )
@@ -627,7 +633,7 @@ def _search_payload(
     request = Request(
         f"{SEARCH_ENDPOINT}?{urlencode(params)}",
         headers={
-            "User-Agent": "MusicTagStudio/0.6.7.7",
+            "User-Agent": "MusicTagStudio/0.6.8.4",
             "Accept": "application/json",
         },
     )
@@ -924,11 +930,11 @@ def _title_score(
     ):
         return 0
 
-    wanted_versions = (
+    wanted_versions = _canonicalize_versions(
         wanted_words
         & _VERSION_WORDS
     )
-    actual_versions = (
+    actual_versions = _canonicalize_versions(
         actual_words
         & _VERSION_WORDS
     )
@@ -988,6 +994,19 @@ def _title_score(
     return round(
         35 * overlap
     )
+
+
+
+def _canonicalize_versions(
+    words: set[str],
+) -> set[str]:
+    return {
+        _VERSION_SYNONYMS.get(
+            word,
+            word,
+        )
+        for word in words
+    }
 
 
 def _field_score(
