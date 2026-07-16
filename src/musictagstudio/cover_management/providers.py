@@ -12,7 +12,7 @@ from .models import CoverCandidate
 
 TIMEOUT = 15
 USER_AGENT = (
-    "MusicTagStudio/0.6.1 "
+    "MusicTagStudio/0.7.1 "
     "(https://github.com/pcblizzard/MusicTagStudio)"
 )
 
@@ -254,6 +254,8 @@ def search_caa_cover(
 
 def download(
     url: str,
+    *,
+    timeout: int = TIMEOUT,
 ) -> bytes:
     request = Request(
         url,
@@ -265,7 +267,7 @@ def download(
 
     with urlopen(
         request,
-        timeout=TIMEOUT,
+        timeout=timeout,
     ) as response:
         return response.read()
 

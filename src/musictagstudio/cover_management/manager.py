@@ -43,6 +43,8 @@ class CoverManager:
         tuple[CoverCandidate, ...],
     ] = {}
     _cache_lock = Lock()
+    _preview_cache: dict[str, bytes] = {}
+    _preview_cache_lock = Lock()
 
     def __init__(
         self,
@@ -238,10 +240,35 @@ class CoverManager:
         if candidate.data is not None:
             return candidate.data
 
-        return download(
+        url = (
             candidate.preview_url
             or candidate.url
         )
+
+        if not url:
+            raise ValueError(
+                "Für dieses Cover ist keine Vorschauadresse vorhanden."
+            )
+
+        with self._preview_cache_lock:
+            cached = self._preview_cache.get(
+                url
+            )
+
+        if cached is not None:
+            return cached
+
+        data = download(
+            url,
+            timeout=8,
+        )
+
+        with self._preview_cache_lock:
+            self._preview_cache[
+                url
+            ] = data
+
+        return data
 
     def hydrate(
         self,

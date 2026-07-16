@@ -164,3 +164,87 @@ weitere technische Konsistenzprüfungen.
 - Storeübergreifender Disc-/Trackabgleich
 - Apple-Music-Diagnoseprotokoll
 - Versionssynonyme für Remaster und Remix
+
+
+## v0.6.8.5 ✅
+
+- Komplette Apple-Lookup-Antworten als JSON sichern
+- Akzeptierte und verworfene Apple-Einträge protokollieren
+- Exakte Verwerfungsgründe pro Eintrag
+- Reproduzierbare Apple-Parser-Diagnose
+
+
+## v0.6.8.6 ✅
+
+- Diagnose ab dem ersten ausführbaren Programmschritt
+- Sitzungs-IDs über alle Logdateien
+- Stabiler Projektpfad für Logs und Cache
+- Vollständiges Album- und Track-Matching-Protokoll
+- Globale Ausnahme- und Qt-Protokollierung
+
+
+## v0.6.8.7 ✅
+
+- Apple-Collection-Recovery aus Songtreffern
+- Albumtitel-Varianten
+- Jahresnormalisierung
+
+
+## v0.7.0 ✅
+
+- Auto-Scan nach Ordnerwahl
+- Änderungsvorschau
+- Vollständige Backups
+- Undo und Redo
+- Sitzungsverlauf
+- Regressions-Testsystem
+- Automatische Release-Prüfung
+- GitHub Actions
+
+
+## v0.7.1 ✅
+
+- Covervorschau vorladen und zwischenspeichern
+- Kommentarfeld im Haupteditor
+- Manuell erzeugte BBCode-Textvorlage
+- Hintergrundermittlung technischer Qualitätsdaten
+
+
+## v0.7.1.1 ✅
+
+- Aktivierung der BBCode-Textvorlage nach Scan und Auswahl korrigiert
+- Auswahl mehrerer Alben abgefangen
+- Hilfreiche Tooltips ergänzt
+
+
+## v0.7.1.2 ✅
+
+- COMMENT-Feld sichtbar
+- Frei veränderbare und gespeicherte Spaltenbreiten
+- Scrollbarer Metadateneditor
+- QThread-Absturz beim Schließen der Audioanalyse behoben
+
+
+## v0.7.1.4 ✅
+
+- Falsche Änderungswarnung beim Auswahlwechsel behoben
+- Kommentar in die zentrale Felddefinition aufgenommen
+
+
+## v0.7.1.5 ✅
+
+- BBCode-Tracklisten für Mehrfach-CDs
+- Originale Apple-Music-Titel in der Textvorlage
+- Vereinfachter Links-Bereich
+- Zweistellige Track- und Disc-Anzeige
+
+
+## v0.7.2 ✅
+
+- Workspace-Navigation
+- Medienbibliothek mit Künstlersuche
+- Discografie, Editionen und Tracklisten
+- manueller Streaming-Check
+- lokaler Albumabgleich
+- APE-, WMA-/ASF- und M4B-Unterstützung
+- BBCode-Datei zuverlässig im Künstlerordner

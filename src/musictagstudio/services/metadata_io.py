@@ -6,6 +6,7 @@ import shutil
 import subprocess
 
 from mutagen.apev2 import APEv2, APETextValue
+from mutagen.asf import ASF
 from mutagen.flac import FLAC
 from mutagen.id3 import (
     COMM,
@@ -42,7 +43,11 @@ SUPPORTED_AUDIO_EXTENSIONS = {
     ".oga",
     ".opus",
     ".m4a",
+    ".m4b",
     ".mp4",
+    ".ape",
+    ".wma",
+    ".asf",
 }
 
 
@@ -105,6 +110,19 @@ def read_metadata(
             path
         )
 
+    if suffix == ".ape":
+        return _read_ape_file(
+            path
+        )
+
+    if suffix in {
+        ".wma",
+        ".asf",
+    }:
+        return _read_asf(
+            path
+        )
+
     if suffix in {
         ".ogg",
         ".oga",
@@ -125,6 +143,7 @@ def read_metadata(
 
     if suffix in {
         ".m4a",
+        ".m4b",
         ".mp4",
     }:
         return _read_mp4(path)
@@ -152,6 +171,23 @@ def save_song_metadata(
 
     if suffix == ".wv":
         _write_wavpack_apev2(
+            path,
+            song,
+        )
+        return
+
+    if suffix == ".ape":
+        _write_ape_file(
+            path,
+            song,
+        )
+        return
+
+    if suffix in {
+        ".wma",
+        ".asf",
+    }:
+        _write_asf(
             path,
             song,
         )
@@ -187,6 +223,7 @@ def save_song_metadata(
 
     if suffix in {
         ".m4a",
+        ".m4b",
         ".mp4",
     }:
         _write_mp4(
@@ -602,6 +639,179 @@ def _song_from_mapping(
         ),
         path=str(path),
     )
+
+
+
+def _read_ape_file(
+    path: Path,
+) -> Song:
+    try:
+        tags = APEv2(path)
+    except Exception as error:
+        raise ValueError(
+            "Monkey's-Audio-Datei erkannt, aber die APEv2-Tags "
+            "konnten nicht gelesen werden."
+        ) from error
+
+    return _song_from_ape_tags(
+        path,
+        tags,
+    )
+
+
+def _write_ape_file(
+    path: Path,
+    song: Song,
+) -> None:
+    try:
+        tags = APEv2(path)
+    except Exception:
+        tags = APEv2()
+
+    _write_apev2(
+        tags,
+        song,
+    )
+    tags.save(path)
+
+
+def _asf_first(
+    tags,
+    *names: str,
+) -> str:
+    for name in names:
+        values = tags.get(name)
+
+        if not values:
+            continue
+
+        value = values[0]
+
+        if hasattr(
+            value,
+            "value",
+        ):
+            value = value.value
+
+        return str(value)
+
+    return ""
+
+
+def _read_asf(
+    path: Path,
+) -> Song:
+    audio = ASF(path)
+    tags = audio.tags or {}
+    track, total_tracks = split_number(
+        _asf_first(
+            tags,
+            "WM/TrackNumber",
+            "WM/Track",
+        )
+    )
+    disc, total_discs = split_number(
+        _asf_first(
+            tags,
+            "WM/PartOfSet",
+        )
+    )
+
+    return Song(
+        title=_asf_first(
+            tags,
+            "Title",
+        ),
+        artist=_asf_first(
+            tags,
+            "Author",
+            "WM/AlbumArtist",
+        ),
+        album_artist=_asf_first(
+            tags,
+            "WM/AlbumArtist",
+        ),
+        album=_asf_first(
+            tags,
+            "WM/AlbumTitle",
+        ),
+        genre=_asf_first(
+            tags,
+            "WM/Genre",
+        ),
+        year=_asf_first(
+            tags,
+            "WM/Year",
+        ),
+        track=track,
+        total_tracks=total_tracks,
+        disc=disc,
+        total_discs=total_discs,
+        isrc=_asf_first(
+            tags,
+            "WM/ISRC",
+        ),
+        label=_asf_first(
+            tags,
+            "WM/Publisher",
+        ),
+        copyright=_asf_first(
+            tags,
+            "Copyright",
+        ),
+        composer=_asf_first(
+            tags,
+            "WM/Composer",
+        ),
+        comment=_asf_first(
+            tags,
+            "Description",
+            "WM/Comments",
+        ),
+        path=str(path),
+    )
+
+
+def _write_asf(
+    path: Path,
+    song: Song,
+) -> None:
+    audio = ASF(path)
+    tags = audio.tags
+
+    values = {
+        "Title": song.title,
+        "Author": song.artist,
+        "WM/AlbumArtist": song.album_artist,
+        "WM/AlbumTitle": song.album,
+        "WM/Genre": song.genre,
+        "WM/Year": song.year,
+        "WM/TrackNumber": combine_number(
+            song.track,
+            song.total_tracks,
+        ),
+        "WM/PartOfSet": combine_number(
+            song.disc,
+            song.total_discs,
+        ),
+        "WM/ISRC": song.isrc,
+        "WM/Publisher": song.label,
+        "Copyright": song.copyright,
+        "WM/Composer": song.composer,
+        "Description": song.comment,
+    }
+
+    for key, value in values.items():
+        value = str(
+            value or ""
+        ).strip()
+
+        if value:
+            tags[key] = [value]
+        elif key in tags:
+            del tags[key]
+
+    audio.save()
 
 
 def _write_wavpack_apev2(

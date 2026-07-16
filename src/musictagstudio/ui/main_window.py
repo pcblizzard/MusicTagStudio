@@ -3,10 +3,20 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QCloseEvent, QPixmap
+from PySide6.QtCore import (
+    QSettings,
+    QThreadPool,
+    Qt,
+)
+from PySide6.QtGui import (
+    QAction,
+    QCloseEvent,
+    QKeySequence,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
@@ -17,8 +27,10 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressDialog,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSplitter,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -26,6 +38,8 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.merger import apply_merged_metadata, song_values
+from ..diagnostics import get_diagnostic_logger, project_root
+from ..history import HistoryManager
 from ..models.song import Song
 from ..services.cover import (
     covers_are_identical,
@@ -38,6 +52,7 @@ from ..services.proposal import (
     build_proposal,
 )
 from ..services.scanner import scan_folder_detailed
+from ..services.release_text import create_release_text
 from ..settings import load_settings, save_settings
 from ..theme import (
     BUTTON_CHANGED,
@@ -50,11 +65,17 @@ from ..batch_comparison_logic import BatchSongProposal
 from .batch_dialog import BatchComparisonDialog
 from .comparison_dialog import ComparisonDialog
 from .settings_dialog import SettingsDialog
-from .cover_dialog import CoverSelectionDialog
+from .cover_dialog import (
+    CoverSelectionDialog,
+    FunctionWorker,
+)
 from .direct_album_dialog import DirectAlbumDialog
 from .audio_analysis_dialog import AudioAnalysisDialog
 from .batch_cover_dialog import BatchCoverDialog
 from .library_audit_dialog import LibraryAuditDialog
+from .change_preview_dialog import ChangePreviewDialog
+from .history_dialog import HistoryDialog
+from .media_library_widget import MediaLibraryWidget
 from ..cover_management.batch import build_album_cover_plans
 from ..cover_management.manager import CoverManager
 
@@ -71,6 +92,7 @@ OPTIONAL_FIELDS = (
     "label",
     "copyright",
     "composer",
+    "comment",
 )
 
 
@@ -95,9 +117,13 @@ class MainWindow(QMainWindow):
 
         self.loading_editor = False
         self.has_unsaved_changes = False
+        self.history = HistoryManager(
+            project_root()
+        )
 
         self.create_ui()
         self.create_menu()
+        self.update_history_actions()
 
     def create_ui(self):
         container = QWidget()
@@ -114,7 +140,7 @@ class MainWindow(QMainWindow):
         self.select_button.clicked.connect(self.select_folder)
 
         self.scan_button = QPushButton(
-            "Audiodateien scannen"
+            "Bibliothek neu einlesen"
         )
         self.scan_button.clicked.connect(self.scan_music)
 
@@ -152,11 +178,22 @@ class MainWindow(QMainWindow):
         )
         self.direct_album_button.setEnabled(False)
 
+        self.release_text_button = QPushButton(
+            "BBCode-Text erstellen"
+        )
+        self.release_text_button.clicked.connect(
+            self.create_release_text_file
+        )
+        self.release_text_button.setEnabled(False)
+
         provider_buttons.addWidget(self.proposal_button)
         provider_buttons.addWidget(self.batch_button)
         provider_buttons.addWidget(self.cover_button)
         provider_buttons.addWidget(
             self.direct_album_button
+        )
+        provider_buttons.addWidget(
+            self.release_text_button
         )
 
         self.table_fields = (
@@ -170,6 +207,7 @@ class MainWindow(QMainWindow):
             "label",
             "copyright",
             "composer",
+            "comment",
             "path",
         )
 
@@ -187,6 +225,7 @@ class MainWindow(QMainWindow):
                 "Label",
                 "Copyright",
                 "Komponist",
+                "Kommentar",
                 "Datei",
             ]
         )
@@ -206,26 +245,62 @@ class MainWindow(QMainWindow):
         )
 
         header = self.table.horizontalHeader()
+        header.setSectionsMovable(False)
+        header.setStretchLastSection(False)
+        header.setMinimumSectionSize(45)
 
-        for index, field_name in enumerate(self.table_fields):
-            if field_name in {"title", "artist", "album"}:
-                mode = QHeaderView.ResizeMode.Stretch
-            elif field_name == "path":
-                mode = QHeaderView.ResizeMode.Interactive
-            else:
-                mode = QHeaderView.ResizeMode.ResizeToContents
+        for index in range(
+            len(self.table_fields)
+        ):
+            header.setSectionResizeMode(
+                index,
+                QHeaderView.ResizeMode.Interactive,
+            )
 
-            header.setSectionResizeMode(index, mode)
+        self._column_settings = QSettings(
+            "MusicTagStudio",
+            "MusicTagStudio",
+        )
+        self._restoring_column_widths = False
+        self._restore_table_column_widths()
+        header.sectionResized.connect(
+            self._save_table_column_widths
+        )
 
-        self.table.setColumnWidth(
-            self.table_fields.index("path"),
-            240,
+        history_buttons = QHBoxLayout()
+        self.undo_button = QPushButton(
+            "↶ Rückgängig"
+        )
+        self.undo_button.clicked.connect(
+            self.undo_last_change
+        )
+        self.redo_button = QPushButton(
+            "↷ Wiederholen"
+        )
+        self.redo_button.clicked.connect(
+            self.redo_last_change
+        )
+        self.history_button = QPushButton(
+            "Änderungsverlauf"
+        )
+        self.history_button.clicked.connect(
+            self.show_history
+        )
+        history_buttons.addWidget(
+            self.undo_button
+        )
+        history_buttons.addWidget(
+            self.redo_button
+        )
+        history_buttons.addWidget(
+            self.history_button
         )
 
         left_layout.addWidget(self.folder_label)
         left_layout.addWidget(self.select_button)
         left_layout.addWidget(self.scan_button)
         left_layout.addLayout(provider_buttons)
+        left_layout.addLayout(history_buttons)
         left_layout.addWidget(self.table)
 
         right_widget = QWidget()
@@ -282,6 +357,7 @@ class MainWindow(QMainWindow):
             "label": "Label:",
             "copyright": "Copyright:",
             "composer": "Komponist:",
+            "comment": "Kommentar:",
         }
 
         for name in (
@@ -335,8 +411,19 @@ class MainWindow(QMainWindow):
                 self.update_dirty_state
             )
 
-        right_layout.addWidget(form_widget)
-        right_layout.addStretch()
+        self.editor_scroll = QScrollArea()
+        self.editor_scroll.setWidgetResizable(True)
+        self.editor_scroll.setFrameShape(
+            QScrollArea.Shape.NoFrame
+        )
+        self.editor_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.editor_scroll.setWidget(form_widget)
+        right_layout.addWidget(
+            self.editor_scroll,
+            stretch=1,
+        )
 
         self.splitter = QSplitter(
             Qt.Orientation.Horizontal
@@ -350,11 +437,357 @@ class MainWindow(QMainWindow):
         self.splitter.setSizes([1080, 420])
 
         container_layout.addWidget(self.splitter)
-        self.setCentralWidget(container)
+
+        self.workspace_stack = QStackedWidget()
+        self.workspace_stack.addWidget(
+            container
+        )
+
+        self.media_library = MediaLibraryWidget(
+            self
+        )
+        self.media_library.open_local_album.connect(
+            self.open_local_album_from_library
+        )
+        self.workspace_stack.addWidget(
+            self.media_library
+        )
+
+        self.workspace_stack.addWidget(
+            self._workspace_launch_page(
+                "Audio-Analyse",
+                (
+                    "Bitrate, Codec, Bit-Tiefe, Abtastrate, "
+                    "Albumvergleich und ReplayGain."
+                ),
+                "Audio-Analyse öffnen",
+                self.open_audio_analysis,
+            )
+        )
+        self.workspace_stack.addWidget(
+            self._workspace_launch_page(
+                "Bibliotheksprüfung",
+                (
+                    "Metadaten, Cover, Nummerierungen und "
+                    "Inkonsistenzen einer Bibliothek prüfen."
+                ),
+                "Bibliotheksprüfung öffnen",
+                self.open_library_audit,
+            )
+        )
+        self.workspace_stack.addWidget(
+            self._workspace_launch_page(
+                "Einstellungen",
+                (
+                    "Metadatenquellen, Coverausgabe, "
+                    "Normalisierung und Darstellung konfigurieren."
+                ),
+                "Einstellungen öffnen",
+                self.open_settings,
+            )
+        )
+
+        sidebar = QWidget()
+        sidebar.setFixedWidth(
+            190
+        )
+        sidebar_layout = QVBoxLayout(
+            sidebar
+        )
+        brand = QLabel(
+            "MusicTagStudio"
+        )
+        brand.setStyleSheet(
+            "font-size: 18px; font-weight: 600;"
+        )
+        sidebar_layout.addWidget(
+            brand
+        )
+
+        self.workspace_buttons = QButtonGroup(
+            self
+        )
+        self.workspace_buttons.setExclusive(
+            True
+        )
+        workspace_names = (
+            "Tagger",
+            "Medienbibliothek",
+            "Audio-Analyse",
+            "Bibliotheksprüfung",
+            "Einstellungen",
+        )
+
+        for index, name in enumerate(
+            workspace_names
+        ):
+            button = QPushButton(
+                name
+            )
+            button.setCheckable(
+                True
+            )
+            button.setMinimumHeight(
+                38
+            )
+            button.clicked.connect(
+                lambda _checked=False, page=index:
+                self.switch_workspace(
+                    page
+                )
+            )
+            self.workspace_buttons.addButton(
+                button,
+                index,
+            )
+            sidebar_layout.addWidget(
+                button
+            )
+
+        sidebar_layout.addStretch()
+
+        shell = QWidget()
+        shell_layout = QHBoxLayout(
+            shell
+        )
+        shell_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+        shell_layout.addWidget(
+            sidebar
+        )
+        shell_layout.addWidget(
+            self.workspace_stack,
+            stretch=1,
+        )
+        self.setCentralWidget(
+            shell
+        )
+        self.workspace_buttons.button(
+            0
+        ).setChecked(
+            True
+        )
 
         self.update_optional_columns()
 
+    def _workspace_launch_page(
+        self,
+        title: str,
+        description: str,
+        button_text: str,
+        callback,
+    ) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(
+            page
+        )
+        layout.addStretch()
+        heading = QLabel(
+            title
+        )
+        heading.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        heading.setStyleSheet(
+            "font-size: 24px; font-weight: 600;"
+        )
+        layout.addWidget(
+            heading
+        )
+        info = QLabel(
+            description
+        )
+        info.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        info.setWordWrap(
+            True
+        )
+        layout.addWidget(
+            info
+        )
+        button = QPushButton(
+            button_text
+        )
+        button.clicked.connect(
+            callback
+        )
+        layout.addWidget(
+            button,
+            alignment=(
+                Qt.AlignmentFlag.AlignHCenter
+            ),
+        )
+        layout.addStretch()
+
+        return page
+
+    def switch_workspace(
+        self,
+        index: int,
+    ) -> None:
+        self.workspace_stack.setCurrentIndex(
+            index
+        )
+        button = self.workspace_buttons.button(
+            index
+        )
+
+        if button is not None:
+            button.setChecked(
+                True
+            )
+
+    def open_local_album_from_library(
+        self,
+        folder: str,
+    ) -> None:
+        self.folder = folder
+        self.folder_label.setText(
+            f"Ordner: {folder}"
+        )
+        self.switch_workspace(
+            0
+        )
+        self.scan_music()
+
+    def _default_table_column_widths(
+        self,
+    ) -> dict[str, int]:
+        return {
+            "track": 72,
+            "title": 230,
+            "artist": 230,
+            "album": 220,
+            "disc": 65,
+            "year": 65,
+            "label": 120,
+            "copyright": 170,
+            "composer": 160,
+            "comment": 220,
+            "path": 300,
+        }
+
+    def _restore_table_column_widths(
+        self,
+    ) -> None:
+        defaults = self._default_table_column_widths()
+        stored = self._column_settings.value(
+            "main_table/column_widths",
+            "",
+        )
+        widths: list[int] = []
+
+        if isinstance(stored, str):
+            try:
+                widths = [
+                    int(value)
+                    for value in stored.split(",")
+                    if value.strip()
+                ]
+            except ValueError:
+                widths = []
+
+        self._restoring_column_widths = True
+
+        try:
+            for index, field_name in enumerate(
+                self.table_fields
+            ):
+                width = (
+                    widths[index]
+                    if index < len(widths)
+                    and widths[index] >= 45
+                    else defaults.get(field_name, 110)
+                )
+                self.table.setColumnWidth(index, width)
+        finally:
+            self._restoring_column_widths = False
+
+    def _save_table_column_widths(
+        self,
+        _logical_index: int,
+        _old_size: int,
+        _new_size: int,
+    ) -> None:
+        if self._restoring_column_widths:
+            return
+
+        widths = [
+            self.table.columnWidth(index)
+            for index in range(
+                self.table.columnCount()
+            )
+        ]
+        self._column_settings.setValue(
+            "main_table/column_widths",
+            ",".join(str(width) for width in widths),
+        )
+
+    def reset_table_column_widths(
+        self,
+    ) -> None:
+        self._column_settings.remove(
+            "main_table/column_widths"
+        )
+        self._restore_table_column_widths()
+
     def create_menu(self):
+        edit_menu = self.menuBar().addMenu(
+            "Bearbeiten"
+        )
+        self.undo_action = QAction(
+            "Rückgängig",
+            self,
+        )
+        self.undo_action.setShortcut(
+            QKeySequence.StandardKey.Undo
+        )
+        self.undo_action.triggered.connect(
+            self.undo_last_change
+        )
+        edit_menu.addAction(
+            self.undo_action
+        )
+
+        self.redo_action = QAction(
+            "Wiederholen",
+            self,
+        )
+        self.redo_action.setShortcuts(
+            [
+                QKeySequence.StandardKey.Redo,
+                QKeySequence(
+                    "Ctrl+Y"
+                ),
+            ]
+        )
+        self.redo_action.triggered.connect(
+            self.redo_last_change
+        )
+        edit_menu.addAction(
+            self.redo_action
+        )
+
+        history_action = edit_menu.addAction(
+            "Änderungsverlauf …"
+        )
+        history_action.triggered.connect(
+            self.show_history
+        )
+
+        edit_menu.addSeparator()
+        reset_columns_action = edit_menu.addAction(
+            "Spaltenbreiten zurücksetzen"
+        )
+        reset_columns_action.triggered.connect(
+            self.reset_table_column_widths
+        )
+
         analysis_menu = self.menuBar().addMenu(
             "Audio-Analyse"
         )
@@ -387,6 +820,366 @@ class MainWindow(QMainWindow):
         settings_action.triggered.connect(
             self.open_settings
         )
+
+    def _selected_album_keys(
+        self,
+        rows: list[int] | None = None,
+    ) -> set[tuple[str, str, str]]:
+        selected = (
+            self.selected_rows()
+            if rows is None
+            else rows
+        )
+
+        return {
+            (
+                (
+                    self.songs[row].album_artist
+                    or self.songs[row].artist
+                ).strip().casefold(),
+                self.songs[row].album.strip().casefold(),
+                str(
+                    Path(
+                        self.songs[row].path
+                    ).parent.resolve()
+                ).casefold(),
+            )
+            for row in selected
+            if 0 <= row < len(
+                self.songs
+            )
+        }
+
+    def _update_release_text_button(
+        self,
+    ) -> None:
+        rows = self.selected_rows()
+        album_keys = (
+            self._selected_album_keys(
+                rows
+            )
+            if rows
+            else set()
+        )
+        enabled = (
+            bool(rows)
+            and len(album_keys) == 1
+        )
+        self.release_text_button.setEnabled(
+            enabled
+        )
+
+        if not rows:
+            tooltip = (
+                "Markiere die Titel eines Albums, "
+                "um eine BBCode-Textvorlage zu erstellen."
+            )
+        elif len(album_keys) > 1:
+            tooltip = (
+                "Die Auswahl enthält mehrere Alben. "
+                "Bitte markiere nur die Titel eines Albums."
+            )
+        else:
+            tooltip = (
+                "Erstellt die BBCode-Textvorlage für "
+                "das ausgewählte Album."
+            )
+
+        self.release_text_button.setToolTip(
+            tooltip
+        )
+
+    def create_release_text_file(
+        self,
+    ):
+        rows = self.selected_rows()
+
+        if not rows:
+            return
+
+        selected_songs = [
+            self.songs[row]
+            for row in rows
+        ]
+        album_keys = self._selected_album_keys(
+            rows
+        )
+
+        if len(album_keys) != 1:
+            QMessageBox.warning(
+                self,
+                "Mehrere Alben ausgewählt",
+                (
+                    "Bitte markiere für die Textvorlage "
+                    "nur die Titel eines Albums."
+                ),
+            )
+            return
+
+        self.release_text_button.setEnabled(
+            False
+        )
+        self.release_text_button.setText(
+            "Textvorlage wird erstellt …"
+        )
+        settings = load_settings()
+        worker = FunctionWorker(
+            create_release_text,
+            selected_songs,
+            settings,
+        )
+
+        def finished(
+            result,
+        ):
+            self.release_text_button.setText(
+                "BBCode-Text erstellen"
+            )
+            self._update_release_text_button()
+            QMessageBox.information(
+                self,
+                "Textvorlage erstellt",
+                (
+                    f"Die Textdatei wurde gespeichert:\n"
+                    f"{result.path}\n\n"
+                    f"Technische Werte: "
+                    f"{result.analyzed_files} von "
+                    f"{result.total_files} Dateien ausgewertet."
+                ),
+            )
+
+        def failed(
+            message: str,
+        ):
+            self.release_text_button.setText(
+                "BBCode-Text erstellen"
+            )
+            self._update_release_text_button()
+            QMessageBox.critical(
+                self,
+                "Textvorlage fehlgeschlagen",
+                message,
+            )
+
+        worker.signals.finished.connect(
+            finished
+        )
+        worker.signals.failed.connect(
+            failed
+        )
+        self._release_text_worker = worker
+        QThreadPool.globalInstance().start(
+            worker
+        )
+
+    def update_history_actions(
+        self,
+    ):
+        can_undo = (
+            self.history.can_undo
+        )
+        can_redo = (
+            self.history.can_redo
+        )
+        self.undo_button.setEnabled(
+            can_undo
+        )
+        self.redo_button.setEnabled(
+            can_redo
+        )
+
+        if hasattr(
+            self,
+            "undo_action",
+        ):
+            self.undo_action.setEnabled(
+                can_undo
+            )
+            self.redo_action.setEnabled(
+                can_redo
+            )
+
+    def undo_last_change(self):
+        entry = self.history.undo()
+
+        if entry is None:
+            return
+
+        self.scan_music()
+        self.update_history_actions()
+        QMessageBox.information(
+            self,
+            "Rückgängig",
+            (
+                f"„{entry.description}“ wurde "
+                "rückgängig gemacht."
+            ),
+        )
+
+    def redo_last_change(self):
+        entry = self.history.redo()
+
+        if entry is None:
+            return
+
+        self.scan_music()
+        self.update_history_actions()
+        QMessageBox.information(
+            self,
+            "Wiederholt",
+            (
+                f"„{entry.description}“ wurde "
+                "erneut angewendet."
+            ),
+        )
+
+    def show_history(self):
+        HistoryDialog(
+            self.history.entries(),
+            self,
+        ).exec()
+
+    def _preview_changes(
+        self,
+        items: list[
+            tuple[int, Song]
+        ],
+    ) -> bool:
+        field_labels = {
+            "title": "Titel",
+            "artist": "Künstler",
+            "album_artist": "Albumkünstler",
+            "album": "Album",
+            "genre": "Genre",
+            "year": "Jahr",
+            "track": "Track",
+            "total_tracks": "Gesamttracks",
+            "disc": "Disc",
+            "total_discs": "Gesamt-Discs",
+            "isrc": "ISRC",
+            "label": "Label",
+            "copyright": "Copyright",
+            "composer": "Komponist",
+            "comment": "Kommentar",
+        }
+        changes: list[
+            tuple[str, str, str, str]
+        ] = []
+
+        for row, updated in items:
+            original = self.songs[
+                row
+            ]
+
+            for name, label in (
+                field_labels.items()
+            ):
+                before = str(
+                    getattr(
+                        original,
+                        name,
+                        "",
+                    )
+                    or ""
+                )
+                after = str(
+                    getattr(
+                        updated,
+                        name,
+                        "",
+                    )
+                    or ""
+                )
+
+                if before != after:
+                    changes.append(
+                        (
+                            original.title
+                            or Path(
+                                original.path
+                            ).name,
+                            label,
+                            before,
+                            after,
+                        )
+                    )
+
+        if not changes:
+            return True
+
+        return (
+            ChangePreviewDialog(
+                changes,
+                self,
+            ).exec()
+            == ChangePreviewDialog.DialogCode.Accepted
+        )
+
+    def _write_song_updates(
+        self,
+        description: str,
+        items: list[
+            tuple[int, Song]
+        ],
+    ) -> tuple[int, list[str]]:
+        if not items:
+            return 0, []
+
+        if not self._preview_changes(
+            items
+        ):
+            return 0, []
+
+        entry = self.history.begin(
+            description,
+            [
+                updated.path
+                for _row, updated
+                in items
+            ],
+        )
+        saved = 0
+        failed: list[str] = []
+
+        try:
+            for row, updated in items:
+                try:
+                    save_song_metadata(
+                        updated.path,
+                        updated,
+                    )
+                except Exception as error:
+                    failed.append(
+                        f"{updated.title}: {error}"
+                    )
+                    continue
+
+                self.songs[row] = (
+                    updated
+                )
+                self.update_table_row(
+                    row,
+                    updated,
+                )
+                saved += 1
+
+            if saved:
+                self.history.commit(
+                    entry
+                )
+            else:
+                self.history.rollback_pending(
+                    entry
+                )
+        except Exception:
+            self.history.rollback_pending(
+                entry
+            )
+            raise
+        finally:
+            self.update_history_actions()
+
+        return saved, failed
 
     def open_library_audit(self):
         selected_rows = self.selected_rows()
@@ -454,6 +1247,7 @@ class MainWindow(QMainWindow):
             self.folder_label.setText(
                 f"Ordner: {folder}"
             )
+            self.scan_music()
 
     def scan_music(self):
         if not self.confirm_pending_changes():
@@ -476,6 +1270,14 @@ class MainWindow(QMainWindow):
         self.songs = list(
             scan_result.songs
         )
+
+        if hasattr(
+            self,
+            "media_library",
+        ):
+            self.media_library.set_local_songs(
+                self.songs
+            )
 
         if scan_result.failures:
             details = "\n\n".join(
@@ -538,11 +1340,13 @@ class MainWindow(QMainWindow):
         self.batch_button.setEnabled(enabled)
         self.cover_button.setEnabled(enabled)
         self.direct_album_button.setEnabled(enabled)
+        self._update_release_text_button()
 
         if enabled:
             self.table.selectRow(0)
             self.table.setCurrentCell(0, 0)
             self.handle_selection_changed()
+            self._update_release_text_button()
             self.table.setFocus()
 
     def selected_rows(self) -> list[int]:
@@ -560,6 +1364,7 @@ class MainWindow(QMainWindow):
 
     def handle_selection_changed(self):
         rows = self.selected_rows()
+        self._update_release_text_button()
 
         if rows == self.active_rows:
             return
@@ -575,6 +1380,7 @@ class MainWindow(QMainWindow):
         if not rows:
             self.current_row = -1
             self.clear_editor()
+            self._update_release_text_button()
             return
 
         if len(rows) == 1:
@@ -719,6 +1525,15 @@ class MainWindow(QMainWindow):
             self.refresh_active_editor()
             return
 
+        cover_logger = get_diagnostic_logger(
+            "cover"
+        )
+        cover_logger.info(
+            "COVERDIALOG ÖFFNEN | Titel=%d | Album=%r | Datei=%s",
+            len(songs),
+            songs[0].album,
+            songs[0].path,
+        )
         dialog = CoverSelectionDialog(
             manager,
             songs[0],
@@ -733,6 +1548,13 @@ class MainWindow(QMainWindow):
         ):
             return
 
+        entry = self.history.begin(
+            "Cover geändert",
+            [
+                song.path
+                for song in songs
+            ],
+        )
         QApplication.setOverrideCursor(
             Qt.CursorShape.WaitCursor
         )
@@ -742,7 +1564,14 @@ class MainWindow(QMainWindow):
                 dialog.selected_candidate,
                 songs,
             )
+            self.history.commit(
+                entry
+            )
+            self.update_history_actions()
         except Exception as error:
+            self.history.rollback_pending(
+                entry
+            )
             QMessageBox.critical(
                 self,
                 "Cover-Verarbeitung fehlgeschlagen",
@@ -831,35 +1660,25 @@ class MainWindow(QMainWindow):
         ):
             return
 
-        saved = 0
-        failed: list[str] = []
-
-        for song_row, updates in (
-            comparison.selected_updates.items()
-        ):
-            song = self.songs[song_row]
-            updated = replace(
-                song,
-                **updates,
-            )
-
-            try:
-                save_song_metadata(
-                    updated.path,
-                    updated,
-                )
-            except Exception as error:
-                failed.append(
-                    f"{song.title}: {error}"
-                )
-                continue
-
-            self.songs[song_row] = updated
-            self.update_table_row(
+        update_items = [
+            (
                 song_row,
-                updated,
+                replace(
+                    self.songs[
+                        song_row
+                    ],
+                    **updates,
+                ),
             )
-            saved += 1
+            for song_row, updates
+            in comparison.selected_updates.items()
+        ]
+        saved, failed = (
+            self._write_song_updates(
+                "Direkte Albumabfrage",
+                update_items,
+            )
+        )
 
         self.update_optional_columns()
         self.refresh_active_editor()
@@ -1024,35 +1843,25 @@ class MainWindow(QMainWindow):
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
 
-        saved = 0
-        failed: list[str] = []
-
-        for song_row, updates in (
-            dialog.selected_updates.items()
-        ):
-            song = self.songs[song_row]
-            updated = replace(
-                song,
-                **updates,
-            )
-
-            try:
-                save_song_metadata(
-                    updated.path,
-                    updated,
-                )
-            except Exception as error:
-                failed.append(
-                    f"{song.title}: {error}"
-                )
-                continue
-
-            self.songs[song_row] = updated
-            self.update_table_row(
+        update_items = [
+            (
                 song_row,
-                updated,
+                replace(
+                    self.songs[
+                        song_row
+                    ],
+                    **updates,
+                ),
             )
-            saved += 1
+            for song_row, updates
+            in dialog.selected_updates.items()
+        ]
+        saved, failed = (
+            self._write_song_updates(
+                "Metadatenvorschläge übernommen",
+                update_items,
+            )
+        )
 
         self.update_optional_columns()
 
@@ -1144,21 +1953,29 @@ class MainWindow(QMainWindow):
             **values,
         )
 
-        try:
-            save_song_metadata(
-                updated.path,
-                updated,
+        saved, failed = (
+            self._write_song_updates(
+                "Metadaten eines Titels geändert",
+                [
+                    (
+                        row,
+                        updated,
+                    )
+                ],
             )
-        except Exception as error:
-            QMessageBox.critical(
-                self,
-                "Speichern fehlgeschlagen",
-                str(error),
-            )
+        )
+
+        if not saved:
+            if failed:
+                QMessageBox.critical(
+                    self,
+                    "Speichern fehlgeschlagen",
+                    "\n".join(
+                        failed
+                    ),
+                )
             return
 
-        self.songs[row] = updated
-        self.update_table_row(row, updated)
         self.update_optional_columns()
 
         self.original_values = values.copy()
@@ -1197,33 +2014,36 @@ class MainWindow(QMainWindow):
             return
 
         edited_values = self.get_editor_values()
-        saved_rows: list[int] = []
-        failed: list[str] = []
+        update_items = []
 
         for row in rows:
             updates = {
-                name: edited_values[name]
+                name: edited_values[
+                    name
+                ]
                 for name in touched_fields
             }
-            updated = replace(
-                self.songs[row],
-                **updates,
+            update_items.append(
+                (
+                    row,
+                    replace(
+                        self.songs[row],
+                        **updates,
+                    ),
+                )
             )
 
-            try:
-                save_song_metadata(
-                    updated.path,
-                    updated,
-                )
-            except Exception as error:
-                failed.append(
-                    f"{self.songs[row].title}: {error}"
-                )
-                continue
-
-            self.songs[row] = updated
-            self.update_table_row(row, updated)
-            saved_rows.append(row)
+        saved_count, failed = (
+            self._write_song_updates(
+                "Mehrfachbearbeitung",
+                update_items,
+            )
+        )
+        saved_rows = (
+            rows[:saved_count]
+            if saved_count
+            else []
+        )
 
         self.update_optional_columns()
 
@@ -1303,20 +2123,49 @@ class MainWindow(QMainWindow):
             for name, field in self.editor_fields.items()
         }
 
+    @staticmethod
+    def _format_number_pair(
+        current: str,
+        total: str = "",
+    ) -> str:
+        def padded(
+            value: str,
+        ) -> str:
+            text = str(
+                value or ""
+            ).strip()
+
+            try:
+                return f"{int(text):02d}"
+            except ValueError:
+                return text
+
+        current_text = padded(
+            current
+        )
+        total_text = padded(
+            total
+        )
+
+        if total_text:
+            return (
+                f"{current_text}/{total_text}"
+            )
+
+        return current_text
+
     def update_table_row(
         self,
         row: int,
         song: Song,
     ):
-        track = (
-            f"{song.track}/{song.total_tracks}"
-            if song.total_tracks
-            else song.track
+        track = self._format_number_pair(
+            song.track,
+            song.total_tracks,
         )
-        disc = (
-            f"{song.disc}/{song.total_discs}"
-            if song.total_discs
-            else song.disc
+        disc = self._format_number_pair(
+            song.disc,
+            song.total_discs,
         )
 
         values = [
@@ -1330,6 +2179,7 @@ class MainWindow(QMainWindow):
             song.label,
             song.copyright,
             song.composer,
+            song.comment,
             song.path,
         ]
 

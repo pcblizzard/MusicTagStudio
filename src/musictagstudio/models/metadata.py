@@ -19,6 +19,7 @@ EDITABLE_FIELDS: tuple[str, ...] = (
     "label",
     "copyright",
     "composer",
+    "comment",
 )
 
 FIELD_LABELS: dict[str, str] = {
@@ -36,6 +37,7 @@ FIELD_LABELS: dict[str, str] = {
     "label": "Label",
     "copyright": "Copyright",
     "composer": "Komponist",
+    "comment": "Kommentar",
 }
 
 

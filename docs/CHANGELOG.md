@@ -1,5 +1,227 @@
 # Changelog
 
+## v0.7.2
+
+### Oberfläche
+
+- feste Workspace-Navigation
+- direkte Bereiche für Tagger, Medienbibliothek, Audio-Analyse,
+  Bibliotheksprüfung und Einstellungen
+
+### Medienbibliothek
+
+- MusicBrainz-Künstlersuche
+- Discografie als Release-Gruppen
+- Editionen mit Datum, Land, Status, Format, Medien- und Trackzahl
+- Tracklisten mit Disc- und Tracknummern
+- manueller Apple-Music-Verfügbarkeitscheck
+- lokaler Abgleich mit dem aktuellen Scan
+- lokales Album im Tagger öffnen
+- Qualitätsabfragen nur auf Knopfdruck
+
+### Audioformate
+
+- Monkey's Audio (`.ape`)
+- WMA/ASF (`.wma`, `.asf`)
+- M4B (`.m4b`)
+
+### BBCode
+
+- Künstlerordner anhand des Albumkünstlernamens robust ermittelt
+
+
+
+## v0.7.1.6
+
+### Coverdialog
+
+- Möglichen nativen Absturz durch späte QRunnable-Rückrufe behoben
+- Globalen Thread-Pool durch dialogeigenen Pool ersetzt
+- Aktive Worker werden bis zu ihrem Abschluss referenziert
+- Closure-basierte Widget-Rückrufe durch gebundene Qt-Slots ersetzt
+- Ergebnisse nach dem Schließen werden verworfen
+- Vorschau-Prefetch auf den gewählten und zwei weitere Treffer begrenzt
+- Diagnoseprotokoll `logs/cover.log` ergänzt
+
+
+
+## v0.7.1.5
+
+### BBCode-Text
+
+- Tracklisten nach CDs gruppiert
+- CD-Überschriften im Format `[b]CD1[/b]:`
+- Originale Apple-Music-Tracktitel werden für die Ausgabe geladen
+- Lokale, normalisierte Artist-Tags bleiben unverändert
+- Sicherer Fallback auf lokale Titel
+- Links-Platzhalter ohne zusätzlichen Image-BBCode
+
+### Haupttabelle
+
+- Track- und Discnummern zweistellig formatiert
+- Beispiele: `01/27`, `02/27`, `01/02`
+
+
+
+## v0.7.1.4
+
+### Auswahl und Editor
+
+- Falsche Warnung zu ungespeicherten Änderungen behoben
+- `comment` zu `EDITABLE_FIELDS` ergänzt
+- Feldbezeichnung „Kommentar“ zentral ergänzt
+- Ausgangswerte und aktuelle Editorwerte besitzen wieder dieselben Felder
+- Titelwechsel, Mehrfachauswahl und Strg+A lösen ohne echte Änderung keine
+  Speicherabfrage mehr aus
+
+
+
+## v0.7.1.3
+
+### Kritischer Startfehler
+
+- `comment` war in `OPTIONAL_FIELDS`, aber nicht in `table_fields` enthalten
+- dadurch scheiterte `update_optional_columns()` beim Programmstart
+- Kommentarspalte vollständig ergänzt
+- GUI-Smoke-Test für die Erzeugung des Hauptfensters hinzugefügt
+
+
+
+## v0.7.1.2
+
+### Hauptfenster
+
+- COMMENT-Feld als „Kommentar“ ergänzt
+- Editorbereich scrollbar gemacht
+- Alle Tabellenspalten frei veränderbar
+- Spaltenbreiten über QSettings dauerhaft gespeichert
+- Menüpunkt zum Zurücksetzen ergänzt
+
+### Audioanalyse
+
+- Absturz in closeEvent behoben
+- Bereits gelöschte Qt-Threadobjekte werden sicher erkannt
+- Threadreferenz wird nach finished auf None gesetzt
+- Schließen und Abbrechen gegen RuntimeError abgesichert
+
+
+
+## v0.7.1.1
+
+### BBCode-Textvorlage
+
+- Fehlerhafte Aktivierungslogik des Buttons korrigiert
+- Status wird unmittelbar nach dem Scan aktualisiert
+- Status wird bei jeder Auswahländerung aktualisiert
+- Funktioniert bei Einzelwahl, Mehrfachwahl und Strg+A
+- Mehrere Alben in einer Auswahl werden zuverlässig erkannt
+- Aussagekräftige Tooltips bei deaktiviertem Button
+- Beschriftung in „BBCode-Text erstellen“ geändert
+
+
+
+## v0.7.1
+
+### Coverdialog
+
+- Vorschaubilder werden nach der Suche parallel vorgeladen
+- Gemeinsamer RAM-Cache für Vorschaubilder
+- Keine doppelten Downloads derselben Vorschau
+- Kürzeres Vorschau-Zeitlimit ohne Einfluss auf den Originaldownload
+
+### Metadaten
+
+- Kommentarfeld im Haupteditor ergänzt
+
+### Textvorlage
+
+- Manueller Button zur Erstellung einer BBCode-Textdatei
+- Ausgabe im Ordner des 400-px-Covers
+- Automatische Tracklist
+- Format aus den ausgewählten Audiodateien
+- Technische Qualitätsangaben über ffprobe im Hintergrund
+- Größe bleibt zur manuellen Ergänzung leer
+
+
+
+## v0.7.0
+
+### Workflow
+
+- Automatischer Scan nach Ordnerauswahl
+- Scan-Button in „Bibliothek neu einlesen“ umbenannt
+- Feldgenaue Änderungsvorschau vor dem Schreiben
+
+### Undo, Redo und Sicherheit
+
+- Rückgängig über Strg+Z und Button
+- Wiederholen über Strg+Y/Standard-Redo und Button
+- Vollständige Dateisicherungen vor Schreiboperationen
+- Undo/Redo für Einzel- und Batch-Tags, direkte Albumabfragen und Cover
+- Sitzungsbasierter Änderungsverlauf
+- Persistente Manifeste unter `.musictagstudio/history/`
+
+### Internes Testsystem
+
+- Reale Regressionstests für Clueso, Stieber Twins und Remaster-Titel
+- Zentrale Release-Prüfung über `scripts/release_check.py`
+- GitHub-Actions-Workflow für jeden Push und Pull Request
+- Neue Tests für Undo und Redo
+
+
+
+## v0.6.8.7
+
+- Alternative Apple-Albumtitel-Suchvarianten
+- Collection-ID-Recovery aus bis zu acht markanten Songtreffern
+- Mehrheitsentscheidung und Lookup-Validierung
+- Prüfung von Albumname und Trackzahl
+- Normalisierung vollständiger Datumswerte auf das Jahr
+- Ausführliche Recovery-Protokolle
+
+
+
+## v0.6.8.6
+
+### Diagnose ab Programmstart
+
+- Protokollierung beginnt vor `QApplication`
+- Eindeutige Sitzungs-ID pro Programmstart
+- Python-, Betriebssystem-, Pfad- und Prozesseinträge
+- Geladene Einstellungen und verwendete Metadatenquelle
+- Globale Protokollierung unbehandelter Ausnahmen und Thread-Ausnahmen
+- Qt-Meldungen in `logs/qt.log`
+- Stabiler Projektordner für Logs und Cache statt abhängigem Arbeitsordner
+
+### Vollständiger Metadaten-Ablauf
+
+- Lokale Eingabedaten jedes markierten Titels
+- Bildung der Albumgruppen und ermittelte Albumidentität
+- Jede Apple-Albumsuchanfrage
+- Alle Albumkandidaten samt Score
+- Entscheidung am Mindestscore
+- Lookup-Aufrufe und Lookup-Fehler
+- Globale Matching-Ergebnisse
+- Fehlende lokale Titel
+- Exakte Track-Nachsuche und Search-Fallback
+- Endergebnis und Warnungen pro Titel
+
+
+
+## v0.6.8.5
+
+### Vollständige Apple-Lookup-Diagnose
+
+- Unveränderte Apple-Antworten werden als JSON gespeichert
+- Separate Dateien pro Collection-ID und Store
+- Jeder Antwort-Eintrag wird protokolliert
+- Auch verworfene Einträge erscheinen im Log
+- Verwerfungsgründe werden einzeln genannt
+- Zusammenfassung über akzeptierte und verworfene Einträge
+- Diagnosepfade: `logs/apple_music.log` und `cache/apple/`
+
+
+
 ## v0.6.8.4
 
 ### Apple-Music-Lookup verbessert

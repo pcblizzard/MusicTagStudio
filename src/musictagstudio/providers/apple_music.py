@@ -9,6 +9,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from ..diagnostics import get_diagnostic_logger
+
 from ..models.metadata import MetadataCandidate
 
 
@@ -66,6 +68,19 @@ def search_album(
     country: str = DEFAULT_COUNTRY,
     limit: int = 25,
 ) -> list[AppleAlbumCandidate]:
+    logger = get_diagnostic_logger(
+        "apple_music"
+    )
+    logger.info(
+        "ALBUMSUCHE START | Store=%s | Album=%r | Künstler=%r | "
+        "Erwartete Tracks=%r | Jahr=%r | Limit=%s",
+        country.upper(),
+        album,
+        artist,
+        expected_track_count,
+        wanted_year,
+        limit,
+    )
     terms = [
         part.strip()
         for part in (
@@ -76,6 +91,10 @@ def search_album(
     ]
 
     if not terms:
+        logger.warning(
+            "ALBUMSUCHE ABBRUCH | Store=%s | Grund=keine Suchbegriffe",
+            country.upper(),
+        )
         return []
 
     params = {
@@ -93,7 +112,7 @@ def search_album(
     request = Request(
         f"{SEARCH_ENDPOINT}?{urlencode(params)}",
         headers={
-            "User-Agent": "MusicTagStudio/0.6.8.4",
+            "User-Agent": "MusicTagStudio/0.6.8.7",
             "Accept": "application/json",
         },
     )
@@ -121,12 +140,30 @@ def search_album(
             "Die Apple-Antwort konnte nicht verarbeitet werden."
         ) from error
 
-    results: list[AppleAlbumCandidate] = []
-
-    for item in payload.get(
+    raw_results = payload.get(
         "results",
         [],
-    ):
+    )
+    logger.info(
+        "ALBUMSUCHE ANTWORT | Store=%s | resultCount=%r | "
+        "Einträge=%d",
+        country.upper(),
+        payload.get(
+            "resultCount",
+            "?",
+        ),
+        (
+            len(raw_results)
+            if isinstance(
+                raw_results,
+                list,
+            )
+            else -1
+        ),
+    )
+    results: list[AppleAlbumCandidate] = []
+
+    for item in raw_results:
         collection_id = str(
             item.get(
                 "collectionId",
@@ -178,6 +215,18 @@ def search_album(
             year=actual_year,
         )
 
+        logger.info(
+            "ALBUMKANDIDAT | Store=%s | Collection-ID=%s | "
+            "Album=%r | Künstler=%r | Tracks=%s | Jahr=%r | Score=%s",
+            country.upper(),
+            collection_id,
+            actual_album,
+            actual_artist,
+            actual_track_count,
+            actual_year,
+            confidence,
+        )
+
         results.append(
             AppleAlbumCandidate(
                 collection_id=collection_id,
@@ -190,7 +239,7 @@ def search_album(
             )
         )
 
-    return sorted(
+    ordered = sorted(
         results,
         key=lambda item: (
             -item.confidence,
@@ -204,6 +253,23 @@ def search_album(
             item.album.casefold(),
         ),
     )
+    logger.info(
+        "ALBUMSUCHE ENDE | Store=%s | Kandidaten=%d | "
+        "Bester=%s",
+        country.upper(),
+        len(ordered),
+        (
+            (
+                f"{ordered[0].collection_id} | "
+                f"{ordered[0].album} | "
+                f"Score {ordered[0].confidence}"
+            )
+            if ordered
+            else "kein Treffer"
+        ),
+    )
+
+    return ordered
 
 
 def _album_match_score(
@@ -307,7 +373,7 @@ def search_song(
     request = Request(
         f"{SEARCH_ENDPOINT}?{urlencode(params)}",
         headers={
-            "User-Agent": "MusicTagStudio/0.6.8.4",
+            "User-Agent": "MusicTagStudio/0.6.8.7",
             "Accept": "application/json",
         },
     )
@@ -633,7 +699,7 @@ def _search_payload(
     request = Request(
         f"{SEARCH_ENDPOINT}?{urlencode(params)}",
         headers={
-            "User-Agent": "MusicTagStudio/0.6.8.4",
+            "User-Agent": "MusicTagStudio/0.6.8.7",
             "Accept": "application/json",
         },
     )

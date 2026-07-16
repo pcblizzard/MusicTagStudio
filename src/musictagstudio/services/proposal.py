@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, replace
@@ -10,6 +11,7 @@ from typing import Callable
 from mutagen import File as MutagenFile
 
 from ..core.merger import merge_metadata
+from ..diagnostics import get_diagnostic_logger
 from ..direct_album_lookup import (
     DirectAlbumLookupError,
     build_album_matching_result,
@@ -29,6 +31,7 @@ from ..provider_catalog import (
 from ..providers.apple_music import (
     MINIMUM_ALBUM_CONFIDENCE,
     MINIMUM_TRACK_CONFIDENCE,
+    AppleAlbumCandidate,
     AppleMusicProviderError,
     search_album as search_apple_album,
     search_song as search_apple,
@@ -190,10 +193,49 @@ def build_batch_proposals(
     offizielle Trackliste geladen und global den lokalen Dateien zugeordnet.
     Dadurch kann Track 7 nicht versehentlich Track 1 oder Track 11 erhalten.
     """
+    logger = get_diagnostic_logger(
+        "proposal"
+    )
+    logger.info(
+        "BATCH START | Titel=%d",
+        len(songs),
+    )
+
+    for index, song in enumerate(
+        songs
+    ):
+        logger.info(
+            "LOKALER TITEL | Index=%d | Datei=%s | Titel=%r | "
+            "Künstler=%r | Albumkünstler=%r | Album=%r | "
+            "Track=%r/%r | Disc=%r/%r | Jahr=%r",
+            index,
+            song.path,
+            song.title,
+            song.artist,
+            song.album_artist,
+            song.album,
+            song.track,
+            song.total_tracks,
+            song.disc,
+            song.total_discs,
+            song.year,
+        )
+
     settings = load_settings()
+    logger.info(
+        "BATCH EINSTELLUNGEN | Bevorzugte Quelle=%s | "
+        "Apple-Store=%s | Ergänzen=%s",
+        settings.selected_provider,
+        settings.apple_country,
+        settings.enrich_missing_fields,
+    )
     provider_order = _provider_order(
         settings.selected_provider,
         settings.enrich_missing_fields,
+    )
+    logger.info(
+        "BATCH PROVIDER | Reihenfolge=%r",
+        provider_order,
     )
     candidates_by_index: list[
         list[MetadataCandidate]
@@ -219,6 +261,12 @@ def build_batch_proposals(
                 warnings_by_index,
                 country=settings.apple_country,
             )
+        )
+        logger.info(
+            "APPLE ALBUMPFAD BEENDET | Behandelte Indizes=%r",
+            sorted(
+                apple_resolved_indexes
+            ),
         )
 
     if "musicbrainz" in provider_order:
@@ -260,6 +308,14 @@ def build_batch_proposals(
                 ]
             )
         ):
+            logger.warning(
+                "APPLE EINZELFALLBACK | Index=%d | Titel=%r | "
+                "Album=%r | Track=%r",
+                index,
+                song.title,
+                song.album,
+                song.track,
+            )
             _add_safe_single_apple_candidate(
                 song,
                 candidates_by_index[
@@ -323,6 +379,31 @@ def build_batch_proposals(
             "Abgeschlossen",
         )
 
+    for index, candidates in enumerate(
+        candidates_by_index
+    ):
+        logger.info(
+            "BATCH ERGEBNIS | Index=%d | Quellen=%r | Warnungen=%r",
+            index,
+            [
+                (
+                    candidate.source,
+                    candidate.title,
+                    candidate.track,
+                    candidate.confidence,
+                )
+                for candidate in candidates
+            ],
+            warnings_by_index[
+                index
+            ],
+        )
+
+    logger.info(
+        "BATCH ENDE | Titel=%d",
+        len(songs),
+    )
+
     return [
         _proposal_result(
             song,
@@ -361,11 +442,27 @@ def _add_album_aware_apple_candidates(
     Song-Suche darf dann keinen ähnlich klingenden Titel aus einem anderen
     Album oder von einer anderen Position einsetzen.
     """
+    logger = get_diagnostic_logger(
+        "proposal"
+    )
     handled_indexes: set[int] = set()
-
-    for indexes in _album_groups(
+    groups = _album_groups(
         songs
-    ).values():
+    )
+    logger.info(
+        "APPLE ALBUMPFAD START | Gruppen=%d | Gruppenschlüssel=%r",
+        len(groups),
+        list(
+            groups.keys()
+        ),
+    )
+
+    for group_key, indexes in groups.items():
+        logger.info(
+            "APPLE GRUPPE | Schlüssel=%r | Indizes=%r",
+            group_key,
+            indexes,
+        )
         group_songs = [
             songs[index]
             for index in indexes
@@ -379,7 +476,22 @@ def _add_album_aware_apple_candidates(
             group_songs
         )
 
+        logger.info(
+            "APPLE ALBUMIDENTITÄT | Schlüssel=%r | Album=%r | "
+            "Albumkünstler=%r | Jahr=%r | Erwartete Tracks=%r",
+            group_key,
+            album_name,
+            album_artist,
+            wanted_year,
+            expected_track_count,
+        )
+
         if not album_name:
+            logger.warning(
+                "APPLE GRUPPE ÜBERSPRUNGEN | Schlüssel=%r | "
+                "Grund=kein Albumname",
+                group_key,
+            )
             continue
 
         store_order = [
@@ -392,32 +504,113 @@ def _add_album_aware_apple_candidates(
         album_candidates = []
 
         for store in store_order:
-            try:
-                found = search_apple_album(
-                    album_name,
-                    album_artist,
-                    expected_track_count=(
-                        expected_track_count
-                    ),
-                    wanted_year=wanted_year,
-                    country=store,
-                    limit=30,
+            logger.info(
+                "APPLE ALBUMSUCHE AUFRUF | Schlüssel=%r | Store=%s",
+                group_key,
+                store,
+            )
+
+            found = []
+            search_error = None
+
+            for album_variant in (
+                _apple_album_title_variants(
+                    album_name
                 )
-            except AppleMusicProviderError as error:
+            ):
+                logger.info(
+                    "APPLE ALBUMSUCHE VARIANTE | Schlüssel=%r | "
+                    "Store=%s | Album=%r",
+                    group_key,
+                    store,
+                    album_variant,
+                )
+
+                try:
+                    variant_results = (
+                        search_apple_album(
+                            album_variant,
+                            album_artist,
+                            expected_track_count=(
+                                expected_track_count
+                            ),
+                            wanted_year=(
+                                wanted_year
+                            ),
+                            country=store,
+                            limit=30,
+                        )
+                    )
+                except AppleMusicProviderError as error:
+                    search_error = error
+                    logger.warning(
+                        "APPLE ALBUMSUCHE VARIANTE FEHLER | "
+                        "Schlüssel=%r | Store=%s | Album=%r | %s",
+                        group_key,
+                        store,
+                        album_variant,
+                        error,
+                    )
+                    continue
+
+                found.extend(variant_results)
+
+                if any(
+                    candidate.confidence >= MINIMUM_ALBUM_CONFIDENCE
+                    for candidate in variant_results
+                ):
+                    break
+
+            found = _deduplicate_apple_album_candidates(found)
+
+            if not found and search_error is not None:
                 _append_group_warning(
                     warnings_by_index,
                     indexes,
-                    str(error),
+                    str(search_error),
                 )
-                continue
 
-            album_candidates.extend(
+            logger.info(
+                "APPLE ALBUMSUCHE RESULTAT | Schlüssel=%r | Store=%s | "
+                "Gefunden=%r | Mindestscore=%s",
+                group_key,
+                store,
+                [
+                    (
+                        candidate.collection_id,
+                        candidate.album,
+                        candidate.artist,
+                        candidate.track_count,
+                        candidate.year,
+                        candidate.confidence,
+                    )
+                    for candidate in found[:10]
+                ],
+                MINIMUM_ALBUM_CONFIDENCE,
+            )
+            accepted = [
                 candidate
                 for candidate in found[:5]
                 if (
                     candidate.confidence
                     >= MINIMUM_ALBUM_CONFIDENCE
                 )
+            ]
+            logger.info(
+                "APPLE ALBUMSUCHE AKZEPTIERT | Schlüssel=%r | "
+                "Store=%s | Kandidaten=%r",
+                group_key,
+                store,
+                [
+                    (
+                        candidate.collection_id,
+                        candidate.confidence,
+                    )
+                    for candidate in accepted
+                ],
+            )
+            album_candidates.extend(
+                accepted
             )
 
         album_candidates = (
@@ -427,13 +620,55 @@ def _add_album_aware_apple_candidates(
         )
 
         if not album_candidates:
-            # Kein Album sicher erkannt. Erst dann ist der allgemeine,
-            # streng bewertete Einzeltitel-Fallback zulässig.
-            continue
+            logger.warning(
+                "APPLE ALBUMSUCHE OHNE TREFFER | Schlüssel=%r | "
+                "Collection-ID wird aus Einzeltreffern rekonstruiert",
+                group_key,
+            )
+            recovered_candidate = (
+                _recover_apple_album_candidate_from_songs(
+                    group_songs,
+                    album_name=album_name,
+                    album_artist=album_artist,
+                    wanted_year=wanted_year,
+                    expected_track_count=expected_track_count,
+                    countries=tuple(store_order),
+                )
+            )
+
+            if recovered_candidate is not None:
+                album_candidates = [recovered_candidate]
+                logger.info(
+                    "APPLE COLLECTION-ID REKONSTRUIERT | "
+                    "Schlüssel=%r | Collection-ID=%s | Store=%s | "
+                    "Album=%r | Tracks=%s | Score=%s",
+                    group_key,
+                    recovered_candidate.collection_id,
+                    recovered_candidate.country,
+                    recovered_candidate.album,
+                    recovered_candidate.track_count,
+                    recovered_candidate.confidence,
+                )
+            else:
+                logger.warning(
+                    "APPLE ALBUMPFAD ABBRUCH | Schlüssel=%r | "
+                    "Grund=weder Albumsuche noch Einzeltitel-Konsens",
+                    group_key,
+                )
+                continue
 
         options = []
 
         for candidate in album_candidates:
+            logger.info(
+                "APPLE LOOKUP AUFRUF | Schlüssel=%r | Collection-ID=%s | "
+                "Store=%s | Score=%s",
+                group_key,
+                candidate.collection_id,
+                candidate.country,
+                candidate.confidence,
+            )
+
             try:
                 album_result = (
                     lookup_apple_album_by_id(
@@ -443,7 +678,15 @@ def _add_album_aware_apple_candidates(
                         ),
                     )
                 )
-            except DirectAlbumLookupError:
+            except DirectAlbumLookupError as error:
+                logger.exception(
+                    "APPLE LOOKUP FEHLER | Schlüssel=%r | "
+                    "Collection-ID=%s | Store=%s | %s",
+                    group_key,
+                    candidate.collection_id,
+                    candidate.country,
+                    error,
+                )
                 continue
 
             matching = (
@@ -451,6 +694,26 @@ def _add_album_aware_apple_candidates(
                     group_songs,
                     album_result,
                 )
+            )
+            logger.info(
+                "APPLE MATCHING | Schlüssel=%r | Collection-ID=%s | "
+                "Remote Tracks=%d | Matches=%r | Lokal ungematcht=%r",
+                group_key,
+                candidate.collection_id,
+                len(
+                    album_result.tracks
+                ),
+                [
+                    (
+                        match.local_index,
+                        match.track.track,
+                        match.track.title,
+                        match.score,
+                        match.confidence,
+                    )
+                    for match in matching.matches
+                ],
+                matching.unmatched_local_indexes,
             )
             options.append(
                 (
@@ -488,6 +751,14 @@ def _add_album_aware_apple_candidates(
             )
             selected_collection_id = (
                 selected_candidate.collection_id
+            )
+            logger.info(
+                "APPLE OPTION GEWÄHLT | Schlüssel=%r | "
+                "Collection-ID=%s | Store=%s | Rang=%r",
+                group_key,
+                selected_collection_id,
+                selected_candidate.country,
+                _best_rank,
             )
             selected_store = (
                 selected_candidate.country
@@ -536,6 +807,12 @@ def _add_album_aware_apple_candidates(
                 if local_index
                 not in matched_local_indexes
             ]
+            logger.info(
+                "APPLE FEHLENDE LOKALE TITEL | Schlüssel=%r | "
+                "Lokale Indizes=%r",
+                group_key,
+                missing_local_indexes,
+            )
         else:
             # Die Albumsuche kennt das Album, aber Lookup lieferte in keinem
             # Store eine verwendbare Trackliste. Wir nutzen dennoch die beste
@@ -589,6 +866,19 @@ def _add_album_aware_apple_candidates(
             )
             exact_track = None
 
+            logger.info(
+                "APPLE TRACK-NACHSUCHE | Schlüssel=%r | Lokalindex=%d | "
+                "Titel=%r | Disc=%r | Track=%r | Collection-ID=%s | "
+                "Stores=%r",
+                group_key,
+                local_index,
+                song.title,
+                wanted_disc_number,
+                wanted_track_number,
+                selected_collection_id,
+                recovery_countries,
+            )
+
             if (
                 wanted_track_number
                 is not None
@@ -608,6 +898,17 @@ def _add_album_aware_apple_candidates(
                 )
 
             if exact_track is not None:
+                logger.info(
+                    "APPLE TRACK-NACHSUCHE ERFOLG | Schlüssel=%r | "
+                    "Lokalindex=%d | Titel=%r | Remote=%r | Track=%r | "
+                    "Song-ID=%r",
+                    group_key,
+                    local_index,
+                    song.title,
+                    exact_track.title,
+                    exact_track.track,
+                    exact_track.external_id,
+                )
                 candidates_by_index[
                     indexes[local_index]
                 ].append(
@@ -622,6 +923,14 @@ def _add_album_aware_apple_candidates(
                     )
                 )
                 continue
+
+            logger.warning(
+                "APPLE SEARCH-FALLBACK START | Schlüssel=%r | "
+                "Lokalindex=%d | Titel=%r",
+                group_key,
+                local_index,
+                song.title,
+            )
 
             try:
                 recovered = (
@@ -664,6 +973,23 @@ def _add_album_aware_apple_candidates(
                     str(error)
                 )
                 continue
+
+            logger.info(
+                "APPLE SEARCH-FALLBACK RESULTAT | Schlüssel=%r | "
+                "Lokalindex=%d | Treffer=%r",
+                group_key,
+                local_index,
+                [
+                    (
+                        item.title,
+                        item.track,
+                        item.release_id,
+                        item.external_id,
+                        item.confidence,
+                    )
+                    for item in recovered
+                ],
+            )
 
             if recovered:
                 candidates_by_index[
@@ -946,9 +1272,11 @@ def _album_identity(
         )
         for song in songs
     )
-    wanted_year = _most_common_text(
-        song.year
-        for song in songs
+    wanted_year = _year_only(
+        _most_common_text(
+            song.year
+            for song in songs
+        )
     )
     expected_track_count = (
         _most_common_positive_int(
@@ -965,6 +1293,89 @@ def _album_identity(
         expected_track_count,
     )
 
+
+
+def _year_only(value: str) -> str:
+    match = re.search(r"\b(19|20)\d{2}\b", str(value or ""))
+    return match.group(0) if match else str(value or "").strip()
+
+
+def _apple_album_title_variants(album: str) -> tuple[str, ...]:
+    original = str(album or "").strip()
+    if not original:
+        return ()
+    variants: list[str] = []
+    def add(value: str) -> None:
+        value = re.sub(r"\s+", " ", value).strip()
+        if value and value.casefold() not in {item.casefold() for item in variants}:
+            variants.append(value)
+    add(original)
+    add(original.replace("/", " "))
+    add(original.replace("/", "-"))
+    add(re.sub(r"[/_-]+", " ", original))
+    return tuple(variants)
+
+
+def _recover_apple_album_candidate_from_songs(
+    songs: list[Song], *, album_name: str, album_artist: str,
+    wanted_year: str, expected_track_count: int,
+    countries: tuple[str, ...],
+) -> AppleAlbumCandidate | None:
+    logger = get_diagnostic_logger("proposal")
+    unique_countries = tuple(dict.fromkeys(country.upper() for country in countries if country))
+    ranked_songs = sorted(enumerate(songs), key=lambda item: (-len(re.sub(r"\W+", "", item[1].title)), _positive_int(item[1].track) or 9999))
+    sampled = ranked_songs[:min(len(ranked_songs), 8)]
+    sample_size = len(sampled)
+    minimum_votes = min(sample_size, max(2, math.ceil(sample_size * 0.4)))
+    voters: dict[str, set[int]] = defaultdict(set)
+    stores: dict[str, Counter[str]] = defaultdict(Counter)
+    examples: dict[str, MetadataCandidate] = {}
+    logger.info("APPLE COLLECTION-RECOVERY START | Album=%r | Künstler=%r | Samples=%d | Mindeststimmen=%d | Stores=%r", album_name, album_artist, sample_size, minimum_votes, unique_countries)
+    for local_index, song in sampled:
+        accepted_for_song: set[str] = set()
+        for store in unique_countries:
+            try:
+                results = search_apple(song.title, song.album_artist or song.artist, song.album, alternate_title=_title_from_filename(song.path), wanted_track=song.track, wanted_disc=song.disc, duration_ms=_local_duration_ms(song.path), country=store, limit=100)
+            except AppleMusicProviderError as error:
+                logger.warning("APPLE COLLECTION-RECOVERY SUCHFEHLER | Lokalindex=%d | Store=%s | Titel=%r | %s", local_index, store, song.title, error)
+                continue
+            suitable = [c for c in results if c.confidence >= MINIMUM_TRACK_CONFIDENCE and c.release_id and (not c.album or _normalized_text(c.album) == _normalized_text(album_name)) and (not c.total_tracks or _positive_int(c.total_tracks) in {None, expected_track_count})]
+            logger.info("APPLE COLLECTION-RECOVERY TITEL | Lokalindex=%d | Store=%s | Titel=%r | Treffer=%r", local_index, store, song.title, [(c.release_id,c.title,c.track,c.album,c.total_tracks,c.confidence) for c in suitable[:5]])
+            for c in suitable[:3]:
+                collection_id=c.release_id
+                stores[collection_id][store]+=1
+                examples.setdefault(collection_id,c)
+                if collection_id in accepted_for_song: continue
+                accepted_for_song.add(collection_id)
+                voters[collection_id].add(local_index)
+        if voters:
+            best_id,best_set=max(voters.items(),key=lambda item:len(item[1]))
+            if len(best_set)>=minimum_votes:
+                logger.info("APPLE COLLECTION-RECOVERY FRÜHER KONSENS | Collection-ID=%s | Stimmen=%d",best_id,len(best_set))
+                break
+    if not voters:
+        logger.warning("APPLE COLLECTION-RECOVERY ENDE | Keine Collection-ID"); return None
+    ranked=sorted(((cid,len(indices)) for cid,indices in voters.items()),key=lambda item:(-item[1],item[0]))
+    best_id,best_votes=ranked[0]; second_votes=ranked[1][1] if len(ranked)>1 else 0
+    if best_votes<minimum_votes or best_votes<=second_votes:
+        logger.warning("APPLE COLLECTION-RECOVERY UNEINDEUTIG | Stimmen=%r | Mindeststimmen=%d",ranked,minimum_votes); return None
+    store_counts=stores[best_id]
+    store=next((s for s in unique_countries if store_counts[s]==max(store_counts.values())),store_counts.most_common(1)[0][0])
+    example=examples[best_id]
+    try: album_result=lookup_apple_album_by_id(best_id,country=store)
+    except DirectAlbumLookupError as error:
+        logger.warning("APPLE COLLECTION-RECOVERY LOOKUP FEHLER | Collection-ID=%s | Store=%s | %s",best_id,store,error); return None
+    remote_count=len(album_result.tracks)
+    matching_album=not album_result.album or _normalized_text(album_result.album)==_normalized_text(album_name)
+    count_plausible=remote_count>=min(len(songs),expected_track_count) or remote_count==expected_track_count
+    if not matching_album or not count_plausible:
+        logger.warning("APPLE COLLECTION-RECOVERY VALIDIERUNG FEHLER | Collection-ID=%s | Remote-Album=%r | Remote-Tracks=%d | Erwartet=%d",best_id,album_result.album,remote_count,expected_track_count); return None
+    logger.info("APPLE COLLECTION-RECOVERY ERFOLG | Collection-ID=%s | Store=%s | Stimmen=%d/%d | Album=%r | Remote-Tracks=%d",best_id,store,best_votes,sample_size,album_result.album,remote_count)
+    return AppleAlbumCandidate(collection_id=best_id,album=album_result.album or example.album or album_name,artist=album_result.album_artist or example.album_artist or album_artist,track_count=remote_count or _positive_int(example.total_tracks) or expected_track_count,year=_year_only(example.year) or wanted_year,country=store,confidence=min(99,80+best_votes*3))
+
+
+def _normalized_text(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
 
 def _warn_unmatched_album_tracks(
     matching,

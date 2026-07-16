@@ -14,14 +14,17 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from .diagnostics import get_diagnostic_logger
+from .diagnostics import (
+    cache_directory,
+    get_diagnostic_logger,
+)
 from .direct_references import DirectAlbumReference
 from .models.metadata import MetadataCandidate
 from .models.song import Song
 
 
 USER_AGENT = (
-    "MusicTagStudio/0.6.8.4 "
+    "MusicTagStudio/0.6.8.5 "
     "(https://github.com/pcblizzard/MusicTagStudio)"
 )
 TIMEOUT_SECONDS = 20
@@ -1040,6 +1043,7 @@ def _lookup_apple_album(
     *,
     country: str,
 ) -> DirectAlbumResult:
+    country = country.upper()
     payload = _get_json(
         "https://itunes.apple.com/lookup?"
         + urlencode(
@@ -1052,38 +1056,228 @@ def _lookup_apple_album(
             }
         )
     )
-
-    results = payload.get("results", [])
-
-    collection = next(
-        (
-            item
-            for item in results
-            if item.get("wrapperType") == "collection"
-        ),
-        None,
+    logger = get_diagnostic_logger(
+        "apple_music"
+    )
+    dump_path = _write_apple_lookup_dump(
+        album_id,
+        country,
+        payload,
+    )
+    results = payload.get(
+        "results",
+        [],
     )
 
-    track_items = [
-        item
-        for item in results
-        if item.get("wrapperType") == "track"
-        and item.get("kind") == "song"
-    ]
+    if not isinstance(
+        results,
+        list,
+    ):
+        logger.error(
+            "Apple-Antwort verworfen | Store=%s | Collection-ID=%s | "
+            "Grund=results ist keine Liste | Typ=%s | JSON=%s",
+            country,
+            album_id,
+            type(results).__name__,
+            dump_path,
+        )
+        raise DirectAlbumLookupError(
+            "Apple Music lieferte eine unerwartete Antwortstruktur."
+        )
 
-    if not collection or not track_items:
+    collection = None
+    track_items: list[dict] = []
+    rejected_count = 0
+
+    logger.info(
+        "Apple-Rohantwort | Store=%s | Collection-ID=%s | "
+        "resultCount=%s | Einträge=%d | JSON=%s",
+        country,
+        album_id,
+        payload.get(
+            "resultCount",
+            "?",
+        ),
+        len(results),
+        dump_path,
+    )
+
+    for index, item in enumerate(
+        results
+    ):
+        if not isinstance(
+            item,
+            dict,
+        ):
+            rejected_count += 1
+            logger.warning(
+                "Apple-Eintrag verworfen | Index=%d | Store=%s | "
+                "Collection-ID=%s | Grund=kein Objekt | Typ=%s",
+                index,
+                country,
+                album_id,
+                type(item).__name__,
+            )
+            continue
+
+        wrapper_type = item.get(
+            "wrapperType"
+        )
+        kind = item.get("kind")
+        item_collection_id = str(
+            item.get(
+                "collectionId",
+                "",
+            )
+        )
+        track_number = item.get(
+            "trackNumber"
+        )
+        disc_number = item.get(
+            "discNumber"
+        )
+        track_id = item.get(
+            "trackId"
+        )
+        track_name = item.get(
+            "trackName"
+        )
+
+        logger.debug(
+            "Apple-Eintrag | Index=%d | Store=%s | Collection-ID=%s | "
+            "wrapperType=%r | kind=%r | itemCollectionId=%r | "
+            "Disc=%r | Track=%r | Song-ID=%r | Titel=%r | Keys=%s",
+            index,
+            country,
+            album_id,
+            wrapper_type,
+            kind,
+            item_collection_id,
+            disc_number,
+            track_number,
+            track_id,
+            track_name,
+            ",".join(
+                sorted(
+                    str(key)
+                    for key in item.keys()
+                )
+            ),
+        )
+
+        if wrapper_type == "collection":
+            if collection is None:
+                collection = item
+                logger.info(
+                    "Apple-Collection akzeptiert | Index=%d | "
+                    "Store=%s | Collection-ID=%s | Album=%r | "
+                    "Künstler=%r | TrackCount=%r",
+                    index,
+                    country,
+                    album_id,
+                    item.get(
+                        "collectionName"
+                    ),
+                    item.get(
+                        "artistName"
+                    ),
+                    item.get(
+                        "trackCount"
+                    ),
+                )
+            else:
+                logger.info(
+                    "Apple-Collection ignoriert | Index=%d | Store=%s | "
+                    "Collection-ID=%s | Grund=Collection bereits gesetzt",
+                    index,
+                    country,
+                    album_id,
+                )
+            continue
+
+        rejection_reasons = _apple_track_rejection_reasons(
+            item,
+            album_id,
+        )
+
+        if rejection_reasons:
+            rejected_count += 1
+            logger.warning(
+                "Apple-Track verworfen | Index=%d | Store=%s | "
+                "Collection-ID=%s | Disc=%r | Track=%r | "
+                "Song-ID=%r | Titel=%r | Gründe=%s",
+                index,
+                country,
+                album_id,
+                disc_number,
+                track_number,
+                track_id,
+                track_name,
+                "; ".join(
+                    rejection_reasons
+                ),
+            )
+            continue
+
+        track_items.append(item)
+        logger.info(
+            "Apple-Track akzeptiert | Index=%d | Store=%s | "
+            "Collection-ID=%s | Disc=%r | Track=%r | "
+            "Song-ID=%r | Titel=%r",
+            index,
+            country,
+            album_id,
+            disc_number,
+            track_number,
+            track_id,
+            track_name,
+        )
+
+    if collection is None:
+        logger.error(
+            "Apple-Album-Lookup ohne Collection | Store=%s | "
+            "Collection-ID=%s | akzeptierte Tracks=%d | "
+            "verworfene Einträge=%d | JSON=%s",
+            country,
+            album_id,
+            len(track_items),
+            rejected_count,
+            dump_path,
+        )
+        raise DirectAlbumLookupError(
+            "Apple Music lieferte für diese Album-ID keinen Albumdatensatz."
+        )
+
+    if not track_items:
+        logger.error(
+            "Apple-Album-Lookup ohne Tracks | Store=%s | "
+            "Collection-ID=%s | verworfene Einträge=%d | JSON=%s",
+            country,
+            album_id,
+            rejected_count,
+            dump_path,
+        )
         raise DirectAlbumLookupError(
             "Apple Music lieferte für diese Album-ID keine Trackliste."
         )
 
     album_name = str(
-        collection.get("collectionName", "")
+        collection.get(
+            "collectionName",
+            "",
+        )
     )
     album_artist = str(
-        collection.get("artistName", "")
+        collection.get(
+            "artistName",
+            "",
+        )
     )
     copyright_value = str(
-        collection.get("copyright", "")
+        collection.get(
+            "copyright",
+            "",
+        )
     )
 
     tracks = tuple(
@@ -1114,29 +1308,17 @@ def _lookup_apple_album(
         for item in track_items
     )
 
-    logger = get_diagnostic_logger(
-        "apple_music"
-    )
     logger.info(
-        "Album-Lookup | Store=%s | Collection-ID=%s | "
-        "Album=%s | geladene Titel=%d",
-        country.upper(),
+        "Album-Lookup abgeschlossen | Store=%s | Collection-ID=%s | "
+        "Album=%s | akzeptierte Titel=%d | verworfene Einträge=%d | "
+        "JSON=%s",
+        country,
         album_id,
         album_name,
         len(tracks),
+        rejected_count,
+        dump_path,
     )
-
-    for track in tracks:
-        logger.info(
-            "Track | Store=%s | Collection-ID=%s | Disc=%s | "
-            "Track=%s | Song-ID=%s | Titel=%s",
-            country.upper(),
-            album_id,
-            track.disc or "1",
-            track.track or "?",
-            track.external_id or "?",
-            track.title,
-        )
 
     return DirectAlbumResult(
         provider="apple_music",
@@ -1144,6 +1326,139 @@ def _lookup_apple_album(
         album_artist=album_artist,
         tracks=tracks,
     )
+
+
+def _apple_track_rejection_reasons(
+    item: dict,
+    requested_collection_id: str,
+) -> list[str]:
+    reasons: list[str] = []
+
+    if item.get(
+        "wrapperType"
+    ) != "track":
+        reasons.append(
+            "wrapperType ist nicht 'track'"
+        )
+
+    kind = item.get("kind")
+
+    if kind != "song":
+        reasons.append(
+            f"kind ist {kind!r} statt 'song'"
+        )
+
+    item_collection_id = str(
+        item.get(
+            "collectionId",
+            "",
+        )
+    )
+
+    if (
+        item_collection_id
+        and item_collection_id
+        != str(
+            requested_collection_id
+        )
+    ):
+        reasons.append(
+            "collectionId stimmt nicht"
+        )
+
+    if item.get(
+        "trackNumber"
+    ) in (
+        None,
+        "",
+    ):
+        reasons.append(
+            "trackNumber fehlt"
+        )
+
+    if item.get(
+        "discNumber"
+    ) in (
+        None,
+        "",
+    ):
+        reasons.append(
+            "discNumber fehlt"
+        )
+
+    if item.get(
+        "trackId"
+    ) in (
+        None,
+        "",
+    ):
+        reasons.append(
+            "trackId fehlt"
+        )
+
+    if not str(
+        item.get(
+            "trackName",
+            "",
+        )
+    ).strip():
+        reasons.append(
+            "trackName fehlt"
+        )
+
+    return reasons
+
+
+def _write_apple_lookup_dump(
+    album_id: str,
+    country: str,
+    payload: dict,
+) -> Path:
+    dump_directory = (
+        cache_directory()
+        / "apple"
+    )
+    dump_directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    safe_album_id = re.sub(
+        r"[^0-9A-Za-z_.-]+",
+        "_",
+        str(album_id),
+    )
+    safe_country = re.sub(
+        r"[^0-9A-Za-z_.-]+",
+        "_",
+        str(country).upper(),
+    )
+    dump_path = (
+        dump_directory
+        / (
+            f"lookup_{safe_album_id}_"
+            f"{safe_country}.json"
+        )
+    )
+
+    try:
+        dump_path.write_text(
+            json.dumps(
+                payload,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+    except OSError:
+        get_diagnostic_logger(
+            "apple_music"
+        ).exception(
+            "Apple-Rohantwort konnte nicht gespeichert werden: %s",
+            dump_path,
+        )
+
+    return dump_path
 
 
 def _resolve_release_group(

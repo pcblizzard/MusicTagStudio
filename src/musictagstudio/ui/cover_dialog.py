@@ -82,8 +82,18 @@ class CoverSelectionDialog(QDialog):
         self.selected_candidate: (
             CoverCandidate | None
         ) = None
-        self.thread_pool = QThreadPool.globalInstance()
+        self.thread_pool = QThreadPool(self)
+        self.thread_pool.setMaxThreadCount(3)
+        self._active_workers: set[FunctionWorker] = set()
+        self._closing = False
         self._preview_generation = 0
+        self._preview_cache: dict[
+            int,
+            bytes,
+        ] = {}
+        self._preview_loading: set[
+            int
+        ] = set()
 
         self.setWindowTitle("Cover auswählen")
         self.resize(980, 650)
@@ -248,6 +258,8 @@ class CoverSelectionDialog(QDialog):
         )
         self.list.clear()
         self.candidates.clear()
+        self._preview_cache.clear()
+        self._preview_loading.clear()
         self.ok_button.setEnabled(False)
         self.preview.clear()
         self.preview.setText(
@@ -266,12 +278,45 @@ class CoverSelectionDialog(QDialog):
         worker.signals.failed.connect(
             self._search_failed
         )
-        self.thread_pool.start(worker)
+        self._start_worker(worker)
+
+    def _start_worker(
+        self,
+        worker: FunctionWorker,
+    ) -> None:
+        if self._closing:
+            return
+
+        self._active_workers.add(
+            worker
+        )
+        worker.signals.finished.connect(
+            lambda _result, current=worker:
+            self._release_worker(current)
+        )
+        worker.signals.failed.connect(
+            lambda _message, current=worker:
+            self._release_worker(current)
+        )
+        self.thread_pool.start(
+            worker
+        )
+
+    def _release_worker(
+        self,
+        worker: FunctionWorker,
+    ) -> None:
+        self._active_workers.discard(
+            worker
+        )
 
     def _search_finished(
         self,
         result,
     ):
+        if self._closing:
+            return
+
         self.direct_button.setEnabled(True)
         self.refresh_button.setEnabled(True)
         self.candidates = list(result)
@@ -312,15 +357,24 @@ class CoverSelectionDialog(QDialog):
             f"Empfehlung: {best.source_label} "
             f"({best.score} Punkte)."
         )
+        best_row = self.candidates.index(
+            best
+        )
         self.list.setCurrentRow(
-            self.candidates.index(best)
+            best_row
         )
         self.ok_button.setEnabled(True)
+        self._prefetch_previews(
+            preferred_row=best_row
+        )
 
     def _search_failed(
         self,
         message: str,
     ):
+        if self._closing:
+            return
+
         self.direct_button.setEnabled(True)
         self.refresh_button.setEnabled(True)
         self.status_label.setText(
@@ -345,9 +399,16 @@ class CoverSelectionDialog(QDialog):
             candidate
         )
 
-        if candidate.data is not None:
+        data = (
+            candidate.data
+            or self._preview_cache.get(
+                row
+            )
+        )
+
+        if data is not None:
             self._show_preview_data(
-                candidate.data,
+                data,
                 candidate,
             )
             return
@@ -356,36 +417,180 @@ class CoverSelectionDialog(QDialog):
         generation = self._preview_generation
         self.preview.clear()
         self.preview.setText(
-            "Vorschau wird geladen …"
+            "Vorschau wird im Hintergrund geladen …"
+        )
+        self._start_preview_download(
+            row,
+            generation=generation,
         )
 
+    def _prefetch_previews(
+        self,
+        *,
+        preferred_row: int,
+    ) -> None:
+        """
+        Lädt die kleinen Vorschaubilder sofort nach der Suche parallel vor.
+        Beim späteren Anklicken ist das Bild dadurch meistens bereits im RAM.
+        """
+        rows = [
+            preferred_row,
+            *(
+                row
+                for row in range(
+                    len(self.candidates)
+                )
+                if row != preferred_row
+            ),
+        ]
+
+        # Nicht sämtliche Onlinequellen gleichzeitig starten. Das hält den
+        # Dialog reaktionsfähig und vermeidet viele späte Rückrufe beim
+        # Schließen. Die aktuell gewählte Vorschau und höchstens zwei weitere
+        # Treffer werden vorbereitet.
+        for row in rows[:3]:
+            candidate = self.candidates[
+                row
+            ]
+
+            if candidate.data is not None:
+                self._preview_cache[
+                    row
+                ] = candidate.data
+                continue
+
+            self._start_preview_download(
+                row
+            )
+
+    def _start_preview_download(
+        self,
+        row: int,
+        *,
+        generation: int | None = None,
+    ) -> None:
+        if (
+            self._closing
+            or row in self._preview_cache
+            or row in self._preview_loading
+            or row < 0
+            or row >= len(
+                self.candidates
+            )
+        ):
+            return
+
+        candidate = self.candidates[
+            row
+        ]
+        self._preview_loading.add(
+            row
+        )
         worker = FunctionWorker(
-            self.manager.load_preview,
+            self._load_preview_result,
+            row,
+            generation,
             candidate,
         )
+        worker.signals.finished.connect(
+            self._preview_finished
+        )
+        worker.signals.failed.connect(
+            self._preview_failed
+        )
+        self._start_worker(
+            worker
+        )
 
-        def show_if_current(data):
-            if (
-                generation
-                != self._preview_generation
-            ):
-                return
+    def _load_preview_result(
+        self,
+        row: int,
+        generation: int | None,
+        candidate: CoverCandidate,
+    ):
+        data = self.manager.load_preview(
+            candidate
+        )
 
+        return (
+            row,
+            generation,
+            candidate,
+            data,
+        )
+
+    @Slot(object)
+    def _preview_finished(
+        self,
+        result,
+    ) -> None:
+        if self._closing:
+            return
+
+        (
+            row,
+            generation,
+            candidate,
+            data,
+        ) = result
+        self._preview_loading.discard(
+            row
+        )
+
+        if (
+            row < 0
+            or row >= len(
+                self.candidates
+            )
+            or self.candidates[row]
+            is not candidate
+        ):
+            return
+
+        self._preview_cache[
+            row
+        ] = data
+
+        if (
+            self.list.currentRow()
+            == row
+            and (
+                generation is None
+                or generation
+                == self._preview_generation
+            )
+        ):
             self._show_preview_data(
                 data,
                 candidate,
             )
 
-        worker.signals.finished.connect(
-            show_if_current
+    @Slot(str)
+    def _preview_failed(
+        self,
+        message: str,
+    ) -> None:
+        if self._closing:
+            return
+
+        current_row = (
+            self.list.currentRow()
         )
-        worker.signals.failed.connect(
-            lambda message:
-            self.preview.setText(
-                f"Vorschau nicht verfügbar\n{message}"
+
+        if current_row >= 0:
+            self._preview_loading.discard(
+                current_row
             )
-        )
-        self.thread_pool.start(worker)
+
+        if (
+            current_row >= 0
+            and current_row
+            not in self._preview_cache
+        ):
+            self.preview.setText(
+                "Vorschau nicht verfügbar\n"
+                + message
+            )
 
     def _show_preview_data(
         self,
@@ -514,6 +719,78 @@ class CoverSelectionDialog(QDialog):
             self.comparison_label.setText(
                 "Kein vorhandenes Master-Cover zum Vergleichen."
             )
+
+    def reject(self) -> None:
+        self._prepare_close()
+        super().reject()
+
+    def accept(self) -> None:
+        self._prepare_close()
+        super().accept()
+
+    def closeEvent(
+        self,
+        event,
+    ) -> None:
+        self._prepare_close()
+        super().closeEvent(
+            event
+        )
+
+    def _prepare_close(
+        self,
+    ) -> None:
+        if self._closing:
+            return
+
+        self._closing = True
+        self._preview_generation += 1
+        self._preview_loading.clear()
+
+        # Die Aufgaben dürfen sauber auslaufen, ihre Ergebnisse werden nach
+        # dem Schließen aber nicht mehr an Widgets weitergereicht.
+        for worker in tuple(
+            self._active_workers
+        ):
+            try:
+                worker.signals.finished.disconnect(
+                    self._search_finished
+                )
+            except (
+                RuntimeError,
+                TypeError,
+            ):
+                pass
+
+            try:
+                worker.signals.failed.disconnect(
+                    self._search_failed
+                )
+            except (
+                RuntimeError,
+                TypeError,
+            ):
+                pass
+
+            try:
+                worker.signals.finished.disconnect(
+                    self._preview_finished
+                )
+            except (
+                RuntimeError,
+                TypeError,
+            ):
+                pass
+
+            try:
+                worker.signals.failed.disconnect(
+                    self._preview_failed
+                )
+            except (
+                RuntimeError,
+                TypeError,
+            ):
+                pass
 
     def _accept(self):
         row = self.list.currentRow()

@@ -788,11 +788,16 @@ class AudioAnalysisDialog(QDialog):
         self.worker.failed.connect(
             self.thread.quit
         )
-        self.thread.finished.connect(
-            self.thread.deleteLater
+        current_thread = self.thread
+        current_thread.finished.connect(
+            current_thread.deleteLater
+        )
+        current_thread.finished.connect(
+            lambda thread=current_thread:
+            self._clear_finished_thread(thread)
         )
 
-        self.thread.start()
+        current_thread.start()
 
     def cancel_analysis(self):
         if self.worker is not None:
@@ -1296,11 +1301,29 @@ class AudioAnalysisDialog(QDialog):
             message,
         )
 
+    def _clear_finished_thread(
+        self,
+        finished_thread: QThread,
+    ) -> None:
+        if self.thread is finished_thread:
+            self.thread = None
+
+    def _thread_is_running(
+        self,
+    ) -> bool:
+        thread = self.thread
+
+        if thread is None:
+            return False
+
+        try:
+            return thread.isRunning()
+        except RuntimeError:
+            self.thread = None
+            return False
+
     def closeEvent(self, event):
-        if (
-            self.thread is not None
-            and self.thread.isRunning()
-        ):
+        if self._thread_is_running():
             answer = QMessageBox.question(
                 self,
                 "Analyse läuft",
@@ -1321,8 +1344,14 @@ class AudioAnalysisDialog(QDialog):
                 return
 
             self.cancel_analysis()
-            self.thread.quit()
-            self.thread.wait(3000)
+            thread = self.thread
+
+            if thread is not None:
+                try:
+                    thread.quit()
+                    thread.wait(3000)
+                except RuntimeError:
+                    self.thread = None
 
         event.accept()
 
