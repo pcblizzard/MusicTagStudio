@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from .library_sources import MusicSource
+
 from .cover_source_catalog import COVER_SOURCES_BY_ID
 from .provider_catalog import PROVIDERS_BY_ID
 
@@ -43,6 +45,12 @@ class AppSettings:
 
     # 0 bedeutet automatische Auswahl anhand des Systems.
     audio_analysis_parallel_jobs: int = 0
+
+    music_sources: tuple[MusicSource, ...] = ()
+    load_sources_on_startup: bool = True
+    scan_sources_on_startup: bool = False
+
+    discogs_token: str = ""
 
 
 def load_settings(
@@ -88,6 +96,18 @@ def load_settings(
     )
     audio_analysis = data.get(
         "audio_analysis",
+        {},
+    )
+    library = data.get(
+        "library",
+        {},
+    )
+    raw_sources = data.get(
+        "music_sources",
+        [],
+    )
+    media_library = data.get(
+        "media_library",
         {},
     )
 
@@ -171,6 +191,58 @@ def load_settings(
     }:
         parallel_jobs = 0
 
+    music_sources: list[MusicSource] = []
+
+    if isinstance(
+        raw_sources,
+        list,
+    ):
+        for item in raw_sources:
+            if not isinstance(
+                item,
+                dict,
+            ):
+                continue
+
+            source_id = str(
+                item.get(
+                    "id",
+                    "",
+                )
+            ).strip()
+            path_value = str(
+                item.get(
+                    "path",
+                    "",
+                )
+            ).strip()
+
+            if not source_id or not path_value:
+                continue
+
+            music_sources.append(
+                MusicSource(
+                    source_id=source_id,
+                    name=str(
+                        item.get(
+                            "name",
+                            "",
+                        )
+                    ).strip()
+                    or Path(
+                        path_value
+                    ).name
+                    or path_value,
+                    path=path_value,
+                    enabled=bool(
+                        item.get(
+                            "enabled",
+                            True,
+                        )
+                    ),
+                )
+            )
+
     return AppSettings(
         theme=theme,
         selected_provider=selected_provider,
@@ -250,6 +322,27 @@ def load_settings(
             default=30,
         ),
         audio_analysis_parallel_jobs=parallel_jobs,
+        music_sources=tuple(
+            music_sources
+        ),
+        load_sources_on_startup=bool(
+            library.get(
+                "load_sources_on_startup",
+                True,
+            )
+        ),
+        scan_sources_on_startup=bool(
+            library.get(
+                "scan_sources_on_startup",
+                False,
+            )
+        ),
+        discogs_token=str(
+            media_library.get(
+                "discogs_token",
+                "",
+            )
+        ).strip(),
     )
 
 
@@ -257,43 +350,102 @@ def save_settings(
     settings: AppSettings,
     config_path: str | Path = "config.toml",
 ) -> None:
-    content = (
-        "[appearance]\n"
-        f'theme = "{settings.theme}"\n\n'
-        "[providers]\n"
-        f'selected = "{settings.selected_provider}"\n'
-        "enrich_missing_fields = "
-        f"{str(settings.enrich_missing_fields).lower()}\n"
-        f'apple_country = "{settings.apple_country.upper()}"\n\n'
-        "[behavior]\n"
-        "preview_before_writing = "
-        f"{str(settings.preview_before_writing).lower()}\n\n"
-        "[normalization]\n"
-        f'feature_handling = "{settings.feature_handling}"\n\n'
-        "[cover_sources]\n"
-        f'selected = "{settings.selected_cover_source}"\n'
-        "fallback_enabled = "
-        f"{str(settings.cover_fallback_enabled).lower()}\n"
-        f"minimum_size = {settings.minimum_cover_size}\n"
-        "cache_max_age_days = "
-        f"{settings.cover_cache_max_age_days}\n\n"
-        "[cover_output]\n"
-        'master_pattern = "{album_artist} - {album}.front.{ext}"\n'
-        f"embedded_size = {settings.embedded_cover_size}\n"
-        f"embedded_quality = {settings.embedded_cover_quality}\n"
-        f"folder_size = {settings.folder_cover_size}\n"
-        f"folder_quality = {settings.folder_cover_quality}\n"
-        'folder_pattern = "{album_artist} - {album}_400px.jpg"\n'
-        "artist_folder_levels_up = "
-        f"{settings.artist_folder_levels_up}\n\n"
-        "[audio_analysis]\n"
-        "parallel_jobs = "
-        f"{settings.audio_analysis_parallel_jobs}\n"
-    )
+    lines = [
+        "[appearance]",
+        f'theme = "{settings.theme}"',
+        "",
+        "[providers]",
+        f'selected = "{settings.selected_provider}"',
+        (
+            "enrich_missing_fields = "
+            f"{str(settings.enrich_missing_fields).lower()}"
+        ),
+        f'apple_country = "{settings.apple_country.upper()}"',
+        "",
+        "[behavior]",
+        (
+            "preview_before_writing = "
+            f"{str(settings.preview_before_writing).lower()}"
+        ),
+        "",
+        "[normalization]",
+        f'feature_handling = "{settings.feature_handling}"',
+        "",
+        "[cover_sources]",
+        f'selected = "{settings.selected_cover_source}"',
+        (
+            "fallback_enabled = "
+            f"{str(settings.cover_fallback_enabled).lower()}"
+        ),
+        f"minimum_size = {settings.minimum_cover_size}",
+        (
+            "cache_max_age_days = "
+            f"{settings.cover_cache_max_age_days}"
+        ),
+        "",
+        "[cover_output]",
+        'master_pattern = "{album_artist} - {album}.front.{ext}"',
+        f"embedded_size = {settings.embedded_cover_size}",
+        f"embedded_quality = {settings.embedded_cover_quality}",
+        f"folder_size = {settings.folder_cover_size}",
+        f"folder_quality = {settings.folder_cover_quality}",
+        'folder_pattern = "{album_artist} - {album}_400px.jpg"',
+        (
+            "artist_folder_levels_up = "
+            f"{settings.artist_folder_levels_up}"
+        ),
+        "",
+        "[audio_analysis]",
+        (
+            "parallel_jobs = "
+            f"{settings.audio_analysis_parallel_jobs}"
+        ),
+        "",
+        "[media_library]",
+        f'discogs_token = "{_toml_string(settings.discogs_token)}"',
+        "",
+        "[library]",
+        (
+            "load_sources_on_startup = "
+            f"{str(settings.load_sources_on_startup).lower()}"
+        ),
+        (
+            "scan_sources_on_startup = "
+            f"{str(settings.scan_sources_on_startup).lower()}"
+        ),
+        "",
+    ]
+
+    for source in settings.music_sources:
+        lines.extend(
+            [
+                "[[music_sources]]",
+                f'id = "{_toml_string(source.source_id)}"',
+                f'name = "{_toml_string(source.name)}"',
+                f'path = "{_toml_string(source.path)}"',
+                (
+                    "enabled = "
+                    f"{str(source.enabled).lower()}"
+                ),
+                "",
+            ]
+        )
 
     Path(config_path).write_text(
-        content,
+        "\n".join(lines),
         encoding="utf-8",
+    )
+
+
+def _toml_string(
+    value: str,
+) -> str:
+    return str(value).replace(
+        "\\",
+        "\\\\",
+    ).replace(
+        '"',
+        '\\"',
     )
 
 

@@ -6,12 +6,14 @@ from pathlib import Path
 from PySide6.QtCore import (
     QSettings,
     QThreadPool,
+    QTimer,
     Qt,
 )
 from PySide6.QtGui import (
     QAction,
     QCloseEvent,
     QKeySequence,
+    QIcon,
     QPixmap,
 )
 from PySide6.QtWidgets import (
@@ -40,6 +42,15 @@ from PySide6.QtWidgets import (
 from ..core.merger import apply_merged_metadata, song_values
 from ..diagnostics import get_diagnostic_logger, project_root
 from ..history import HistoryManager
+from ..library_sources import (
+    IndexedAlbum,
+    MusicSource,
+    load_library_index,
+    merge_scan_results,
+    save_library_index,
+    scan_source,
+    update_source_availability,
+)
 from ..models.song import Song
 from ..services.cover import (
     covers_are_identical,
@@ -76,6 +87,7 @@ from .library_audit_dialog import LibraryAuditDialog
 from .change_preview_dialog import ChangePreviewDialog
 from .history_dialog import HistoryDialog
 from .media_library_widget import MediaLibraryWidget
+from .dashboard_widget import DashboardWidget
 from ..cover_management.batch import build_album_cover_plans
 from ..cover_management.manager import CoverManager
 
@@ -120,10 +132,18 @@ class MainWindow(QMainWindow):
         self.history = HistoryManager(
             project_root()
         )
+        self.library_index: list[
+            IndexedAlbum
+        ] = []
+        self.source_scan_worker = None
 
         self.create_ui()
         self.create_menu()
         self.update_history_actions()
+        QTimer.singleShot(
+            0,
+            self.load_configured_sources,
+        )
 
     def create_ui(self):
         container = QWidget()
@@ -186,6 +206,16 @@ class MainWindow(QMainWindow):
         )
         self.release_text_button.setEnabled(False)
 
+        self.more_artist_button = QPushButton(
+            "Mehr vom Künstler"
+        )
+        self.more_artist_button.clicked.connect(
+            self.show_more_from_artist
+        )
+        self.more_artist_button.setEnabled(
+            False
+        )
+
         provider_buttons.addWidget(self.proposal_button)
         provider_buttons.addWidget(self.batch_button)
         provider_buttons.addWidget(self.cover_button)
@@ -194,6 +224,9 @@ class MainWindow(QMainWindow):
         )
         provider_buttons.addWidget(
             self.release_text_button
+        )
+        provider_buttons.addWidget(
+            self.more_artist_button
         )
 
         self.table_fields = (
@@ -453,41 +486,63 @@ class MainWindow(QMainWindow):
             self.media_library
         )
 
-        self.workspace_stack.addWidget(
-            self._workspace_launch_page(
-                "Audio-Analyse",
-                (
-                    "Bitrate, Codec, Bit-Tiefe, Abtastrate, "
-                    "Albumvergleich und ReplayGain."
-                ),
-                "Audio-Analyse öffnen",
-                self.open_audio_analysis,
-            )
+        self.audio_analysis_workspace = AudioAnalysisDialog(
+            [],
+            [],
+            self,
+            embedded=True,
         )
         self.workspace_stack.addWidget(
-            self._workspace_launch_page(
-                "Bibliotheksprüfung",
-                (
-                    "Metadaten, Cover, Nummerierungen und "
-                    "Inkonsistenzen einer Bibliothek prüfen."
-                ),
-                "Bibliotheksprüfung öffnen",
-                self.open_library_audit,
-            )
+            self.audio_analysis_workspace
+        )
+
+        self.library_audit_workspace = LibraryAuditDialog(
+            [],
+            [],
+            self,
+            embedded=True,
         )
         self.workspace_stack.addWidget(
-            self._workspace_launch_page(
-                "Einstellungen",
-                (
-                    "Metadatenquellen, Coverausgabe, "
-                    "Normalisierung und Darstellung konfigurieren."
-                ),
-                "Einstellungen öffnen",
-                self.open_settings,
-            )
+            self.library_audit_workspace
+        )
+
+        self.settings_workspace = SettingsDialog(
+            load_settings(),
+            self,
+            embedded=True,
+        )
+        self.settings_workspace.settings_saved.connect(
+            self.apply_embedded_settings
+        )
+        self.workspace_stack.addWidget(
+            self.settings_workspace
+        )
+
+        self.dashboard_workspace = DashboardWidget(
+            self
+        )
+        self.dashboard_workspace.open_workspace.connect(
+            self.switch_workspace
+        )
+        self.dashboard_workspace.refresh_requested.connect(
+            self.scan_configured_sources
+        )
+        self.workspace_stack.addWidget(
+            self.dashboard_workspace
         )
 
         sidebar = QWidget()
+        sidebar.setObjectName(
+            "mainSidebar"
+        )
+        sidebar.setStyleSheet(
+            """
+            QWidget#mainSidebar {
+                border-right: 1px solid palette(mid);
+                background: palette(base);
+            }
+            """
+        )
         sidebar.setFixedWidth(
             190
         )
@@ -510,17 +565,16 @@ class MainWindow(QMainWindow):
         self.workspace_buttons.setExclusive(
             True
         )
-        workspace_names = (
-            "Tagger",
-            "Medienbibliothek",
-            "Audio-Analyse",
-            "Bibliotheksprüfung",
-            "Einstellungen",
+        workspace_pages = (
+            ("Startseite", 5),
+            ("Tagger", 0),
+            ("Medienbibliothek", 1),
+            ("Audio-Analyse", 2),
+            ("Bibliotheksprüfung", 3),
+            ("Einstellungen", 4),
         )
 
-        for index, name in enumerate(
-            workspace_names
-        ):
+        for name, index in workspace_pages:
             button = QPushButton(
                 name
             )
@@ -567,71 +621,61 @@ class MainWindow(QMainWindow):
             shell
         )
         self.workspace_buttons.button(
-            0
+            5
         ).setChecked(
             True
         )
+        self.workspace_stack.setCurrentIndex(
+            5
+        )
+        self.statusBar().showMessage(
+            "Bereit"
+        )
 
         self.update_optional_columns()
-
-    def _workspace_launch_page(
-        self,
-        title: str,
-        description: str,
-        button_text: str,
-        callback,
-    ) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(
-            page
-        )
-        layout.addStretch()
-        heading = QLabel(
-            title
-        )
-        heading.setAlignment(
-            Qt.AlignmentFlag.AlignCenter
-        )
-        heading.setStyleSheet(
-            "font-size: 24px; font-weight: 600;"
-        )
-        layout.addWidget(
-            heading
-        )
-        info = QLabel(
-            description
-        )
-        info.setAlignment(
-            Qt.AlignmentFlag.AlignCenter
-        )
-        info.setWordWrap(
-            True
-        )
-        layout.addWidget(
-            info
-        )
-        button = QPushButton(
-            button_text
-        )
-        button.clicked.connect(
-            callback
-        )
-        layout.addWidget(
-            button,
-            alignment=(
-                Qt.AlignmentFlag.AlignHCenter
-            ),
-        )
-        layout.addStretch()
-
-        return page
 
     def switch_workspace(
         self,
         index: int,
     ) -> None:
+        if index in {
+            2,
+            3,
+        }:
+            selected_rows = self.selected_rows()
+            selected_songs = [
+                self.songs[row]
+                for row in selected_rows
+                if 0 <= row < len(self.songs)
+            ]
+
+            if index == 2:
+                self.audio_analysis_workspace.set_songs(
+                    selected_songs,
+                    self.songs,
+                )
+            else:
+                self.library_audit_workspace.set_songs(
+                    selected_songs,
+                    self.songs,
+                )
+
         self.workspace_stack.setCurrentIndex(
             index
+        )
+        names = {
+            0: "Tagger",
+            1: "Medienbibliothek",
+            2: "Audio-Analyse",
+            3: "Bibliotheksprüfung",
+            4: "Einstellungen",
+            5: "Startseite",
+        }
+        self.statusBar().showMessage(
+            names.get(
+                index,
+                "Bereit",
+            )
         )
         button = self.workspace_buttons.button(
             index
@@ -641,6 +685,27 @@ class MainWindow(QMainWindow):
             button.setChecked(
                 True
             )
+
+    def apply_embedded_settings(
+        self,
+        new_settings,
+    ) -> None:
+        save_settings(
+            new_settings
+        )
+        app = QApplication.instance()
+
+        if isinstance(app, QApplication):
+            apply_theme(
+                app,
+                new_settings.theme,
+            )
+
+        self.load_configured_sources()
+        self.statusBar().showMessage(
+            "Einstellungen gespeichert",
+            4000,
+        )
 
     def open_local_album_from_library(
         self,
@@ -737,6 +802,42 @@ class MainWindow(QMainWindow):
         self._restore_table_column_widths()
 
     def create_menu(self):
+        file_menu = self.menuBar().addMenu(
+            "Datei"
+        )
+
+        add_folder_action = QAction(
+            "Ordner hinzufügen …",
+            self,
+        )
+        add_folder_action.setShortcut(
+            QKeySequence(
+                "Ctrl+O"
+            )
+        )
+        add_folder_action.triggered.connect(
+            self.select_folder
+        )
+        file_menu.addAction(
+            add_folder_action
+        )
+
+        rescan_action = QAction(
+            "Neu einlesen",
+            self,
+        )
+        rescan_action.setShortcut(
+            QKeySequence(
+                "F5"
+            )
+        )
+        rescan_action.triggered.connect(
+            self.scan_music
+        )
+        file_menu.addAction(
+            rescan_action
+        )
+
         edit_menu = self.menuBar().addMenu(
             "Bearbeiten"
         )
@@ -788,37 +889,74 @@ class MainWindow(QMainWindow):
             self.reset_table_column_widths
         )
 
-        analysis_menu = self.menuBar().addMenu(
-            "Audio-Analyse"
+    def _selected_album_artist(
+        self,
+    ) -> str:
+        rows = self.selected_rows()
+
+        if not rows:
+            return ""
+
+        artists = {
+            (
+                self.songs[row].album_artist
+                or self.songs[row].artist
+            ).strip()
+            for row in rows
+            if 0 <= row < len(
+                self.songs
+            )
+        }
+        artists.discard(
+            ""
         )
 
-        analysis_action = analysis_menu.addAction(
-            "Analyse öffnen …"
-        )
-        analysis_action.triggered.connect(
-            self.open_audio_analysis
+        if len(artists) != 1:
+            return ""
+
+        return next(
+            iter(
+                artists
+            )
         )
 
-        audit_menu = self.menuBar().addMenu(
-            "Bibliotheksprüfung"
+    def _update_more_artist_button(
+        self,
+    ) -> None:
+        artist = (
+            self._selected_album_artist()
+        )
+        self.more_artist_button.setEnabled(
+            bool(
+                artist
+            )
+        )
+        self.more_artist_button.setToolTip(
+            (
+                f"Discografie von {artist} öffnen"
+                if artist
+                else (
+                    "Markiere Titel mit demselben "
+                    "Albumkünstler."
+                )
+            )
         )
 
-        audit_action = audit_menu.addAction(
-            "Prüfung öffnen …"
-        )
-        audit_action.triggered.connect(
-            self.open_library_audit
-        )
-
-        settings_menu = self.menuBar().addMenu(
-            "Einstellungen"
+    def show_more_from_artist(
+        self,
+    ) -> None:
+        artist = (
+            self._selected_album_artist()
         )
 
-        settings_action = settings_menu.addAction(
-            "Optionen …"
+        if not artist:
+            return
+
+        self.switch_workspace(
+            1
         )
-        settings_action.triggered.connect(
-            self.open_settings
+        self.media_library.search_artist(
+            artist
         )
 
     def _selected_album_keys(
@@ -1182,55 +1320,153 @@ class MainWindow(QMainWindow):
         return saved, failed
 
     def open_library_audit(self):
-        selected_rows = self.selected_rows()
-        selected_songs = [
-            self.songs[row]
-            for row in selected_rows
-            if 0 <= row < len(self.songs)
-        ]
-
-        dialog = LibraryAuditDialog(
-            selected_songs,
-            self.songs,
-            self,
-        )
-        dialog.exec()
+        self.switch_workspace(3)
 
     def open_audio_analysis(self):
-        selected_rows = self.selected_rows()
-        selected_songs = [
-            self.songs[row]
-            for row in selected_rows
-            if 0 <= row < len(self.songs)
-        ]
-
-        dialog = AudioAnalysisDialog(
-            selected_songs,
-            self.songs,
-            self,
-        )
-        dialog.exec()
+        self.switch_workspace(2)
 
     def open_settings(self):
-        current_settings = load_settings()
-        dialog = SettingsDialog(
-            current_settings,
-            self,
+        self.switch_workspace(4)
+
+    def load_configured_sources(
+        self,
+    ) -> None:
+        settings = load_settings()
+        sources = tuple(
+            source
+            for source in settings.music_sources
+            if source.enabled
+        )
+        self.library_index = update_source_availability(
+            load_library_index(),
+            sources,
+        )
+        self.media_library.set_library_index(
+            self.library_index
+        )
+        self.dashboard_workspace.update_library(
+            self.library_index,
+            settings.music_sources,
         )
 
-        if dialog.exec() != dialog.DialogCode.Accepted:
+        if not settings.load_sources_on_startup:
             return
 
-        new_settings = dialog.selected_settings()
-        save_settings(new_settings)
+        missing = [
+            source
+            for source in sources
+            if not source.available
+        ]
 
-        app = QApplication.instance()
-
-        if isinstance(app, QApplication):
-            apply_theme(
-                app,
-                new_settings.theme,
+        if missing:
+            lines = "\n".join(
+                f"• {source.name}: {source.path}"
+                for source in missing
             )
+            QMessageBox.warning(
+                self,
+                "Musikquelle nicht gefunden",
+                (
+                    "Folgende hinterlegte Musikquelle(n) "
+                    "konnten nicht geladen werden:\n\n"
+                    f"{lines}\n\n"
+                    "Bereits indizierte Alben bleiben in der "
+                    "Medienbibliothek sichtbar. Sie können nur "
+                    "nicht im Tagger geöffnet werden, solange die "
+                    "Quelle offline ist."
+                ),
+            )
+
+        if settings.scan_sources_on_startup:
+            self.scan_configured_sources(
+                sources
+            )
+
+    def scan_configured_sources(
+        self,
+        sources: tuple[MusicSource, ...] | None = None,
+    ) -> None:
+        settings = load_settings()
+
+        if sources is None:
+            sources = tuple(
+                source
+                for source in settings.music_sources
+                if source.enabled
+            )
+
+        online_sources = tuple(
+            source
+            for source in sources
+            if source.available
+        )
+
+        if not online_sources:
+            return
+
+        self.source_scan_worker = FunctionWorker(
+            self._scan_sources_worker,
+            online_sources,
+        )
+        self.source_scan_worker.signals.finished.connect(
+            self._source_scan_finished
+        )
+        self.source_scan_worker.signals.failed.connect(
+            self._source_scan_failed
+        )
+        QThreadPool.globalInstance().start(
+            self.source_scan_worker
+        )
+
+    def _scan_sources_worker(
+        self,
+        sources: tuple[MusicSource, ...],
+    ):
+        return [
+            scan_source(
+                source
+            )
+            for source in sources
+        ]
+
+    def _source_scan_finished(
+        self,
+        summaries,
+    ) -> None:
+        settings = load_settings()
+        self.library_index = merge_scan_results(
+            self.library_index,
+            list(
+                summaries
+            ),
+            settings.music_sources,
+        )
+        save_library_index(
+            self.library_index
+        )
+        self.media_library.set_library_index(
+            self.library_index
+        )
+        self.dashboard_workspace.update_library(
+            self.library_index,
+            settings.music_sources,
+        )
+        self.source_scan_worker = None
+        self.statusBar().showMessage(
+            "Bibliotheksindex aktualisiert",
+            5000,
+        )
+
+    def _source_scan_failed(
+        self,
+        message: str,
+    ) -> None:
+        self.source_scan_worker = None
+        QMessageBox.warning(
+            self,
+            "Musikquellen konnten nicht aktualisiert werden",
+            message,
+        )
 
     def select_folder(self):
         if not self.confirm_pending_changes():
@@ -1341,12 +1577,14 @@ class MainWindow(QMainWindow):
         self.cover_button.setEnabled(enabled)
         self.direct_album_button.setEnabled(enabled)
         self._update_release_text_button()
+        self._update_more_artist_button()
 
         if enabled:
             self.table.selectRow(0)
             self.table.setCurrentCell(0, 0)
             self.handle_selection_changed()
             self._update_release_text_button()
+            self._update_more_artist_button()
             self.table.setFocus()
 
     def selected_rows(self) -> list[int]:
@@ -1365,6 +1603,7 @@ class MainWindow(QMainWindow):
     def handle_selection_changed(self):
         rows = self.selected_rows()
         self._update_release_text_button()
+        self._update_more_artist_button()
 
         if rows == self.active_rows:
             return

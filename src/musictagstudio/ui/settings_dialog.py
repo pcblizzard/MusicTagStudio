@@ -1,20 +1,26 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Qt
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QPushButton,
     QRadioButton,
     QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -22,6 +28,7 @@ from PySide6.QtWidgets import (
 
 from ..cover_source_catalog import COVER_SOURCES
 from ..provider_catalog import PROVIDERS
+from ..library_sources import MusicSource, new_source
 from ..settings import AppSettings
 
 
@@ -45,15 +52,19 @@ class SettingsDialog(QDialog):
         self,
         settings: AppSettings,
         parent=None,
+        *,
+        embedded: bool = False,
     ):
         super().__init__(parent)
 
+        self.embedded = embedded
         self.initial_settings = settings
         self.provider_buttons = {}
         self.cover_buttons = {}
 
-        self.setWindowTitle("Einstellungen")
-        self.resize(740, 860)
+        if not self.embedded:
+            self.setWindowTitle("Einstellungen")
+            self.resize(740, 860)
 
         outer_layout = QVBoxLayout(self)
         scroll_area = QScrollArea()
@@ -91,6 +102,94 @@ class SettingsDialog(QDialog):
             self.theme_combo,
         )
         layout.addWidget(appearance)
+
+        library = QGroupBox(
+            "Musikquellen"
+        )
+        library_layout = QVBoxLayout(
+            library
+        )
+        library_info = QLabel(
+            "Mehrere lokale Laufwerke, externe Festplatten und "
+            "Netzwerkpfade können gemeinsam indiziert werden. "
+            "Nicht erreichbare Quellen bleiben im Index sichtbar."
+        )
+        library_info.setWordWrap(
+            True
+        )
+        library_layout.addWidget(
+            library_info
+        )
+
+        self.source_table = QTableWidget(
+            0,
+            4,
+        )
+        self.source_table.setHorizontalHeaderLabels(
+            [
+                "Aktiv",
+                "Name",
+                "Pfad",
+                "Status",
+            ]
+        )
+        self.source_table.horizontalHeader().setStretchLastSection(
+            True
+        )
+        library_layout.addWidget(
+            self.source_table
+        )
+
+        source_buttons = QHBoxLayout()
+        self.add_source_button = QPushButton(
+            "Quelle hinzufügen"
+        )
+        self.add_source_button.clicked.connect(
+            self._add_source
+        )
+        self.remove_source_button = QPushButton(
+            "Quelle entfernen"
+        )
+        self.remove_source_button.clicked.connect(
+            self._remove_source
+        )
+        source_buttons.addWidget(
+            self.add_source_button
+        )
+        source_buttons.addWidget(
+            self.remove_source_button
+        )
+        source_buttons.addStretch()
+        library_layout.addLayout(
+            source_buttons
+        )
+
+        self.load_sources_checkbox = QCheckBox(
+            "Hinterlegte Quellen beim Programmstart automatisch laden"
+        )
+        self.load_sources_checkbox.setChecked(
+            settings.load_sources_on_startup
+        )
+        library_layout.addWidget(
+            self.load_sources_checkbox
+        )
+
+        self.scan_sources_checkbox = QCheckBox(
+            "Beim Programmstart nach neuen oder geänderten Audiodateien suchen"
+        )
+        self.scan_sources_checkbox.setChecked(
+            settings.scan_sources_on_startup
+        )
+        library_layout.addWidget(
+            self.scan_sources_checkbox
+        )
+
+        self._populate_sources(
+            settings.music_sources
+        )
+        layout.addWidget(
+            library
+        )
 
         providers = QGroupBox(
             "Metadatenquelle"
@@ -358,18 +457,205 @@ class SettingsDialog(QDialog):
             scroll_area
         )
 
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save
-            | QDialogButtonBox.StandardButton.Cancel
-        )
-        button_box.accepted.connect(
-            self.accept
-        )
-        button_box.rejected.connect(
-            self.reject
-        )
+        if self.embedded:
+            button_box = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Save
+            )
+            button_box.accepted.connect(
+                self._save_embedded
+            )
+        else:
+            button_box = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Save
+                | QDialogButtonBox.StandardButton.Cancel
+            )
+            button_box.accepted.connect(
+                self.accept
+            )
+            button_box.rejected.connect(
+                self.reject
+            )
         outer_layout.addWidget(
             button_box
+        )
+
+    def _populate_sources(
+        self,
+        sources: tuple[MusicSource, ...],
+    ) -> None:
+        self.source_table.setRowCount(
+            0
+        )
+
+        for source in sources:
+            self._append_source_row(
+                source
+            )
+
+    def _append_source_row(
+        self,
+        source: MusicSource,
+    ) -> None:
+        row = self.source_table.rowCount()
+        self.source_table.insertRow(
+            row
+        )
+
+        active = QTableWidgetItem()
+        active.setFlags(
+            active.flags()
+            | Qt.ItemFlag.ItemIsUserCheckable
+        )
+        active.setCheckState(
+            (
+                Qt.CheckState.Checked
+                if source.enabled
+                else Qt.CheckState.Unchecked
+            )
+        )
+        active.setData(
+            Qt.ItemDataRole.UserRole,
+            source.source_id,
+        )
+        self.source_table.setItem(
+            row,
+            0,
+            active,
+        )
+        self.source_table.setItem(
+            row,
+            1,
+            QTableWidgetItem(
+                source.name
+            ),
+        )
+        self.source_table.setItem(
+            row,
+            2,
+            QTableWidgetItem(
+                source.path
+            ),
+        )
+        status = (
+            "Erreichbar"
+            if Path(
+                source.path
+            ).is_dir()
+            else "Pfad nicht gefunden"
+        )
+        status_item = QTableWidgetItem(
+            status
+        )
+        status_item.setFlags(
+            status_item.flags()
+            & ~Qt.ItemFlag.ItemIsEditable
+        )
+        self.source_table.setItem(
+            row,
+            3,
+            status_item,
+        )
+
+    def _add_source(
+        self,
+    ) -> None:
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            "Musikquelle auswählen",
+            "",
+        )
+
+        if not folder:
+            return
+
+        self._append_source_row(
+            new_source(
+                folder
+            )
+        )
+
+    def _remove_source(
+        self,
+    ) -> None:
+        row = self.source_table.currentRow()
+
+        if row >= 0:
+            self.source_table.removeRow(
+                row
+            )
+
+    def _selected_sources(
+        self,
+    ) -> tuple[MusicSource, ...]:
+        sources: list[MusicSource] = []
+
+        for row in range(
+            self.source_table.rowCount()
+        ):
+            active = self.source_table.item(
+                row,
+                0,
+            )
+            name_item = self.source_table.item(
+                row,
+                1,
+            )
+            path_item = self.source_table.item(
+                row,
+                2,
+            )
+
+            if (
+                active is None
+                or name_item is None
+                or path_item is None
+            ):
+                continue
+
+            path_value = path_item.text().strip()
+
+            if not path_value:
+                continue
+
+            source_id = str(
+                active.data(
+                    Qt.ItemDataRole.UserRole
+                )
+                or ""
+            ).strip()
+
+            if not source_id:
+                source_id = new_source(
+                    path_value
+                ).source_id
+
+            sources.append(
+                MusicSource(
+                    source_id=source_id,
+                    name=name_item.text().strip()
+                    or Path(
+                        path_value
+                    ).name
+                    or path_value,
+                    path=path_value,
+                    enabled=(
+                        active.checkState()
+                        == Qt.CheckState.Checked
+                    ),
+                )
+            )
+
+        return tuple(
+            sources
+        )
+
+    def _save_embedded(
+        self,
+    ) -> None:
+        new_settings = self.selected_settings()
+        self.initial_settings = new_settings
+        self.settings_saved.emit(
+            new_settings
         )
 
     def _provider_row(
@@ -472,6 +758,14 @@ class SettingsDialog(QDialog):
             audio_analysis_parallel_jobs=int(
                 self.parallel_jobs_combo.currentData()
             ),
+            music_sources=self._selected_sources(),
+            load_sources_on_startup=(
+                self.load_sources_checkbox.isChecked()
+            ),
+            scan_sources_on_startup=(
+                self.scan_sources_checkbox.isChecked()
+            ),
+            discogs_token=self.initial_settings.discogs_token,
         )
 
     @staticmethod

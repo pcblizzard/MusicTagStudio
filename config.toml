@@ -29,3 +29,20 @@ artist_folder_levels_up = 2
 
 [audio_analysis]
 parallel_jobs = 0
+
+
+[library]
+load_sources_on_startup = true
+scan_sources_on_startup = false
+
+# Beispiel:
+# [[music_sources]]
+# id = "music-ssd"
+# name = "Musik SSD"
+# path = "D:\\Musik"
+# enabled = true
+
+
+[media_library]
+# Optional. Wird nur bei einem manuellen Klick auf „Discogs ergänzen“ benutzt.
+discogs_token = ""

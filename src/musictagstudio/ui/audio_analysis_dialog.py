@@ -408,9 +408,12 @@ class AudioAnalysisDialog(QDialog):
         selected_songs: list[Song],
         all_songs: list[Song],
         parent=None,
+        *,
+        embedded: bool = False,
     ):
         super().__init__(parent)
 
+        self.embedded = embedded
         self.selected_songs = selected_songs
         self.all_songs = all_songs
         self.current_songs: list[Song] = []
@@ -428,13 +431,18 @@ class AudioAnalysisDialog(QDialog):
             or automatic_worker_count()
         )
 
-        self.setWindowTitle(
-            "Audio-Analyse"
-        )
-        self.resize(
-            1500,
-            840,
-        )
+        if not self.embedded:
+            self.setWindowTitle(
+                "Audio-Analyse"
+            )
+            self.resize(
+                1500,
+                840,
+            )
+        else:
+            self.setWindowFlags(
+                Qt.WindowType.Widget
+            )
 
         layout = QVBoxLayout(self)
 
@@ -592,9 +600,10 @@ class AudioAnalysisDialog(QDialog):
         )
         self.write_button.setEnabled(False)
 
-        close_buttons = QDialogButtonBox(
+        self.close_buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Close
         )
+        close_buttons = self.close_buttons
         close_buttons.rejected.connect(
             self.reject
         )
@@ -610,6 +619,9 @@ class AudioAnalysisDialog(QDialog):
         layout.addWidget(
             close_buttons
         )
+
+        if self.embedded:
+            close_buttons.hide()
 
         enabled = (
             self.installation.available
@@ -712,6 +724,33 @@ class AudioAnalysisDialog(QDialog):
             )
 
         return table
+
+    def set_songs(
+        self,
+        selected_songs: list[Song],
+        all_songs: list[Song],
+    ) -> None:
+        self.selected_songs = list(selected_songs)
+        self.all_songs = list(all_songs)
+        running = self._thread_is_running()
+        self.selected_button.setText(
+            "Markierte Titel analysieren "
+            f"({len(self.selected_songs)})"
+        )
+        self.selected_button.setEnabled(
+            bool(self.selected_songs)
+            and self.installation.available
+            and not running
+        )
+        self.all_button.setText(
+            "Alle gescannten Titel analysieren "
+            f"({len(self.all_songs)})"
+        )
+        self.all_button.setEnabled(
+            bool(self.all_songs)
+            and self.installation.available
+            and not running
+        )
 
     def start_analysis(
         self,

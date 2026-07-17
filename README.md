@@ -456,3 +456,314 @@ Brand-Assets sauber und regelkonform in das Projekt aufgenommen sind.
 Der Künstlerordner wird nun anhand des Albumkünstlernamens ermittelt. Die
 Textdatei landet damit auch bei unterschiedlich tiefen Ordnerstrukturen im
 Künstlerordner und nicht im allgemeinen Music-Ordner.
+
+
+## v0.7.2.1
+
+### Medienbibliothek
+
+- Kategorien besitzen kleine mitgelieferte SVG-Symbole statt Emojis.
+- Der Aufklapppfeil steht direkt vor „Alben“, „EPs“, „Singles“ usw.
+- Die Kategorieüberschrift zeigt die Anzahl ihrer Einträge.
+- Die Spalten sind jetzt „Veröffentlichung“, „Jahr“, „Typ“ und „Lokal“.
+- Für die gewählte konkrete Edition wird ein Cover angezeigt.
+- Lokale eingebettete Cover haben Vorrang.
+- Danach wird das Frontcover der konkreten MusicBrainz-Ausgabe über das
+  Cover Art Archive geladen.
+- Onlinecover werden unter `cache/media_library/covers/` gespeichert.
+- Veraltete Hintergrundergebnisse werden beim schnellen Editionswechsel
+  verworfen.
+
+### Navigation
+
+- Die doppelten oberen Menüs „Audio-Analyse“, „Bibliotheksprüfung“ und
+  „Einstellungen“ wurden entfernt.
+- Im Tagger gibt es den Button „Mehr vom Künstler“.
+- Er verwendet bevorzugt den Albumkünstler und ist nur bei einer eindeutigen
+  Künstlerauswahl aktiv.
+- Ein Klick wechselt in die Medienbibliothek, trägt den Künstler ein und
+  startet die Suche automatisch.
+
+
+## v0.7.2.2
+
+Audio-Analyse, Bibliotheksprüfung und Einstellungen werden nun direkt im
+Hauptfenster angezeigt. Die bisherigen Zwischenansichten und zusätzlichen
+„Öffnen“-Schaltflächen entfallen.
+
+- Analysefunktionen sind sofort nach dem Klick auf „Audio-Analyse“ sichtbar.
+- Die aktuelle Titelauswahl wird beim Bereichswechsel übernommen.
+- Bibliotheksprüfung samt Filter, Ergebnissen und Details ist direkt sichtbar.
+- Einstellungen werden direkt im Workspace gespeichert.
+- Die Dialogklassen bleiben für bestehende interne Aufrufe kompatibel.
+
+
+## v0.7.2.3 – Mehrere Musikquellen
+
+### Einstellungen
+
+Im Bereich „Musikquellen“ können mehrere Ordner, Laufwerke, externe
+Festplatten und Netzwerkpfade hinterlegt werden.
+
+- Quelle hinzufügen und entfernen
+- frei wählbarer Quellenname
+- Quelle aktivieren oder deaktivieren
+- aktueller Status „Erreichbar“ oder „Pfad nicht gefunden“
+- hinterlegte Quellen beim Programmstart automatisch laden
+- optional beim Start im Hintergrund nach neuen oder geänderten Dateien suchen
+
+### Offline-Quellen
+
+Ist eine externe Festplatte oder ein Netzwerkpfad nicht erreichbar, erscheint
+eine Meldung mit dem vollständigen Pfad. Die Anwendung startet trotzdem weiter.
+
+Bereits indizierte Alben bleiben in der Medienbibliothek sichtbar und werden
+als „Offline“ markiert. Der Online-Katalog und „Mehr vom Künstler“ bleiben
+vollständig nutzbar. Nur „Lokales Album im Tagger öffnen“ ist deaktiviert, bis
+die Quelle wieder erreichbar ist.
+
+### Lokaler Index
+
+Der lokale Bibliotheksindex liegt unter:
+
+`.musictagstudio/library_index.json`
+
+Ein automatischer Startscan aktualisiert nur erreichbare und aktivierte
+Quellen. Daten von vorübergehend nicht erreichbaren Quellen werden nicht
+gelöscht.
+
+
+## v0.7.3.0 – Medienbibliothek 2.0
+
+### Collector-Kategorien
+
+MusicTagStudio verwendet nun eigene, verständliche Kategorien:
+
+- Alben
+- Live
+- EPs
+- Singles
+- Mixtapes
+- Sampler
+- Compilations
+- Soundtracks
+- Boxsets
+- Bootlegs
+- Sonstiges
+
+Die vereinbarte Unterscheidung lautet:
+
+- **Sampler:** verschiedene Künstler, aber ein gemeinsames Label
+- **Compilation:** verschiedene Künstler aus mehreren Labels
+
+Mixtapes werden zusätzlich anhand von Schreibweisen wie `Mixtape`,
+`M.I.X.T.A.P.E.`, `Street Tape` oder `Street Album` erkannt.
+
+### Optionale Discogs-Ergänzung
+
+MusicBrainz bleibt die schnelle Grundquelle. Discogs wird ausschließlich über
+den Button **„Discogs ergänzen“** abgefragt. Dafür kann in den Einstellungen
+ein persönlicher Discogs-Token hinterlegt werden.
+
+Die manuelle Ergänzung:
+
+- sucht den ausgewählten Künstler bei Discogs,
+- lädt dessen Hauptveröffentlichungen,
+- ergänzt Releases, die MusicBrainz nicht geliefert hat,
+- ordnet Discogs-„Miscellaneous“ anhand von Titel, Format, Künstlern und
+  Labels in die MusicTagStudio-Kategorien ein,
+- lädt Trackliste und Cover einer Discogs-Ausgabe erst bei Auswahl.
+
+Damit kann beispielsweise `Sternstunde M.I.X.T.A.P.E.` als Mixtape erscheinen,
+obwohl es in der bisherigen MusicBrainz-Ansicht fehlte.
+
+### Badges und Filter
+
+Discogs-Formate und Beschreibungen werden als Zusatzinformationen übernommen,
+zum Beispiel:
+
+- CD
+- 2×CD
+- Vinyl
+- Cassette
+- File
+- Promo
+- Limited Edition
+- Reissue
+- Remastered
+
+Oberhalb der Veröffentlichungen gibt es eine Suche nach Titel, Kategorie,
+Quelle, Label und Format.
+
+### Ressourcen
+
+Discogs wird nicht automatisch beim Programmstart oder bei jeder Künstlersuche
+abgefragt. Dadurch entstehen nur dann zusätzliche Netzwerkanfragen, wenn der
+Nutzer ausdrücklich auf „Discogs ergänzen“ klickt.
+
+
+## v0.7.3.1
+
+- Kritischen Startfehler aus v0.7.3.0 behoben.
+- Die neue Mehrquellen-Verwaltung erzeugte einen zyklischen Python-Import:
+  `settings → library_sources → services → proposal → settings`.
+- Der Scanner wird nun erst innerhalb von `scan_source()` importiert.
+- Einstellungen, Hauptfenster und Medienbibliothek können dadurch wieder
+  regulär importiert und gestartet werden.
+- Ein eigener Import-Regressionstest verhindert, dass dieser Fehler erneut
+  unbemerkt bleibt.
+
+
+## v0.7.3.2
+
+- Startabsturz in der eingebetteten Bibliotheksprüfung behoben.
+- `Qt.WindowType.Widget` wurde verwendet, ohne `Qt` zu importieren.
+- Neuer echter GUI-Starttest:
+  - erzeugt das vollständige `MainWindow`,
+  - wechselt nacheinander durch alle Workspaces,
+  - verarbeitet Qt-Ereignisse,
+  - schließt das Fenster anschließend sauber.
+- Zusätzlicher Regressionstest prüft den erforderlichen Qt-Import.
+
+
+## v0.7.4.0 – Globale Katalogsuche
+
+Die Medienbibliothek kann nun nicht mehr nur nach Künstlern suchen.
+
+### Suchmodi
+
+- Alles
+- Künstler
+- Veröffentlichung
+- Label
+
+Die globale Suche findet unter anderem:
+
+- Künstler und Gruppen
+- einzelne Alben, EPs, Singles, Mixtapes und Sampler
+- Master-Veröffentlichungen
+- Labels wie Aggro Berlin, ersguterjunge/EGJ oder Death Row Records
+- eindeutig benannte Reihen und Ausgaben wie `Aggro Ansage Nr. 3`
+
+### Verhalten
+
+- Die reine Künstlersuche verwendet weiterhin MusicBrainz und benötigt
+  keinen Discogs-Token.
+- „Alles“, „Veröffentlichung“ und „Label“ verwenden die offizielle
+  Discogs-Suche und werden nur auf ausdrücklichen Klick ausgeführt.
+- Ein Künstler-Treffer lädt dessen Discogs-Veröffentlichungen.
+- Ein Label-Treffer lädt die Veröffentlichungen des Labels.
+- Ein Release- oder Master-Treffer öffnet die konkrete Veröffentlichung
+  mit Cover, Edition und Trackliste.
+- Alle gefundenen Veröffentlichungen werden anschließend in die bekannten
+  MusicTagStudio-Kategorien eingeordnet.
+
+Damit können Veröffentlichungen gefunden werden, die keiner vollständigen
+Künstlerdiskografie zugeordnet sind, etwa Label-Sampler, Various-Artists-
+Veröffentlichungen oder bei Discogs unter „Miscellaneous“ geführte Mixtapes.
+
+
+## v0.7.5.0 – Mehrere Bibliotheksansichten
+
+Neu sind Discografie, Tabelle, Coverraster und Cover + Liste. Covergrößen sind in vier Stufen einstellbar. Ansicht und Größe werden gespeichert. Der Filter wirkt auf alle Ansichten; ein Klick lädt stets dieselbe Detailansicht.
+
+
+## v0.7.5.1 – Vereinfachte Suche
+
+Discogs und die Auswahl zwischen Künstler, Veröffentlichung und Label wurden
+vorerst aus der Oberfläche entfernt. Die Medienbibliothek besitzt wieder ein
+einziges Suchfeld, das zuverlässig über MusicBrainz nach Künstlern sucht.
+Die neuen Ansichten aus v0.7.5.0 bleiben unverändert erhalten.
+
+
+## v0.8.0 – Oberfläche und Startseite
+
+### Neues Erscheinungsbild
+
+Der Hellmodus wurde vollständig neu aufgebaut. Statt beige-grauer
+Systemflächen verwendet MusicTagStudio jetzt helle Arbeitsflächen, klare
+Kontraste, dezente Rahmen und Türkis als Akzentfarbe. Auch das dunkle Design
+wurde vereinheitlicht.
+
+### Startseite
+
+Beim Programmstart öffnet sich nun ein Dashboard mit:
+
+- Anzahl der indizierten Alben
+- Anzahl der Künstler
+- Summe der indizierten Titel
+- Status der hinterlegten Musikquellen
+- Schnellzugriff auf alle Arbeitsbereiche
+- manuellem Bibliotheks-Refresh
+
+Offline-Quellen werden mit Name und Pfad angezeigt.
+
+### Toolbar
+
+Die wichtigsten Funktionen sind direkt erreichbar:
+
+- Musikordner öffnen
+- Bibliothek neu einlesen
+- Rückgängig und Wiederholen
+- Tagger
+- Medienbibliothek
+- Audio-Analyse
+- Bibliotheksprüfung
+- Einstellungen
+
+### Bedienung
+
+Nach dem Speichern der Einstellungen erscheint keine blockierende
+Bestätigung mehr. Stattdessen informiert die Statusleiste kurz über den
+erfolgreichen Speichervorgang.
+
+
+## v0.8.0.1 – Überarbeiteter Hellmodus
+
+Der Hellmodus orientiert sich farblich nun stärker an einer modernen,
+zurückhaltenden Windows-Oberfläche:
+
+- nahezu weiße Arbeitsflächen
+- sehr helle blau-graue Navigations- und Kopfbereiche
+- mittelblauer Akzent statt kräftigem Türkis
+- dunkle, gut lesbare Schrift
+- dezente Rahmen und Tabellenköpfe
+- hellblaue Auswahlflächen
+- klarere aktive Navigation
+- weniger visuelle Härte bei Buttons und Eingabefeldern
+
+Die Anordnung und Funktionsweise der Oberfläche bleibt unverändert.
+
+
+## v0.8.0.2 – Startkorrektur der Medienbibliothek
+
+- das zusätzliche Feld „Veröffentlichungen filtern“ wurde vollständig entfernt
+- die verwaiste Verbindung zu `_apply_release_filter()` wurde entfernt
+- die Medienbibliothek kann dadurch wieder erzeugt werden
+- veraltete Tests für die bewusst entfernte Discogs-Schaltfläche und die
+  früheren Suchmodi wurden aus der Testsuite entfernt
+- ein neuer Regressionstest prüft, dass diese ausgebauten Bedienelemente
+  nicht versehentlich wieder auftauchen
+
+
+## v0.8.0.3 – Bereinigte Hauptnavigation
+
+Die zusätzliche Symbolleiste „Hauptfunktionen“ wurde vollständig entfernt.
+Dadurch gibt es keine doppelte Navigation mehr neben der linken Seitenleiste.
+
+Die verbleibenden Befehle wurden in die vorhandenen Menüs einsortiert:
+
+### Datei
+
+- Ordner hinzufügen …
+- Neu einlesen
+
+### Bearbeiten
+
+- Rückgängig
+- Wiederholen
+- Änderungsverlauf
+- Spaltenbreiten zurücksetzen
+
+Die Symbolleiste kann nicht mehr per Rechtsklick aktiviert werden, da sie nicht
+mehr erzeugt wird.

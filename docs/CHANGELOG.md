@@ -1,5 +1,213 @@
 # Changelog
 
+## v0.8.0.3
+
+### Hauptfenster
+
+- Symbolleiste „Hauptfunktionen“ vollständig entfernt
+- doppelte Navigation beseitigt
+- „Ordner“ in „Ordner hinzufügen …“ umbenannt
+- „Ordner hinzufügen …“ und „Neu einlesen“ unter „Datei“ eingeordnet
+- Rückgängig und Wiederholen ausschließlich unter „Bearbeiten“
+- Toolbar-Kontextmenü entfällt automatisch
+
+### Tests
+
+- Regressionstest stellt sicher, dass keine Hauptsymbolleiste mehr existiert
+- Menütests für Datei und Bearbeiten ergänzt
+
+
+
+## v0.8.0.2
+
+### Medienbibliothek
+
+- verwaistes Veröffentlichungsfilter-Feld entfernt
+- fehlerhafte Signalverbindung zu nicht mehr vorhandener Methode entfernt
+- Startabsturz der Medienbibliothek behoben
+
+### Tests
+
+- veralteten Discogs-UI-Test entfernt
+- veralteten Test der globalen Suchmodi entfernt
+- Regressionstest für die bewusst vereinfachte Suche ergänzt
+
+
+
+## v0.8.0.1
+
+### Hellmodus
+
+- neue weiß-blaugraue Farbpalette
+- blauer, zurückhaltender Akzent
+- Navigation und Toolbar optisch beruhigt
+- Tabellen, Eingabefelder und Auswahlflächen überarbeitet
+- Kontraste und Lesbarkeit verbessert
+- keine Änderungen am Aufbau der Benutzeroberfläche
+
+
+
+## v0.8.0
+
+### Design
+
+- Light Theme vollständig neu gestaltet
+- Dark Theme vereinheitlicht
+- moderne Buttons, Eingabefelder, Tabellen und Scrollleisten
+- konsistente Akzentfarbe
+- überarbeitete Tooltips und Menüflächen
+
+### Startseite
+
+- neues Dashboard als Startansicht
+- Kennzahlen für Alben, Künstler, Titel und Quellen
+- Online-/Offline-Status der Musikquellen
+- Schnellzugriff auf alle Arbeitsbereiche
+- manueller Index-Refresh
+
+### Toolbar und Statusleiste
+
+- neue Hauptsymbolleiste
+- Ordner öffnen, Scan, Undo/Redo und Workspace-Wechsel
+- Statusmeldungen statt blockierender Speicherbestätigung
+
+
+
+## v0.7.5.1
+
+### Suche vereinfacht
+
+- Discogs vorerst vollständig aus der sichtbaren Medienbibliothek entfernt
+- Discogs-Token-Feld aus den Einstellungen entfernt
+- Suchmodus-Drop-down entfernt
+- ein einziges Suchfeld startet wieder die stabile MusicBrainz-Künstlersuche
+- irreführende globale Suche und Token-Meldung entfernt
+- Tabellen-, Cover- und Discografieansichten bleiben erhalten
+
+
+
+## v0.7.5.0
+
+- Discografie, Tabelle, Coverraster und Cover + Liste
+- vier Covergrößen
+- Ansicht und Covergröße gespeichert
+- Filter auf alle Ansichten erweitert
+
+
+
+## v0.7.4.0
+
+### Globale Medienbibliotheks-Suche
+
+- Suchmodi Alles, Künstler, Veröffentlichung und Label
+- gemischte Trefferliste mit Künstlern, Releases, Mastern und Labels
+- direkte Release- und Master-Suche
+- Labelsuche samt Label-Veröffentlichungen
+- Discogs-Künstler direkt als Katalogeinstieg
+- Suchbegriffe wie Aggro Ansage, ersguterjunge oder Death Row Records
+- direkte Einordnung der Treffer in die MusicTagStudio-Kategorien
+
+
+
+## v0.7.3.2
+
+### Kritischer GUI-Startfehler
+
+- fehlenden `Qt`-Import in `library_audit_dialog.py` ergänzt
+- Absturz bei `Qt.WindowType.Widget` behoben
+- vollständigen Headless-GUI-Starttest ergänzt
+- automatischen Wechsel durch alle Workspaces im Test ergänzt
+
+
+
+## v0.7.3.1
+
+### Kritischer Startfehler
+
+- zyklischen Import zwischen Einstellungen, Musikquellen und Proposal-Service
+  behoben
+- Scanner-Import in `library_sources.scan_source()` verzögert
+- Importtest für Einstellungen und Medienbibliothek ergänzt
+
+
+
+## v0.7.3.0
+
+### Medienbibliothek 2.0
+
+- eigene Sammler-Kategorien
+- Mixtape-, Soundtrack-, Boxset- und Bootleg-Erkennung
+- Sampler: mehrere Künstler, ein gemeinsames Label
+- Compilation: mehrere Künstler, mehrere Labels
+- neue SVG-Icons für die zusätzlichen Kategorien
+- Filter innerhalb der Künstlerveröffentlichungen
+
+### Discogs
+
+- optionaler persönlicher Token in den Einstellungen
+- manuelle Künstler- und Veröffentlichungsabfrage
+- Discogs-exklusive Releases ergänzen
+- Discogs-Tracklisten und Edition-Cover
+- Formate, Labels und Badges
+- keine automatische Discogs-Abfrage
+
+
+
+## v0.7.2.3
+
+### Musikquellen
+
+- beliebig viele lokale, externe und Netzwerk-Musikquellen
+- Quellenverwaltung in den Einstellungen
+- Aktiv-/Deaktiv-Schalter, Name, Pfad und Erreichbarkeitsstatus
+- automatische Quellenladung beim Programmstart
+- optionaler Hintergrundscan beim Programmstart
+- genaue Warnung bei nicht gefundenen Pfaden
+
+### Bibliotheksindex
+
+- persistenter lokaler Albumindex
+- offline befindliche Quellen bleiben sichtbar
+- erreichbare Quellen werden beim Scan aktualisiert
+- Offline-Alben können nicht im Tagger geöffnet werden
+- „Mehr vom Künstler“ und Online-Discografie bleiben unabhängig nutzbar
+
+
+
+## v0.7.2.2
+
+### Workspaces
+
+- Audio-Analyse vollständig in das Hauptfenster eingebettet
+- Bibliotheksprüfung vollständig in das Hauptfenster eingebettet
+- Einstellungen vollständig in das Hauptfenster eingebettet
+- unnötige Öffnen-Schaltflächen und Zwischenansichten entfernt
+- markierte und gescannte Titel werden beim Wechsel aktualisiert
+- Einstellungen lassen sich direkt im Workspace speichern
+
+
+
+## v0.7.2.1
+
+### Medienbibliothek
+
+- Kategoriebaum im Explorer-Stil überarbeitet
+- SVG-Icons für Album, Live, EP, Single, Compilation und weitere Typen
+- Aufklapppfeil direkt an der Kategorieüberschrift
+- Anzahl der Veröffentlichungen pro Kategorie
+- Covervorschau der konkreten Edition
+- lokales Cover vor Cover Art Archive bevorzugt
+- persistenter Cover-Cache
+- Schutz vor veralteten Cover-Rückmeldungen
+
+### Navigation
+
+- doppelte Menüs in der oberen Menüleiste entfernt
+- „Mehr vom Künstler“ im Tagger ergänzt
+- automatischer Wechsel und Suche in der Medienbibliothek
+
+
+
 ## v0.7.2
 
 ### Oberfläche

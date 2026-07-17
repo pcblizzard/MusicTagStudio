@@ -248,3 +248,53 @@ weitere technische Konsistenzprüfungen.
 - lokaler Albumabgleich
 - APE-, WMA-/ASF- und M4B-Unterstützung
 - BBCode-Datei zuverlässig im Künstlerordner
+
+
+## v0.7.2.1 ✅
+
+- Kategoriebaum mit SVG-Icons
+- Covervorschau und Cover-Cache
+- doppelte obere Navigation entfernt
+- bidirektionale Navigation zwischen Tagger und Medienbibliothek
+
+
+## v0.7.2.2 ✅
+
+- Audio-Analyse als direkter Workspace
+- Bibliotheksprüfung als direkter Workspace
+- Einstellungen als direkter Workspace
+
+
+## v0.7.2.3 ✅
+
+- mehrere Musikquellen
+- automatische Quellenladung
+- optionaler Startscan
+- Offline-Erkennung mit genauer Pfadangabe
+- persistenter Bibliotheksindex
+- Offline-Alben bleiben in der Medienbibliothek sichtbar
+
+
+## v0.7.3.0 ✅
+
+- eigene Veröffentlichungs-Kategorien
+- Sampler-/Compilation-Definition nach Labelstruktur
+- Mixtape-Erkennung
+- optionale manuelle Discogs-Ergänzung
+- Discogs-exklusive Releases, Tracklisten und Cover
+- Badge-System und Veröffentlichungsfilter
+
+
+## v0.7.3.2 ✅
+
+- Qt-Importfehler der Bibliotheksprüfung behoben
+- vollständiger GUI-Starttest
+- alle Workspaces werden im Regressionstest geöffnet
+
+
+## v0.7.4.0 ✅
+
+- globale Katalogsuche
+- Künstler-, Release- und Labelsuche
+- direkte Labeldiskografien
+- direkte Sampler-/Mixtape-/Album-Suche

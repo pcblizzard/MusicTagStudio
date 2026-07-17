@@ -6,6 +6,7 @@ from PySide6.QtCore import (
     QThreadPool,
     Signal,
     Slot,
+    Qt,
 )
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
@@ -90,9 +91,12 @@ class LibraryAuditDialog(QDialog):
         selected_songs: list[Song],
         all_songs: list[Song],
         parent=None,
+        *,
+        embedded: bool = False,
     ):
         super().__init__(parent)
 
+        self.embedded = embedded
         self.selected_songs = selected_songs
         self.all_songs = all_songs
         self.summary: (
@@ -102,13 +106,18 @@ class LibraryAuditDialog(QDialog):
             QThreadPool.globalInstance()
         )
 
-        self.setWindowTitle(
-            "Bibliotheksprüfung"
-        )
-        self.resize(
-            1350,
-            760,
-        )
+        if not self.embedded:
+            self.setWindowTitle(
+                "Bibliotheksprüfung"
+            )
+            self.resize(
+                1350,
+                760,
+            )
+        else:
+            self.setWindowFlags(
+                Qt.WindowType.Widget
+            )
 
         layout = QVBoxLayout(self)
 
@@ -144,42 +153,42 @@ class LibraryAuditDialog(QDialog):
             self.filter_combo
         )
 
-        selected_button = QPushButton(
+        self.selected_button = QPushButton(
             (
                 "Markierte Titel prüfen "
                 f"({len(selected_songs)})"
             )
         )
-        selected_button.clicked.connect(
+        self.selected_button.clicked.connect(
             lambda:
             self.start_audit(
                 self.selected_songs
             )
         )
-        selected_button.setEnabled(
+        self.selected_button.setEnabled(
             bool(selected_songs)
         )
         layout.addWidget(
-            selected_button
+            self.selected_button
         )
 
-        all_button = QPushButton(
+        self.all_button = QPushButton(
             (
                 "Alle gescannten Titel prüfen "
                 f"({len(all_songs)})"
             )
         )
-        all_button.clicked.connect(
+        self.all_button.clicked.connect(
             lambda:
             self.start_audit(
                 self.all_songs
             )
         )
-        all_button.setEnabled(
+        self.all_button.setEnabled(
             bool(all_songs)
         )
         layout.addWidget(
-            all_button
+            self.all_button
         )
 
         splitter = QSplitter()
@@ -253,14 +262,37 @@ class LibraryAuditDialog(QDialog):
             splitter
         )
 
-        buttons = QDialogButtonBox(
+        self.close_buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Close
         )
+        buttons = self.close_buttons
         buttons.rejected.connect(
             self.reject
         )
         layout.addWidget(
             buttons
+        )
+
+    def set_songs(
+        self,
+        selected_songs: list[Song],
+        all_songs: list[Song],
+    ) -> None:
+        self.selected_songs = list(selected_songs)
+        self.all_songs = list(all_songs)
+        self.selected_button.setText(
+            "Markierte Titel prüfen "
+            f"({len(self.selected_songs)})"
+        )
+        self.selected_button.setEnabled(
+            bool(self.selected_songs)
+        )
+        self.all_button.setText(
+            "Alle gescannten Titel prüfen "
+            f"({len(self.all_songs)})"
+        )
+        self.all_button.setEnabled(
+            bool(self.all_songs)
         )
 
     def start_audit(
