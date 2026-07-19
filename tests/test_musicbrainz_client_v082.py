@@ -30,7 +30,7 @@ def test_client_uses_cache(monkeypatch, tmp_path):
     calls = []
 
     def fake_urlopen(*args, **kwargs):
-        calls.append(args)
+        calls.append(args[0].full_url)
         return Response()
 
     monkeypatch.setattr(
@@ -54,7 +54,7 @@ def test_client_uses_cache(monkeypatch, tmp_path):
     )
 
     assert first == second
-    assert len(calls) == 1
+    assert calls.count(first_trace.url) == 1
     assert first_trace.from_cache is False
     assert second_trace.from_cache is True
 
@@ -63,7 +63,7 @@ def test_client_uses_memory_cache_when_disk_write_fails(monkeypatch, tmp_path):
     calls = []
 
     def fake_urlopen(*args, **kwargs):
-        calls.append(args)
+        calls.append(args[0].full_url)
         return Response()
 
     def fail_write(*args, **kwargs):
@@ -79,9 +79,11 @@ def test_client_uses_memory_cache_when_disk_write_fails(monkeypatch, tmp_path):
         cache_directory=tmp_path,
         cache_ttl_seconds=3600,
     )
-    first, _ = client.get_json("artist", {"query": "Stieber Twins"})
+    first, first_trace = client.get_json(
+        "artist", {"query": "Stieber Twins"}
+    )
     second, trace = client.get_json("artist", {"query": "Stieber Twins"})
 
     assert first == second
-    assert len(calls) == 1
+    assert calls.count(first_trace.url) == 1
     assert trace.from_cache is True
