@@ -5,7 +5,7 @@ from musictagstudio.media_library.controller import CatalogSearchController
 class AliasClient:
     def get_json(self, endpoint, params, *, result_key):
         assert endpoint == "artist/artist-id"
-        assert params == {"inc": "artist-rels+label-rels"}
+        assert params == {"inc": "artist-rels+label-rels+aliases"}
         return (
             {
                 "relations": [],

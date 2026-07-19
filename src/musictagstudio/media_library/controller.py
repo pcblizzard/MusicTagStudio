@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 import re
 from urllib.parse import quote
 
@@ -111,20 +112,21 @@ class CatalogSearchController:
             artists,
         )
 
-        if artists:
+        if exact:
             return ArtistSearchResponse(
                 query=query,
                 artists=tuple(
                     artists
                 ),
                 exact_match=exact,
-                suggestion_mode=not exact,
+                suggestion_mode=False,
                 traces=tuple(
                     traces
                 ),
             )
 
         # 2) Explicit artist field search.
+        candidates = list(artists)
         payload, trace = self.client.get_json(
             "artist",
             {
@@ -138,25 +140,26 @@ class CatalogSearchController:
         traces.append(
             trace
         )
-        artists = _artist_candidates(
+        field_artists = _artist_candidates(
             payload
         )
         exact = self._has_exact_match(
             query,
-            artists,
+            field_artists,
         )
-        if artists:
+        if exact:
             return ArtistSearchResponse(
                 query=query,
                 artists=tuple(
-                    artists
+                    self._rank_candidates(query, field_artists)
                 ),
                 exact_match=exact,
-                suggestion_mode=not exact,
+                suggestion_mode=False,
                 traces=tuple(
                     traces
                 ),
             )
+        candidates.extend(field_artists)
 
         # 3) MusicBrainz/Lucene fuzzy terms for typographical errors.
         terms = re.findall(
@@ -181,9 +184,14 @@ class CatalogSearchController:
             traces.append(
                 trace
             )
-            artists = _artist_candidates(
+            candidates.extend(_artist_candidates(
                 payload
-            )
+            ))
+
+        artists = self._rank_candidates(
+            query,
+            candidates,
+        )
 
         return ArtistSearchResponse(
             query=query,
@@ -197,6 +205,34 @@ class CatalogSearchController:
             traces=tuple(
                 traces
             ),
+        )
+
+    @staticmethod
+    def _rank_candidates(
+        query: str,
+        artists: list[ArtistCandidate],
+    ) -> list[ArtistCandidate]:
+        wanted = _normalise_artist_name(query)
+        unique = {
+            artist.artist_id: artist
+            for artist in artists
+        }
+
+        def similarity(artist: ArtistCandidate) -> tuple[float, int]:
+            names = (
+                _normalise_artist_name(artist.name),
+                _normalise_artist_name(artist.sort_name),
+            )
+            ratio = max(
+                SequenceMatcher(None, wanted, name).ratio()
+                for name in names
+            )
+            return ratio, artist.score
+
+        return sorted(
+            unique.values(),
+            key=similarity,
+            reverse=True,
         )
 
     def load_release_groups(
@@ -285,7 +321,7 @@ class CatalogSearchController:
     ) -> ArtistRelationsResponse:
         payload, trace = self.client.get_json(
             f"artist/{artist_id}",
-            {"inc": "artist-rels+label-rels"},
+            {"inc": "artist-rels+label-rels+aliases"},
             result_key="relations",
         )
         relations: list[ArtistRelation] = []

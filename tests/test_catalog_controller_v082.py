@@ -70,3 +70,47 @@ def test_typo_reaches_fuzzy_stage():
     assert "~0.75" in client.queries[-1]
     assert response.suggestion_mode is True
     assert response.artists[0].name == "Stieber Twins"
+
+
+def test_broad_initial_results_do_not_prevent_typo_correction():
+    client = FakeClient(
+        [
+            {
+                "artists": [
+                    artist("Twins"),
+                    artist("Thompson Twins"),
+                ]
+            },
+            {"artists": []},
+            {
+                "artists": [
+                    artist("Stieber Twins", 89)
+                ]
+            },
+        ]
+    )
+
+    response = CatalogSearchController(client).search_artists("Stiber Twins")
+
+    assert len(client.queries) == 3
+    assert response.suggestion_mode is True
+    assert response.artists[0].name == "Stieber Twins"
+
+
+def test_fuzzy_results_are_ranked_by_name_similarity():
+    client = FakeClient(
+        [
+            {"artists": [artist("Berlin", 100)]},
+            {"artists": []},
+            {
+                "artists": [
+                    artist("Berlin", 100),
+                    artist("Aggro Berlin", 80),
+                ]
+            },
+        ]
+    )
+
+    response = CatalogSearchController(client).search_artists("Aggo Berlin")
+
+    assert response.artists[0].name == "Aggro Berlin"

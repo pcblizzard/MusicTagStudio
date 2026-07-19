@@ -5,6 +5,7 @@
 - Ein Klick auf einen verknüpften Künstler öffnet dessen Suche und Diskografie.
 - MusicBrainz-Aliase werden aus dem Künstlerdatensatz übernommen und sind als interne Suche anklickbar.
 - Verknüpfte Labels öffnen beim Anklicken ihre eindeutige MusicBrainz-Seite.
+- Tippfehler wie „Stiber Twins“ und „Aggo Berlin“ liefern den ähnlichsten Künstler zuerst, auch wenn die allgemeine Suche bereits unscharfe Treffer findet.
 - Lokale Statusanzeige vereinheitlicht: „Lokal verfügbar“, „Externe Quelle nicht erreichbar“, „Nicht vorhanden“.
 - Fehlerhafte Aktualisierung der lokalen Statusspalte im Discografiebaum korrigiert.
 
