@@ -153,6 +153,8 @@ class MediaLibraryWidget(QWidget):
         self.discogs_releases: list[DiscogsRelease] = []
         self.discogs_release_groups: list[ReleaseGroup] = []
         self.current_artist_name = ""
+        self.breadcrumbs: list[tuple[str, str, str]] = []
+        self._preserve_breadcrumbs = False
         self.editions: list[
             Edition
         ] = []
@@ -270,6 +272,18 @@ class MediaLibraryWidget(QWidget):
             search_row
         )
 
+        self.breadcrumb_label = QLabel()
+        self.breadcrumb_label.setTextFormat(Qt.TextFormat.RichText)
+        self.breadcrumb_label.setOpenExternalLinks(False)
+        self.breadcrumb_label.linkActivated.connect(
+            self._breadcrumb_activated
+        )
+        self.breadcrumb_label.setStyleSheet(
+            "padding: 3px 0; color: palette(mid);"
+        )
+        self.breadcrumb_label.hide()
+        root.addWidget(self.breadcrumb_label)
+
         self.suggestion_label = QLabel()
         self.suggestion_label.setWordWrap(
             True
@@ -352,13 +366,13 @@ class MediaLibraryWidget(QWidget):
         group_layout.addLayout(view_row)
         self.release_view_stack = QStackedWidget()
         self.group_tree = QTreeWidget()
-        self.group_tree.setHeaderLabels(["Veröffentlichung", "Jahr", "Kategorie", "Quelle", "Lokal"])
+        self.group_tree.setHeaderLabels(["Veröffentlichung", "Jahr", "Kategorie", "Quelle", "Status"])
         self.group_tree.setIconSize(QSize(18,18)); self.group_tree.setIndentation(22); self.group_tree.setColumnCount(5)
         self.group_tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.group_tree.currentItemChanged.connect(self._group_selected)
         self.release_view_stack.addWidget(self.group_tree)
         self.release_table = QTableWidget(0,7)
-        self.release_table.setHorizontalHeaderLabels(["Titel","Künstler","Jahr","Kategorie","Quelle","Label / Format","Lokal"])
+        self.release_table.setHorizontalHeaderLabels(["Titel","Künstler","Jahr","Kategorie","Quelle","Label / Format","Status"])
         self.release_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.release_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.release_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -653,6 +667,8 @@ class MediaLibraryWidget(QWidget):
     def search_artist(
         self,
         artist_name: str,
+        *,
+        preserve_breadcrumbs: bool = False,
     ) -> None:
         artist_name = str(
             artist_name or ""
@@ -664,6 +680,7 @@ class MediaLibraryWidget(QWidget):
         self.search_edit.setText(
             artist_name
         )
+        self._preserve_breadcrumbs = preserve_breadcrumbs
         self.search()
 
     def search(self) -> None:
@@ -671,6 +688,11 @@ class MediaLibraryWidget(QWidget):
 
         if not query:
             return
+
+        if not self._preserve_breadcrumbs:
+            self.breadcrumbs = []
+            self._render_breadcrumbs()
+        self._preserve_breadcrumbs = False
 
         self.search_button.setEnabled(
             False
@@ -953,6 +975,11 @@ class MediaLibraryWidget(QWidget):
         self.musicbrainz_release_groups = []
         self.discogs_release_groups = []
         self.current_artist_name = artist.name
+        self._push_breadcrumb(
+            "artist",
+            artist.name,
+            artist.artist_id,
+        )
         self.group_tree.clear()
         self.release_table.setRowCount(
             0
@@ -1074,7 +1101,10 @@ class MediaLibraryWidget(QWidget):
         if relation is None:
             return
         if relation.target_type in {"artist", "alias"}:
-            self.search_artist(relation.name)
+            self.search_artist(
+                relation.name,
+                preserve_breadcrumbs=True,
+            )
         elif relation.target_type == "label":
             self._set_status(
                 f"MusicBrainz-Label „{relation.name}“ wird geöffnet …"
@@ -1223,14 +1253,19 @@ class MediaLibraryWidget(QWidget):
         cover_size,_ = self._cover_dimensions(); placeholder=QPixmap(cover_size,cover_size); placeholder.fill(Qt.GlobalColor.transparent)
         for row, group in enumerate(self.release_groups):
             source = "Discogs" if group.source == "discogs" else "MusicBrainz"
-            local = self.local_album_status.get(_normalized(group.title), "Nein")
+            local = _local_status_display(
+                self.local_album_status.get(
+                    _normalized(group.title),
+                    "Nicht vorhanden",
+                )
+            )
             extra = " · ".join([*group.labels[:2],*group.formats[:3]])
             values=(group.title,group.artist,group.first_release_date[:4],_category(group),source,extra,local)
             for col,value in enumerate(values):
                 item=QTableWidgetItem(str(value or "")); item.setData(Qt.ItemDataRole.UserRole,row); self.release_table.setItem(row,col,item)
-            grid=QStandardItem(QIcon(placeholder), f"{group.title}\n{group.artist or source}\n{group.first_release_date[:4]}")
+            grid=QStandardItem(QIcon(placeholder), f"{group.title}\n{group.artist or source}\n{group.first_release_date[:4]} · {local}")
             grid.setData(row,Qt.ItemDataRole.UserRole); grid.setEditable(False); self.cover_model.appendRow(grid)
-            li=QListWidgetItem(QIcon(placeholder), f"{group.title}\n{group.artist or 'Unbekannter Künstler'} · {group.first_release_date[:4] or 'Jahr unbekannt'} · {_category(group)}\n{extra or source}")
+            li=QListWidgetItem(QIcon(placeholder), f"{group.title}\n{group.artist or 'Unbekannter Künstler'} · {group.first_release_date[:4] or 'Jahr unbekannt'} · {_category(group)}\n{extra or source} · {local}")
             li.setData(Qt.ItemDataRole.UserRole,row); li.setSizeHint(QSize(300,max(76,cover_size+12))); self.cover_list.addItem(li)
             self._load_release_thumbnail(row,group)
         self.release_table.setSortingEnabled(True); self.release_table.resizeColumnsToContents(); self._view_syncing=False
@@ -1277,7 +1312,12 @@ class MediaLibraryWidget(QWidget):
         self.current_group=group; self.editions=[]; self.edition_combo.clear(); self.track_table.setRowCount(0)
         self._cover_generation += 1; self._show_cover(None); self.group_title.setText(group.title)
         key=_normalized(group.title); local_path=self.local_albums.get(key); status=self.local_album_status.get(key,"Nicht vorhanden"); local_online=status == "Lokal verfügbar"
-        self.group_meta.setText(" · ".join(v for v in (_type_text(group),group.first_release_date or "Datum unbekannt",status) if v))
+        self._push_breadcrumb(
+            "release",
+            group.title,
+            group.release_group_id,
+        )
+        self.group_meta.setText(" · ".join(v for v in (_type_text(group),group.first_release_date or "Datum unbekannt",_local_status_display(status)) if v))
         self.open_local_button.setProperty(
             "local_path",
             local_path or "",
@@ -1437,9 +1477,11 @@ class MediaLibraryWidget(QWidget):
                             group
                         ),
                         source_text,
-                        self.local_album_status.get(
-                            local_key,
-                            "Nein",
+                        _local_status_display(
+                            self.local_album_status.get(
+                                local_key,
+                                "Nicht vorhanden",
+                            )
                         ),
                     ]
                 )
@@ -2048,11 +2090,71 @@ class MediaLibraryWidget(QWidget):
                 )
                 item.setText(
                     4,
-                    self.local_album_status.get(
-                        key,
-                        "Nein",
+                    _local_status_display(
+                        self.local_album_status.get(
+                            key,
+                            "Nicht vorhanden",
+                        )
                     ),
                 )
+
+        self._render_alternative_views()
+
+    def _push_breadcrumb(
+        self,
+        kind: str,
+        label: str,
+        identifier: str,
+    ) -> None:
+        entry = (kind, str(label), str(identifier))
+        if kind == "artist" and self.breadcrumbs:
+            if self.breadcrumbs[-1][0] == "release":
+                self.breadcrumbs.pop()
+            if self.breadcrumbs and self.breadcrumbs[-1] == entry:
+                self._render_breadcrumbs()
+                return
+        if kind == "release" and self.breadcrumbs:
+            if self.breadcrumbs[-1][0] == "release":
+                self.breadcrumbs[-1] = entry
+            else:
+                self.breadcrumbs.append(entry)
+        elif not self.breadcrumbs or self.breadcrumbs[-1] != entry:
+            self.breadcrumbs.append(entry)
+        self._render_breadcrumbs()
+
+    def _render_breadcrumbs(self) -> None:
+        if not self.breadcrumbs:
+            self.breadcrumb_label.clear()
+            self.breadcrumb_label.hide()
+            return
+        links = [
+            f'<a href="breadcrumb:{index}">{html.escape(label)}</a>'
+            for index, (_kind, label, _identifier) in enumerate(
+                self.breadcrumbs
+            )
+        ]
+        self.breadcrumb_label.setText(
+            " <span style='color:#888'>›</span> ".join(links)
+        )
+        self.breadcrumb_label.show()
+
+    def _breadcrumb_activated(self, link: str) -> None:
+        if not link.startswith("breadcrumb:"):
+            return
+        try:
+            index = int(link.split(":", 1)[1])
+            kind, label, identifier = self.breadcrumbs[index]
+        except (ValueError, IndexError):
+            return
+        self.breadcrumbs = self.breadcrumbs[: index + 1]
+        self._render_breadcrumbs()
+        if kind == "artist":
+            self.search_artist(label, preserve_breadcrumbs=True)
+            return
+        for group in self.release_groups:
+            if group.release_group_id == identifier:
+                self._load_group(group)
+                return
 
     def _run(
         self,
@@ -2338,6 +2440,15 @@ def _normalized(
             value or ""
         ).casefold(),
     )
+
+
+def _local_status_display(status: str) -> str:
+    return {
+        "Lokal verfügbar": "🟢 Lokal verfügbar",
+        "Externe Quelle nicht erreichbar": "🟡 Externe Quelle nicht erreichbar",
+        "Nicht vorhanden": "⚪ Nicht vorhanden",
+        "Nein": "⚪ Nicht vorhanden",
+    }.get(str(status or ""), "⚪ Nicht vorhanden")
 
 
 def _category(

@@ -11,7 +11,7 @@ def test_artist_relations_controller_and_ui_are_present():
     assert '"artist-rels+label-rels+aliases"' in controller
     assert 'QLabel("Verknüpfungen")' in widget
     assert "def _relation_clicked" in widget
-    assert "self.search_artist(relation.name)" in widget
+    assert "preserve_breadcrumbs=True" in widget
 
 
 def test_aliases_and_labels_are_clickable():

@@ -1,4 +1,14 @@
-# MusicTagStudio 0.8.3-alpha3
+# MusicTagStudio 0.8.3-beta
+
+## UI-Polishing und Navigation
+
+- Einheitliche Statusspalte in Discografie- und Tabellenansicht.
+- 🟢 Lokal verfügbar
+- 🟡 Externe Quelle nicht erreichbar
+- ⚪ Nicht vorhanden
+- Status wird ebenfalls in Coverraster, Coverliste und Detailkopf angezeigt.
+- Anklickbare Breadcrumb-Navigation für Künstler, Beziehungen und Veröffentlichungen.
+- Ein Pfad kann beispielsweise „Aggro Berlin › Sido › Maske“ abbilden.
 
 ## Discogs-Erweiterung
 
