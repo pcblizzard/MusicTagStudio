@@ -1,5 +1,6 @@
 from .cache import LyricsCache, lyrics_cache_key
 from .duration import read_duration_seconds
+from .embedding import LyricsEmbeddingPlan, build_embedding_plan, embed_lyrics
 from .embedded import read_embedded_lyrics, read_embedded_lyrics_variants
 from .lrc import parse_lrc, render_lrc
 from .lrclib import LrclibClient, LrclibError, LyricsNotFound
@@ -14,6 +15,7 @@ from .resolver import (
 
 __all__ = [
     "LyricsDocument",
+    "LyricsEmbeddingPlan",
     "LyricsCache",
     "LyricsLine",
     "LyricsRequest",
@@ -32,4 +34,6 @@ __all__ = [
     "sidecar_path",
     "live_version_warning",
     "lyrics_cache_key",
+    "build_embedding_plan",
+    "embed_lyrics",
 ]

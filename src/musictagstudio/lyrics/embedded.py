@@ -78,6 +78,7 @@ def lyrics_variants_from_tags(
             "UNSYNCEDLYRICS",
             "©LYR",
             "\xa9LYR",
+            "WM/LYRICS",
         }:
             for text in _text_values(value):
                 if text.strip():

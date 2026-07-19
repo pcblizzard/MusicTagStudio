@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
@@ -19,6 +21,8 @@ from ..lyrics import (
     LyricsRequest,
     LyricsResolution,
     LyricsResolver,
+    build_embedding_plan,
+    embed_lyrics,
     read_duration_seconds,
     save_sidecar,
 )
@@ -132,6 +136,10 @@ class LyricsDialog(QDialog):
         self.save_button.clicked.connect(self._save_selected)
         self.save_button.setEnabled(False)
         actions.addWidget(self.save_button)
+        self.embed_button = QPushButton("In Audiodatei einbetten …")
+        self.embed_button.clicked.connect(self._preview_embedding)
+        self.embed_button.setEnabled(False)
+        actions.addWidget(self.embed_button)
         layout.addLayout(actions)
 
         self.status_label = QLabel()
@@ -193,6 +201,7 @@ class LyricsDialog(QDialog):
             self.lyrics_text.clear()
             self.source_details.setText("Keine lokale Quelle vorhanden")
             self.save_button.setEnabled(False)
+            self.embed_button.setEnabled(False)
         else:
             self.lyrics_text.setPlainText(document.display_text())
             details = [document.source]
@@ -202,6 +211,17 @@ class LyricsDialog(QDialog):
                 details.append(f"abgerufen {document.fetched_at}")
             self.source_details.setText(" · ".join(details))
             self.save_button.setEnabled(not document.is_empty)
+            plan = build_embedding_plan(self.song.path, document)
+            self.embed_button.setEnabled(
+                not document.is_empty
+                and plan.supported
+                and Path(self.song.path).is_file()
+            )
+            self.embed_button.setToolTip(
+                f"Unterstütztes Zielformat: {plan.format_name}"
+                if plan.supported
+                else plan.warning
+            )
         self.warning_label.setText(warning)
         self.warning_label.setVisible(bool(warning))
 
@@ -255,6 +275,94 @@ class LyricsDialog(QDialog):
         self.status_label.setText(f"Gespeichert: {destination}")
         self._apply_resolution(self.resolver.local(self.request))
 
+    def _preview_embedding(self) -> None:
+        document = self.current_document()
+        if document is None:
+            return
+        plan = build_embedding_plan(self.song.path, document)
+        if not plan.supported:
+            QMessageBox.warning(self, "Lyrics einbetten", plan.warning)
+            return
+        preview = LyricsEmbedPreviewDialog(plan, document, self)
+        if preview.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            embed_lyrics(self.song.path, document, confirmed=True)
+        except Exception as error:
+            QMessageBox.critical(self, "Lyrics einbetten", str(error))
+            return
+        self.status_label.setText(
+            f"Lyrics wurden bestätigt in {plan.format_name} eingebettet."
+        )
+        self._apply_resolution(self.resolver.local(self.request))
+
     def closeEvent(self, event: QCloseEvent) -> None:
         self._closing = True
         super().closeEvent(event)
+
+
+class LyricsEmbedPreviewDialog(QDialog):
+    def __init__(
+        self,
+        plan,
+        document: LyricsDocument,
+        parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Lyrics-Einbettung bestätigen")
+        self.resize(900, 620)
+        layout = QVBoxLayout(self)
+        summary = QLabel(
+            f"Format: {plan.format_name} · "
+            f"Vorhandene eingebettete Varianten: {len(plan.existing)}"
+        )
+        summary.setWordWrap(True)
+        layout.addWidget(summary)
+        if plan.warning:
+            warning = QLabel(plan.warning)
+            warning.setWordWrap(True)
+            warning.setStyleSheet(
+                "padding: 9px; border: 1px solid #d69e2e; border-radius: 7px;"
+            )
+            layout.addWidget(warning)
+
+        comparison = QHBoxLayout()
+        before_layout = QVBoxLayout()
+        before_layout.addWidget(QLabel("Derzeit eingebettet"))
+        before = QPlainTextEdit()
+        before.setReadOnly(True)
+        before.setPlainText(
+            "\n\n".join(
+                f"--- {item.source} ---\n{item.display_text()}"
+                for item in plan.existing
+            )
+            or "Keine eingebetteten Lyrics vorhanden."
+        )
+        before_layout.addWidget(before)
+        comparison.addLayout(before_layout, stretch=1)
+
+        after_layout = QVBoxLayout()
+        after_layout.addWidget(QLabel("Wird eingebettet"))
+        after = QPlainTextEdit()
+        after.setReadOnly(True)
+        after.setPlainText(document.display_text())
+        after_layout.addWidget(after)
+        comparison.addLayout(after_layout, stretch=1)
+        layout.addLayout(comparison, stretch=1)
+
+        note = QLabel(
+            "Bestehende eingebettete Lyrics werden ersetzt. Andere Metadaten "
+            "und eine vorhandene LRC-Datei bleiben unverändert."
+        )
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Cancel
+            | QDialogButtonBox.StandardButton.Save
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Save).setText(
+            "Bestätigt einbetten"
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)

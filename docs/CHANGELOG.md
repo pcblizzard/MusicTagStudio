@@ -1,3 +1,15 @@
+# MusicTagStudio 0.8.4-alpha3
+
+## Bestätigtes Einbetten
+
+- Der Lyrics-Dialog zeigt vor dem Einbetten vorhandene und neue Lyrics nebeneinander.
+- Bestehende eingebettete Lyrics werden nur nach ausdrücklicher Bestätigung ersetzt.
+- Andere Metadaten und vorhandene LRC-Dateien bleiben unverändert.
+- MP3/ID3, FLAC, Ogg Vorbis, Opus, WavPack/APE, MP4/M4A/M4B und WMA/ASF werden unterstützt.
+- ID3-, Vorbis- und APEv2-basierte Formate behalten synchronisierte Zeitmarken.
+- Bei MP4 und ASF wird vorab darauf hingewiesen, dass nur Klartext eingebettet wird.
+- Vor dem Schreiben wird eine temporäre Sicherheitskopie angelegt; bei Fehlern wird die Audiodatei wiederhergestellt.
+
 # MusicTagStudio 0.8.4-alpha2
 
 ## Sichtbare Lyrics-Ansicht
