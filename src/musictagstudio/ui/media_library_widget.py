@@ -83,7 +83,7 @@ from ..media_library.tasks import (
     _fetch_discogs_hit_catalog,
     _fetch_live_artist_suggestions,
     _fetch_release_cover,
-    _fetch_release_group_cover,
+    _fetch_release_group_cover_with_discogs,
     _fetch_url_cover,
 )
 from ..media_library.presentation import (
@@ -1559,9 +1559,13 @@ class MediaLibraryWidget(QWidget):
             )
         elif group.source == "musicbrainz":
             self._run(
-                _fetch_release_group_cover,
+                _fetch_release_group_cover_with_discogs,
                 group.release_group_id,
                 self.cover_cache_directory,
+                self.current_artist_name or group.artist,
+                group.title,
+                group.first_release_date[:4],
+                load_settings().discogs_token,
                 finished=lambda data,target=row,group_id=group.release_group_id:self._apply_release_thumbnail(target,data,group_id),
             )
 

@@ -248,6 +248,26 @@ def _fetch_release_group_cover(
     )
 
 
+def _fetch_release_group_cover_with_discogs(
+    release_group_id: str,
+    cache_directory: Path,
+    artist: str,
+    title: str,
+    year: str,
+    token: str,
+) -> bytes | None:
+    data = _fetch_release_group_cover(release_group_id, cache_directory)
+    if data:
+        return data
+    return _fetch_matching_discogs_cover(
+        cache_directory,
+        artist,
+        title,
+        year,
+        token,
+    )
+
+
 def _fetch_release_cover_with_discogs(
     release_id: str,
     cache_directory: Path,
@@ -257,8 +277,26 @@ def _fetch_release_cover_with_discogs(
     token: str,
 ) -> bytes | None:
     data = _fetch_release_cover(release_id, cache_directory)
-    if data or not token.strip() or not artist.strip() or not title.strip():
+    if data:
         return data
+    return _fetch_matching_discogs_cover(
+        cache_directory,
+        artist,
+        title,
+        year,
+        token,
+    )
+
+
+def _fetch_matching_discogs_cover(
+    cache_directory: Path,
+    artist: str,
+    title: str,
+    year: str,
+    token: str,
+) -> bytes | None:
+    if not token.strip() or not artist.strip() or not title.strip():
+        return None
     try:
         hits = search_catalog(
             f"{artist} {title}",
