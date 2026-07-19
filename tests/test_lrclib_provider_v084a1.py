@@ -1,6 +1,7 @@
 import json
 import pytest
 
+from musictagstudio import __version__
 from musictagstudio.lyrics.lrclib import LrclibClient, document_from_lrclib
 
 
@@ -60,7 +61,7 @@ def test_lrclib_uses_cached_endpoint_by_default(monkeypatch):
     )
 
     assert "/api/get-cached?" in captured["url"]
-    assert "MusicTagStudio/0.8.4-alpha1.post1" in captured["user_agent"]
+    assert f"MusicTagStudio/{__version__}" in captured["user_agent"]
     assert document.source == "LRCLIB"
 
 

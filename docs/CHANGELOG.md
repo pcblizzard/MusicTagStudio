@@ -1,3 +1,15 @@
+# MusicTagStudio 0.8.4-alpha2
+
+## Sichtbare Lyrics-Ansicht
+
+- Im Tagger öffnet „Lyrics anzeigen“ für genau einen ausgewählten Titel einen eigenen Lyrics-Dialog.
+- Lokale LRC-Dateien, eingebettete Varianten und lokal zwischengespeicherte LRCLIB-Texte werden sofort angeboten.
+- Quelle, Synchronisationsstatus, LRCLIB-ID und Abrufzeitpunkt sind sichtbar.
+- „LRCLIB prüfen“ verwendet den schonenden Cache-Endpunkt; „LRCLIB live suchen“ löst nur auf ausdrücklichen Klick eine Live-Abfrage aus.
+- Netzwerkzugriffe laufen im Hintergrund und blockieren die Oberfläche nicht.
+- Die ausgewählte Quelle kann als UTF-8-LRC neben der Audiodatei gespeichert werden.
+- Bei möglicherweise abweichenden Live-Fassungen erscheint der vorbereitete Warnhinweis direkt über dem Liedtext.
+
 # MusicTagStudio 0.8.4-alpha1.1
 
 ## Lyrics-Härtung vor alpha2

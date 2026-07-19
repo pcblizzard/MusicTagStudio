@@ -248,6 +248,14 @@ def _light_stylesheet() -> str:
         background: #edf5ff;
         color: #174ea6;
     }
+    QPlainTextEdit#lyricsDisplay {
+        background: #ffffff;
+        border: 1px solid #dbe2ea;
+        border-radius: 10px;
+        padding: 14px;
+        font-family: "Segoe UI";
+        font-size: 11pt;
+    }
     QComboBox::drop-down {
         border: none;
         width: 24px;
@@ -399,6 +407,14 @@ def _dark_stylesheet() -> str:
     QListWidget#liveSearchSuggestions::item:selected {
         background: #30363c;
         color: #ffffff;
+    }
+    QPlainTextEdit#lyricsDisplay {
+        background: #101418;
+        border: 1px solid #303a43;
+        border-radius: 10px;
+        padding: 14px;
+        font-family: "Segoe UI";
+        font-size: 11pt;
     }
     QComboBox::drop-down {
         border: none;

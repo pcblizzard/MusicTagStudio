@@ -90,6 +90,7 @@ from .library_audit_dialog import LibraryAuditDialog
 from .change_preview_dialog import ChangePreviewDialog
 from .history_dialog import HistoryDialog
 from .media_library_widget import MediaLibraryWidget
+from .lyrics_dialog import LyricsDialog
 from .dashboard_widget import DashboardWidget
 from ..cover_management.batch import build_album_cover_plans
 from ..cover_management.manager import CoverManager
@@ -200,6 +201,13 @@ class MainWindow(QMainWindow):
             self.manage_cover
         )
         self.cover_button.setEnabled(False)
+
+        self.lyrics_button = QPushButton("Lyrics anzeigen")
+        self.lyrics_button.setToolTip(
+            "Lyrics aus LRC, Audiodatei oder LRCLIB anzeigen"
+        )
+        self.lyrics_button.clicked.connect(self.show_lyrics)
+        self.lyrics_button.setEnabled(False)
 
         self.direct_album_button = QPushButton(
             "Album-/Song-Link oder ID laden"
@@ -337,6 +345,7 @@ class MainWindow(QMainWindow):
             self.proposal_button,
             self.batch_button,
             self.cover_button,
+            self.lyrics_button,
             self.direct_album_button,
             self.release_text_button,
             self.more_artist_button,
@@ -867,6 +876,7 @@ class MainWindow(QMainWindow):
             ("Vorschlag …", "Vorschlag für ausgewählten Titel"),
             ("Mehrfachvorschlag …", "Vorschläge für markierte Titel"),
             ("Cover …", "Cover für Auswahl verwalten"),
+            ("Lyrics …", "Lyrics anzeigen"),
             ("Link oder ID …", "Album-/Song-Link oder ID laden"),
             ("BBCode-Text …", "BBCode-Text erstellen"),
             ("Mehr vom Künstler", "Mehr vom Künstler"),
@@ -1184,6 +1194,23 @@ class MainWindow(QMainWindow):
         self.release_text_button.setToolTip(
             tooltip
         )
+
+    def _update_lyrics_button(self) -> None:
+        rows = self.selected_rows()
+        enabled = len(rows) == 1 and 0 <= rows[0] < len(self.songs)
+        self.lyrics_button.setEnabled(enabled)
+        self.lyrics_button.setToolTip(
+            "Lyrics für den ausgewählten Titel anzeigen"
+            if enabled
+            else "Bitte genau einen Titel auswählen."
+        )
+
+    def show_lyrics(self) -> None:
+        rows = self.selected_rows()
+        if len(rows) != 1 or not (0 <= rows[0] < len(self.songs)):
+            return
+        dialog = LyricsDialog(self.songs[rows[0]], self)
+        dialog.exec()
 
     def create_release_text_file(
         self,
@@ -1935,6 +1962,7 @@ class MainWindow(QMainWindow):
         self.cover_button.setEnabled(
             enabled
         )
+        self._update_lyrics_button()
         self.direct_album_button.setEnabled(
             enabled
         )
@@ -1973,6 +2001,7 @@ class MainWindow(QMainWindow):
         rows = self.selected_rows()
         self._update_release_text_button()
         self._update_more_artist_button()
+        self._update_lyrics_button()
 
         if rows == self.active_rows:
             return
@@ -1989,6 +2018,7 @@ class MainWindow(QMainWindow):
             self.current_row = -1
             self.clear_editor()
             self._update_release_text_button()
+            self._update_lyrics_button()
             return
 
         if len(rows) == 1:
