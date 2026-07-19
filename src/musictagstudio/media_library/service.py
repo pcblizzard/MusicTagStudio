@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from urllib.parse import urlencode
 
 from .discogs import classify_release, release_badges
@@ -22,6 +23,14 @@ class ArtistCandidate:
     country: str = ""
     artist_type: str = ""
     score: int = 0
+
+
+@dataclass(frozen=True)
+class ArtistSearchResult:
+    query: str
+    artists: tuple[ArtistCandidate, ...]
+    used_fuzzy_search: bool = False
+
 
 
 @dataclass(frozen=True)
@@ -79,29 +88,118 @@ def search_artists(
     *,
     limit: int = 25,
 ) -> list[ArtistCandidate]:
+    return list(
+        search_artists_with_fallback(
+            query,
+            limit=limit,
+        ).artists
+    )
+
+
+def search_artists_with_fallback(
+    query: str,
+    *,
+    limit: int = 25,
+) -> ArtistSearchResult:
     query = str(
         query or ""
     ).strip()
 
     if not query:
-        return []
+        return ArtistSearchResult(
+            query="",
+            artists=(),
+        )
 
-    payload = _request_json(
+    request_limit = max(
+        1,
+        min(
+            limit,
+            100,
+        ),
+    )
+
+    normal_payload = _request_json(
         f"{BASE_URL}/artist?"
         + urlencode(
             {
-                "query": f'artist:"{_escape(query)}"',
-                "fmt": "json",
-                "limit": max(
-                    1,
-                    min(
-                        limit,
-                        100,
-                    ),
+                "query": _escape(
+                    query
                 ),
+                "fmt": "json",
+                "limit": request_limit,
             }
         )
     )
+    normal_artists = _artist_candidates(
+        normal_payload
+    )
+
+    wanted = _normalise_artist_name(
+        query
+    )
+    exact_found = any(
+        _normalise_artist_name(
+            artist.name
+        ) == wanted
+        or _normalise_artist_name(
+            artist.sort_name
+        ) == wanted
+        for artist in normal_artists
+    )
+
+    if normal_artists:
+        return ArtistSearchResult(
+            query=query,
+            artists=tuple(
+                normal_artists
+            ),
+            used_fuzzy_search=not exact_found,
+        )
+
+    fuzzy_terms = [
+        f"{_escape(term)}~0.8"
+        for term in re.findall(
+            r"[\wÀ-ÖØ-öø-ÿ]+",
+            query,
+            flags=re.UNICODE,
+        )
+        if len(term) >= 3
+    ]
+
+    if not fuzzy_terms:
+        return ArtistSearchResult(
+            query=query,
+            artists=(),
+        )
+
+    fuzzy_payload = _request_json(
+        f"{BASE_URL}/artist?"
+        + urlencode(
+            {
+                "query": " ".join(
+                    fuzzy_terms
+                ),
+                "fmt": "json",
+                "limit": request_limit,
+            }
+        )
+    )
+
+    return ArtistSearchResult(
+        query=query,
+        artists=tuple(
+            _artist_candidates(
+                fuzzy_payload
+            )
+        ),
+        used_fuzzy_search=True,
+    )
+
+
+def _artist_candidates(
+    payload: dict,
+) -> list[ArtistCandidate]:
     artists: list[
         ArtistCandidate
     ] = []
@@ -116,7 +214,6 @@ def search_artists(
                 "",
             )
         )
-
         if not artist_id:
             continue
 
@@ -170,6 +267,92 @@ def search_artists(
     )
 
 
+def _normalise_artist_name(
+    value: str,
+) -> str:
+    return re.sub(
+        r"[^a-z0-9]+",
+        "",
+        str(
+            value or ""
+        ).casefold(),
+    )
+
+
+
+def _parse_release_groups(
+    raw_groups: list[dict],
+) -> list[ReleaseGroup]:
+    groups: list[
+        ReleaseGroup
+    ] = []
+
+    for item in raw_groups:
+        group_id = str(
+            item.get(
+                "id",
+                "",
+            )
+        )
+        if not group_id:
+            continue
+
+        title = str(
+            item.get(
+                "title",
+                "",
+            )
+        )
+        primary_type = str(
+            item.get(
+                "primary-type",
+                "",
+            )
+        )
+        secondary_types = tuple(
+            str(value)
+            for value in item.get(
+                "secondary-types",
+                [],
+            )
+        )
+        category = classify_release(
+            title=title,
+            primary_type=primary_type,
+            secondary_types=secondary_types,
+        )
+        groups.append(
+            ReleaseGroup(
+                release_group_id=group_id,
+                title=title,
+                first_release_date=str(
+                    item.get(
+                        "first-release-date",
+                        "",
+                    )
+                ),
+                primary_type=primary_type,
+                secondary_types=secondary_types,
+                artist=_artist_credit(
+                    item.get(
+                        "artist-credit",
+                        [],
+                    )
+                ),
+                category=category,
+                badges=release_badges(
+                    category=category,
+                ),
+                external_url=(
+                    "https://musicbrainz.org/release-group/"
+                    + group_id
+                ),
+            )
+        )
+
+    return groups
+
+
 def fetch_artist_release_groups(
     artist_id: str,
     *,
@@ -203,69 +386,11 @@ def fetch_artist_release_groups(
             [],
         )
 
-        for item in raw_groups:
-            group_id = str(
-                item.get(
-                    "id",
-                    "",
-                )
+        groups.extend(
+            _parse_release_groups(
+                raw_groups
             )
-
-            if not group_id:
-                continue
-
-            title = str(
-                item.get(
-                    "title",
-                    "",
-                )
-            )
-            primary_type = str(
-                item.get(
-                    "primary-type",
-                    "",
-                )
-            )
-            secondary_types = tuple(
-                str(value)
-                for value in item.get(
-                    "secondary-types",
-                    [],
-                )
-            )
-            category = classify_release(
-                title=title,
-                primary_type=primary_type,
-                secondary_types=secondary_types,
-            )
-            groups.append(
-                ReleaseGroup(
-                    release_group_id=group_id,
-                    title=title,
-                    first_release_date=str(
-                        item.get(
-                            "first-release-date",
-                            "",
-                        )
-                    ),
-                    primary_type=primary_type,
-                    secondary_types=secondary_types,
-                    artist=_artist_credit(
-                        item.get(
-                            "artist-credit",
-                            [],
-                        )
-                    ),
-                    category=category,
-                    badges=release_badges(
-                        category=category,
-                    ),
-                    external_url=(
-                        "https://musicbrainz.org/release-group/"
-                        + group_id
-                    ),
-                )
-            )
+        )
 
         offset += len(
             raw_groups

@@ -211,6 +211,50 @@ def update_source_availability(
     ]
 
 
+
+def index_songs(
+    source: MusicSource,
+    songs: list[Song],
+) -> SourceScanSummary:
+    grouped: dict[tuple[str, str, str], list[Song]] = {}
+    for song in songs:
+        folder = str(Path(song.path).parent)
+        artist = (song.album_artist or song.artist).strip()
+        album = song.album.strip()
+        grouped.setdefault(
+            (_key(artist), _key(album), folder.casefold()),
+            [],
+        ).append(song)
+
+    now = _now()
+    albums: list[IndexedAlbum] = []
+    for album_songs in grouped.values():
+        first = album_songs[0]
+        artist = (first.album_artist or first.artist).strip()
+        album = first.album.strip()
+        folder = str(Path(first.path).parent)
+        albums.append(
+            IndexedAlbum(
+                key=_album_key(artist, album, folder),
+                album=album,
+                album_artist=artist,
+                folder=folder,
+                representative_file=first.path,
+                source_id=source.source_id,
+                source_name=source.name,
+                source_path=source.path,
+                source_online=source.available,
+                track_count=len(album_songs),
+                last_seen=now,
+            )
+        )
+    return SourceScanSummary(
+        source=source,
+        albums=tuple(albums),
+        song_count=len(songs),
+        failure_count=0,
+    )
+
 def scan_source(
     source: MusicSource,
 ) -> SourceScanSummary:

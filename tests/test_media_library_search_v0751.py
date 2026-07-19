@@ -19,7 +19,7 @@ def test_search_is_single_musicbrainz_artist_search():
     assert '"Discogs-Token fehlt"' not in text
     assert "search_catalog" not in text
     assert "search_artists" in text
-    assert '"Künstler suchen, z. B. Stieber Twins"' in text
+    assert 'tr("search_artist_placeholder", self.language)' in text
 
 
 def test_views_remain_available():

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import html
 import re
 import urllib.error
 import urllib.request
@@ -37,6 +38,7 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
     QListView,
@@ -46,15 +48,21 @@ from PySide6.QtWidgets import (
 
 from ..media_library import (
     ArtistCandidate,
+    ArtistSearchResult,
     Edition,
     ReleaseGroup,
     Track,
     fetch_artist_release_groups,
     fetch_release_group_editions,
     fetch_release_tracklist,
-    search_artists,
+    ArtistRelationsResponse,
+    ArtistSearchResponse,
+    ReleaseGroupResponse,
+    default_controller,
 )
 from ..diagnostics import project_root
+from ..settings import load_settings
+from ..i18n import tr
 from ..library_sources import IndexedAlbum
 from ..models.song import Song
 from ..services.cover import load_cover
@@ -131,6 +139,7 @@ class MediaLibraryWidget(QWidget):
         self.release_groups: list[
             ReleaseGroup
         ] = []
+        self.artist_relations = []
         self.editions: list[
             Edition
         ] = []
@@ -167,6 +176,9 @@ class MediaLibraryWidget(QWidget):
         self.release_view_mode = str(self.ui_settings.value("media_library/view_mode", "discography"))
         self.cover_size_name = str(self.ui_settings.value("media_library/cover_size", "medium"))
         self._view_syncing = False
+        self.language = load_settings().language
+        self.catalog_controller = default_controller
+        self.search_debug_lines: list[str] = []
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -199,13 +211,13 @@ class MediaLibraryWidget(QWidget):
         search_row = QHBoxLayout()
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText(
-            "Künstler suchen, z. B. Stieber Twins"
+            tr("search_artist_placeholder", self.language)
         )
         self.search_edit.returnPressed.connect(
             self.search
         )
         self.search_button = QPushButton(
-            "Suchen"
+            tr("search", self.language)
         )
         self.search_button.clicked.connect(
             self.search
@@ -217,10 +229,52 @@ class MediaLibraryWidget(QWidget):
         search_row.addWidget(
             self.search_button
         )
+        self.debug_button = QPushButton(
+            "Debug"
+        )
+        self.debug_button.setCheckable(
+            True
+        )
+        self.debug_button.toggled.connect(
+            self._toggle_debug_panel
+        )
+        search_row.addWidget(
+            self.debug_button
+        )
         root.addLayout(
             search_row
         )
 
+        self.suggestion_label = QLabel()
+        self.suggestion_label.setWordWrap(
+            True
+        )
+        self.suggestion_label.setOpenExternalLinks(
+            False
+        )
+        self.suggestion_label.linkActivated.connect(
+            self._use_artist_suggestion
+        )
+        self.suggestion_label.hide()
+        root.addWidget(
+            self.suggestion_label
+        )
+
+        self.debug_output = QTextEdit()
+        self.debug_output.setReadOnly(
+            True
+        )
+        self.debug_output.setMaximumHeight(
+            180
+        )
+        self.debug_output.setPlaceholderText(
+            "Hier erscheinen MusicBrainz-Anfragen, "
+            "HTTP-Status und Trefferzahlen."
+        )
+        self.debug_output.hide()
+        root.addWidget(
+            self.debug_output
+        )
 
         splitter = QSplitter(
             Qt.Orientation.Horizontal
@@ -232,7 +286,7 @@ class MediaLibraryWidget(QWidget):
         )
         artist_layout.addWidget(
             QLabel(
-                "Suchtreffer"
+                tr("search_results", self.language)
             )
         )
         self.artist_list = QListWidget()
@@ -240,8 +294,18 @@ class MediaLibraryWidget(QWidget):
             self._artist_selected
         )
         artist_layout.addWidget(
-            self.artist_list
+            self.artist_list,
+            stretch=2,
         )
+        artist_layout.addWidget(QLabel("Verknüpfungen"))
+        self.relations_tree = QTreeWidget()
+        self.relations_tree.setHeaderHidden(True)
+        self.relations_tree.setRootIsDecorated(True)
+        self.relations_tree.setToolTip(
+            "Ein Klick auf einen Künstler öffnet dessen Diskografie."
+        )
+        self.relations_tree.itemClicked.connect(self._relation_clicked)
+        artist_layout.addWidget(self.relations_tree, stretch=1)
 
         group_panel = QWidget()
         group_layout = QVBoxLayout(group_panel)
@@ -504,7 +568,7 @@ class MediaLibraryWidget(QWidget):
                     album.representative_file
                 )
                 statuses[key] = (
-                    f"Online · {album.source_name}"
+                    "Lokal verfügbar"
                 )
             elif current is None:
                 folders[key] = album.folder
@@ -512,7 +576,7 @@ class MediaLibraryWidget(QWidget):
                     album.representative_file
                 )
                 statuses[key] = (
-                    f"Offline · {album.source_name}"
+                    "Externe Quelle nicht erreichbar"
                 )
 
         self.local_albums = folders
@@ -556,7 +620,7 @@ class MediaLibraryWidget(QWidget):
             album_files
         )
         self.local_album_status = {
-            key: "Online · aktueller Scan"
+            key: "Lokal verfügbar"
             for key in albums
         }
         self._refresh_local_markers()
@@ -587,6 +651,8 @@ class MediaLibraryWidget(QWidget):
             False
         )
         self.artist_list.clear()
+        self.suggestion_label.clear()
+        self.suggestion_label.hide()
         self.group_tree.clear()
         self.release_table.setRowCount(
             0
@@ -598,24 +664,56 @@ class MediaLibraryWidget(QWidget):
             0
         )
         self.group_title.setText(
-            "Suche läuft …"
+            tr("search_running", self.language)
         )
         self._set_status(
-            f"Künstlersuche nach „{query}“ …"
+            tr("artist_search", self.language, query=query)
         )
+        self.search_debug_lines = [
+            f"Suche: {query}"
+        ]
+        self._refresh_debug_output()
         self._run(
-            search_artists,
+            self.catalog_controller.search_artists,
             query,
             finished=self._artists_loaded,
         )
 
     def _artists_loaded(
         self,
-        artists,
+        result,
     ) -> None:
-        self.artists = list(
-            artists
-        )
+        if isinstance(
+            result,
+            ArtistSearchResponse,
+        ):
+            self.artists = list(
+                result.artists
+            )
+            used_fuzzy_search = (
+                result.suggestion_mode
+            )
+            for trace in result.traces:
+                self.search_debug_lines.append(
+                    trace.as_text()
+                )
+        elif isinstance(
+            result,
+            ArtistSearchResult,
+        ):
+            self.artists = list(
+                result.artists
+            )
+            used_fuzzy_search = (
+                result.used_fuzzy_search
+            )
+        else:
+            self.artists = list(
+                result
+            )
+            used_fuzzy_search = False
+
+        self._refresh_debug_output()
         self.result_items = []
         self.artist_list.clear()
 
@@ -642,14 +740,115 @@ class MediaLibraryWidget(QWidget):
         self.search_button.setEnabled(
             True
         )
+
+        if not self.artists:
+            self.group_title.setText(
+                "Keine Künstler gefunden"
+            )
+            self.group_meta.setText(
+                (
+                    "MusicBrainz lieferte für diese "
+                    "Schreibweise keine Treffer. "
+                    "Öffne bei Bedarf „Debug“, um "
+                    "Anfrage und Antwort zu prüfen."
+                )
+            )
+            self._set_status(
+                "Keine Künstler gefunden."
+            )
+            self.suggestion_label.hide()
+            return
+
         self._set_status(
-            f"{len(self.artists)} Künstler gefunden."
+            tr(
+                "artists_found",
+                self.language,
+                count=len(
+                    self.artists
+                ),
+            )
         )
 
-        if self.artists:
-            self.artist_list.setCurrentRow(
-                0
+        if used_fuzzy_search:
+            links = []
+            for index, artist in enumerate(
+                self.artists[:5]
+            ):
+                links.append(
+                    (
+                        f'<a href="artist:{index}">'
+                        f"{html.escape(artist.name)}"
+                        "</a>"
+                    )
+                )
+            self.suggestion_label.setText(
+                (
+                    "Kein exakter Treffer. "
+                    "Meintest du vielleicht: "
+                    + ", ".join(
+                        links
+                    )
+                    + "?"
+                )
             )
+            self.suggestion_label.show()
+        else:
+            self.suggestion_label.hide()
+
+        self.artist_list.setCurrentRow(
+            0
+        )
+
+    def _use_artist_suggestion(
+        self,
+        link: str,
+    ) -> None:
+        if not link.startswith(
+            "artist:"
+        ):
+            return
+
+        try:
+            index = int(
+                link.split(
+                    ":",
+                    1,
+                )[1]
+            )
+            artist = self.artists[
+                index
+            ]
+        except (
+            ValueError,
+            IndexError,
+            TypeError,
+        ):
+            return
+
+        self.search_edit.setText(
+            artist.name
+        )
+        self.suggestion_label.hide()
+        self.search()
+
+    def _toggle_debug_panel(
+        self,
+        visible: bool,
+    ) -> None:
+        self.debug_output.setVisible(
+            visible
+        )
+        if visible:
+            self._refresh_debug_output()
+
+    def _refresh_debug_output(
+        self,
+    ) -> None:
+        self.debug_output.setPlainText(
+            "\n\n".join(
+                self.search_debug_lines
+            )
+        )
 
     def _catalog_loaded(
         self,
@@ -746,14 +945,99 @@ class MediaLibraryWidget(QWidget):
         self.group_meta.setText(
             "MusicBrainz-Künstler"
         )
+        self.relations_tree.clear()
+        loading_item = QTreeWidgetItem(["Verknüpfungen werden geladen …"])
+        self.relations_tree.addTopLevelItem(loading_item)
+        self._run(
+            self.catalog_controller.load_artist_relations,
+            artist.artist_id,
+            finished=self._relations_loaded,
+        )
         self._set_status(
             f"Veröffentlichungen von {artist.name} werden geladen …"
         )
+        self.search_debug_lines.append(
+            f"Veröffentlichungen laden: {artist.name}"
+        )
+        self._refresh_debug_output()
         self._run(
-            fetch_artist_release_groups,
+            self.catalog_controller.load_release_groups,
             artist.artist_id,
             finished=self._groups_loaded,
         )
+
+    def _relations_loaded(self, result) -> None:
+        self.relations_tree.clear()
+        if isinstance(result, ArtistRelationsResponse):
+            self.artist_relations = list(result.relations)
+            for trace in result.traces:
+                self.search_debug_lines.append(trace.as_text())
+        else:
+            self.artist_relations = list(result or [])
+        self._refresh_debug_output()
+
+        if not self.artist_relations:
+            self.relations_tree.addTopLevelItem(
+                QTreeWidgetItem(["Keine Verknüpfungen gefunden"])
+            )
+            return
+
+        groups: dict[str, list] = {}
+        for relation in self.artist_relations:
+            groups.setdefault(self._relation_category(relation), []).append(relation)
+
+        order = (
+            "Mitglieder", "Gruppen", "Kollaborationen", "Aliase",
+            "Produzenten / Mitwirkende", "Labels", "Weitere",
+        )
+        for category in order:
+            entries = groups.get(category, [])
+            if not entries:
+                continue
+            parent = QTreeWidgetItem([f"{category} ({len(entries)})"])
+            font = parent.font(0)
+            font.setBold(True)
+            parent.setFont(0, font)
+            self.relations_tree.addTopLevelItem(parent)
+            for relation in entries:
+                suffix = " (ehemalig)" if relation.ended else ""
+                child = QTreeWidgetItem([f"{relation.name}{suffix}"])
+                child.setData(0, Qt.ItemDataRole.UserRole, relation)
+                details = [relation.relation_type]
+                if relation.disambiguation:
+                    details.append(relation.disambiguation)
+                if relation.begin or relation.end:
+                    details.append(f"{relation.begin or '?'}–{relation.end or 'heute'}")
+                child.setToolTip(0, " · ".join(details))
+                parent.addChild(child)
+        self.relations_tree.expandAll()
+
+    @staticmethod
+    def _relation_category(relation) -> str:
+        relation_type = relation.relation_type.casefold()
+        if relation.target_type == "label":
+            return "Labels"
+        if relation_type in {"member of band", "founder"}:
+            return "Gruppen" if relation.direction == "forward" else "Mitglieder"
+        if "alias" in relation_type or relation_type in {"is person", "performance name"}:
+            return "Aliase"
+        if any(word in relation_type for word in ("producer", "mix", "master", "engineer", "instrument", "vocal")):
+            return "Produzenten / Mitwirkende"
+        if any(word in relation_type for word in ("collaboration", "collaborated", "supporting musician")):
+            return "Kollaborationen"
+        return "Weitere"
+
+    def _relation_clicked(self, item: QTreeWidgetItem, column: int) -> None:
+        relation = item.data(0, Qt.ItemDataRole.UserRole)
+        if relation is None:
+            return
+        if relation.target_type == "artist":
+            self.search_artist(relation.name)
+        elif relation.target_type == "label":
+            self.search_edit.setText(relation.name)
+            self._set_status(
+                f"Label „{relation.name}“ ausgewählt. Die Label-Suche folgt mit der Discogs-Erweiterung."
+            )
 
     def _single_discogs_release_loaded(
         self,
@@ -892,7 +1176,7 @@ class MediaLibraryWidget(QWidget):
     def _load_group(self, group: ReleaseGroup) -> None:
         self.current_group=group; self.editions=[]; self.edition_combo.clear(); self.track_table.setRowCount(0)
         self._cover_generation += 1; self._show_cover(None); self.group_title.setText(group.title)
-        key=_normalized(group.title); local_path=self.local_albums.get(key); status=self.local_album_status.get(key,"Nicht lokal indiziert"); local_online=status.startswith("Online")
+        key=_normalized(group.title); local_path=self.local_albums.get(key); status=self.local_album_status.get(key,"Nicht vorhanden"); local_online=status == "Lokal verfügbar"
         self.group_meta.setText(" · ".join(v for v in (_type_text(group),group.first_release_date or "Datum unbekannt",status) if v))
         self.open_local_button.setEnabled(bool(local_path) and local_online)
         self.open_local_button.setToolTip(
@@ -909,13 +1193,33 @@ class MediaLibraryWidget(QWidget):
 
     def _groups_loaded(
         self,
-        groups,
+        result,
     ) -> None:
-        self.release_groups = list(
-            groups
-        )
+        if isinstance(
+            result,
+            ReleaseGroupResponse,
+        ):
+            self.release_groups = list(
+                result.release_groups
+            )
+            for trace in result.traces:
+                self.search_debug_lines.append(
+                    trace.as_text()
+                )
+        else:
+            self.release_groups = list(
+                result
+            )
+
+        self._refresh_debug_output()
         self._render_release_groups()
         self._render_alternative_views()
+        self._set_status(
+            (
+                f"{len(self.release_groups)} "
+                "Veröffentlichungen geladen."
+            )
+        )
 
     def _render_release_groups(
         self,
@@ -1611,7 +1915,7 @@ class MediaLibraryWidget(QWidget):
                     group.title
                 )
                 item.setText(
-                    3,
+                    4,
                     self.local_album_status.get(
                         key,
                         "Nein",
@@ -1680,6 +1984,17 @@ class MediaLibraryWidget(QWidget):
             self.current_group
             is not None
         )
+        self.group_title.setText(
+            "Suche fehlgeschlagen"
+        )
+        self.group_meta.setText(
+            message
+        )
+        self.search_debug_lines.append(
+            "Fehler: " + message
+        )
+        self._refresh_debug_output()
+        self.suggestion_label.hide()
         self._set_status(
             "Fehler: "
             + message
@@ -1838,6 +2153,35 @@ def _category(
         "Sonstiges",
     )
 
+
+
+def _artist_text(
+    artist: ArtistCandidate,
+) -> str:
+    details: list[str] = []
+
+    if artist.country:
+        details.append(
+            artist.country
+        )
+
+    if artist.artist_type:
+        details.append(
+            artist.artist_type
+        )
+
+    if artist.disambiguation:
+        details.append(
+            artist.disambiguation
+        )
+
+    if not details:
+        return artist.name
+
+    return (
+        f"{artist.name} "
+        f"({' · '.join(details)})"
+    )
 
 def _category_order(
     category: str,

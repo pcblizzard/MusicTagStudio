@@ -767,3 +767,121 @@ Die verbleibenden Befehle wurden in die vorhandenen Menüs einsortiert:
 
 Die Symbolleiste kann nicht mehr per Rechtsklick aktiviert werden, da sie nicht
 mehr erzeugt wird.
+
+
+## v0.8.0.4 – Fenster und Datei-Menü
+
+### Größenänderung
+
+- Das Hauptfenster kann jetzt auch horizontal verkleinert und vergrößert werden.
+- Der Metadatenbereich besitzt keine starre Breite von 420 Pixeln mehr.
+- Die Breite des Metadatenbereichs kann über den Trennbalken angepasst werden.
+- Tabellen- und Arbeitsbereiche erhalten den zusätzlichen Platz dynamisch.
+
+### Navigation und Datei-Menü
+
+- „Einstellungen“ wurde aus der linken Arbeitsbereichsnavigation entfernt.
+- „Einstellungen …“ befindet sich nun unter „Datei“.
+- „Beenden“ wurde am Ende des Datei-Menüs ergänzt.
+- Tastenkürzel:
+  - Einstellungen: `Strg+,`
+  - Beenden: systemübliches Beenden-Kürzel
+
+### Projektpflege
+
+- `.gitignore` für Python-Caches, Builddateien, Logs und lokale Caches ergänzt.
+- `scripts/release_check.py` entfernt vor und nach der Release-Prüfung
+  automatisch `__pycache__`, `.pytest_cache`, `.pyc` und `.pyo`.
+
+
+## v0.8.1 – Bibliothekszustand, responsive Oberfläche und Sprachen
+
+- Musikquellen werden immer in der Projektkonfiguration gespeichert und beim
+  Neustart wieder geladen, unabhängig vom aktuellen Arbeitsverzeichnis.
+- Der Bibliotheksindex wird auch nach einem Scan im Tagger aktualisiert.
+- Die Startseite liest den aktuellen Index beim Öffnen erneut ein.
+- Der doppelte Schnellzugriff wurde entfernt.
+- Bei der ersten Einrichtung ohne Musikquelle öffnet MusicTagStudio direkt
+  die Einstellungen.
+- Die Künstlerdatenbank bleibt eine reine Online-Suche über MusicBrainz und
+  funktioniert unabhängig von der lokalen Sammlung. Eine weniger strikte
+  Suchanfrage dient als Fallback.
+- Die Tagger-Schaltflächen wechseln bei geringer Fensterbreite auf kurze
+  Beschriftungen mit Auslassungspunkten und vollständigen Tooltips.
+- Qt verwendet die Windows-DPI-Skalierung mit unverfälschten Skalierungsfaktoren.
+- Sprachgrundlage für Deutsch, Englisch, Spanisch, Französisch, Italienisch,
+  Portugiesisch (Portugal) und Portugiesisch (Brasilien).
+- Sprachoption heißt „Automatisch (System)“.
+- Der Speichern-Button der Einstellungen wird passend zur ausgewählten Sprache
+  beschriftet.
+
+
+## v0.8.1.1 – Startkorrektur
+
+- fehlenden Import von `QGridLayout` ergänzt
+- Startabsturz der responsiven Tagger-Schaltflächen behoben
+- GUI-Starttest erneut ausgeführt
+
+
+## v0.8.1.2 – Vollständiger Tagger-Scan und Künstlersuche
+
+- den fest eingetragenen Testpfad zum Album „Fenster zum Hof“ entfernt
+- ein Scan der konfigurierten Musikquellen befüllt nun gleichzeitig:
+  - Bibliotheksindex
+  - Startseitenstatistik
+  - Tagger-Titelliste
+- bei mehreren Quellen werden deren Titel gemeinsam im Tagger angezeigt
+- „Bibliothek neu einlesen“ scannt die hinterlegten erreichbaren Quellen
+- MusicBrainz-Künstlersuche vereinfacht und mit offizieller Fuzzy-Syntax ergänzt
+- bei abweichender Schreibweise erscheint „Meintest du vielleicht …?“
+- leere Ergebnisse und Verbindungsfehler werden sichtbar statt dauerhaft
+  als „Suche läuft …“ angezeigt
+
+
+## v0.8.2 – Neuer Online-Katalog
+
+Die Medienbibliothek besitzt nun einen eigenen MusicBrainz-Client und einen
+CatalogSearchController. Künstler-, Veröffentlichungs- und spätere
+Tracklistenabfragen sind damit vom Widget getrennt.
+
+### Suche
+
+- normale MusicBrainz-Künstlersuche
+- gezielte Artist-Feldsuche als zweite Stufe
+- Fuzzy-Suche für Tippfehler als dritte Stufe
+- anklickbare „Meintest du vielleicht …?“-Vorschläge
+- deutliche Meldungen bei null Treffern und Verbindungsfehlern
+
+### Diagnose und Cache
+
+- Debug-Schalter direkt neben dem Suchfeld
+- Anzeige der angefragten URL, HTTP-Status, Laufzeit und Trefferzahl
+- eigenes Log unter `logs/musicbrainz.log`
+- lokaler JSON-Cache unter `cache/media_library/musicbrainz`
+- bereits geladene Antworten erscheinen beim nächsten Aufruf sofort
+
+### Vorbereitung
+
+Die neue Trennung aus MusicBrainzClient und CatalogSearchController bereitet
+weitere Katalogquellen vor. Lyrics sind für eine spätere Version vorgesehen:
+Anzeige im internen Player sowie optionales Schreiben in geeignete
+Metadatenfelder der Musikdateien.
+
+
+## v0.8.2.1 – Startkorrektur der Medienbibliothek
+
+- fehlende Methode `_use_artist_suggestion()` ergänzt
+- anklickbare „Meintest du vielleicht …?“-Vorschläge funktionieren wieder
+- ein Klick auf einen Vorschlag übernimmt den Künstlernamen und startet die Suche
+- GUI-Starttest und vollständige Testsuite erneut ausgeführt
+
+
+## v0.8.2.2 – Anzeige der Künstler-Suchergebnisse
+
+- fehlende Formatierungsfunktion `_artist_text()` ergänzt
+- erfolgreiche MusicBrainz-Antworten werden nun tatsächlich in der
+  Künstlerliste dargestellt
+- Länderkennung, Künstlertyp und MusicBrainz-Unterscheidung werden als
+  Zusatzinformationen angezeigt, sofern vorhanden
+- Regressionstest simuliert jetzt den vollständigen Weg von einer
+  MusicBrainz-Antwort bis zum sichtbaren Listeneintrag

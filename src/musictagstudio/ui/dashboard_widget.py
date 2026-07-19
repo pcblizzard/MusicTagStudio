@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..library_sources import IndexedAlbum, MusicSource
+from ..i18n import tr
 
 
 class DashboardWidget(QWidget):
@@ -139,52 +140,25 @@ class DashboardWidget(QWidget):
             status_box
         )
 
-        quick_title = QLabel(
-            "Schnellzugriff"
+        self.add_source_button = QPushButton(
+            "Musikquelle hinzufügen …"
         )
-        quick_title.setStyleSheet(
-            "font-size: 13pt; font-weight: 650;"
+        self.add_source_button.clicked.connect(
+            lambda: self.open_workspace.emit(4)
         )
         root.addWidget(
-            quick_title
+            self.add_source_button,
+            alignment=Qt.AlignmentFlag.AlignLeft,
         )
 
-        quick_row = QHBoxLayout()
-        for text, index in (
-            ("Tagger öffnen", 0),
-            ("Medienbibliothek", 1),
-            ("Audio-Analyse", 2),
-            ("Bibliothek prüfen", 3),
-            ("Einstellungen", 4),
-        ):
-            button = QPushButton(
-                text
-            )
-            button.setMinimumHeight(
-                42
-            )
-            button.clicked.connect(
-                lambda _checked=False, page=index:
-                self.open_workspace.emit(
-                    page
-                )
-            )
-            quick_row.addWidget(
-                button
-            )
-
-        root.addLayout(
-            quick_row
-        )
-
-        refresh = QPushButton(
+        self.refresh_button = QPushButton(
             "Bibliotheksdaten aktualisieren"
         )
-        refresh.clicked.connect(
+        self.refresh_button.clicked.connect(
             self.refresh_requested.emit
         )
         root.addWidget(
-            refresh,
+            self.refresh_button,
             alignment=Qt.AlignmentFlag.AlignLeft,
         )
         root.addStretch()
@@ -310,6 +284,12 @@ class DashboardWidget(QWidget):
             lines.append(
                 "Noch keine aktive Musikquelle eingerichtet."
             )
+        self.add_source_button.setVisible(
+            not bool(sources)
+        )
+        self.refresh_button.setEnabled(
+            bool(online)
+        )
 
         self.source_status.setText(
             "\n".join(

@@ -13,7 +13,7 @@ def test_media_library_distinguishes_online_and_offline():
     )
 
     assert "def set_library_index" in text
-    assert '"Offline · {album.source_name}"' in text
+    assert '"Externe Quelle nicht erreichbar"' in text
     assert "local_online" in text
     assert "momentan nicht erreichbar" in text
 

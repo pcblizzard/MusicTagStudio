@@ -298,3 +298,12 @@ weitere technische Konsistenzprüfungen.
 - Künstler-, Release- und Labelsuche
 - direkte Labeldiskografien
 - direkte Sampler-/Mixtape-/Album-Suche
+
+
+## Lyrics (spätere Version)
+
+- synchronisierte oder unsynchronisierte Liedtexte im internen Player anzeigen
+- Lyrics manuell suchen und auswählen
+- vorhandene Lyrics aus Audiodateien lesen
+- optional in FLAC/MP3/MP4/APE-kompatible Metadatenfelder schreiben
+- Änderungen wie alle anderen Tag-Änderungen über Vorschau und Rückgängig absichern

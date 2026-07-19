@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -49,6 +50,7 @@ from ..library_sources import (
     merge_scan_results,
     save_library_index,
     scan_source,
+    index_songs,
     update_source_availability,
 )
 from ..models.song import Song
@@ -65,6 +67,7 @@ from ..services.proposal import (
 from ..services.scanner import scan_folder_detailed
 from ..services.release_text import create_release_text
 from ..settings import load_settings, save_settings
+from ..i18n import tr
 from ..theme import (
     BUTTON_CHANGED,
     BUTTON_NORMAL,
@@ -92,10 +95,7 @@ from ..cover_management.batch import build_album_cover_plans
 from ..cover_management.manager import CoverManager
 
 
-DEFAULT_MUSIC_FOLDER = (
-    r"C:\Users\Michael\Music\Stieber Twins\Stieber Twins"
-    r"\Stieber Twins - Fenster zum Hof"
-)
+DEFAULT_MUSIC_FOLDER: str | None = None
 
 COVER_SIZE = 280
 MIXED_VALUE_PLACEHOLDER = "<verschiedene Werte>"
@@ -113,7 +113,14 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("MusicTagStudio")
-        self.resize(1500, 780)
+        self.resize(
+            1500,
+            780,
+        )
+        self.setMinimumSize(
+            860,
+            560,
+        )
 
         self.folder: str | None = DEFAULT_MUSIC_FOLDER
         self.current_cover: QPixmap | None = None
@@ -136,6 +143,7 @@ class MainWindow(QMainWindow):
             IndexedAlbum
         ] = []
         self.source_scan_worker = None
+        self.language = load_settings().language
 
         self.create_ui()
         self.create_menu()
@@ -162,13 +170,14 @@ class MainWindow(QMainWindow):
         self.scan_button = QPushButton(
             "Bibliothek neu einlesen"
         )
-        self.scan_button.clicked.connect(self.scan_music)
+        self.scan_button.clicked.connect(self.rescan_library)
 
-        provider_buttons = QHBoxLayout()
+        self.provider_buttons_layout = QGridLayout()
 
         self.proposal_button = QPushButton(
             "Vorschlag für ausgewählten Titel"
         )
+        self.proposal_button.setToolTip("Vorschlag für ausgewählten Titel")
         self.proposal_button.clicked.connect(
             self.create_single_proposal
         )
@@ -177,6 +186,7 @@ class MainWindow(QMainWindow):
         self.batch_button = QPushButton(
             "Vorschläge für markierte Titel"
         )
+        self.batch_button.setToolTip("Vorschläge für markierte Titel")
         self.batch_button.clicked.connect(
             self.create_batch_proposals
         )
@@ -185,6 +195,7 @@ class MainWindow(QMainWindow):
         self.cover_button = QPushButton(
             "Cover für Auswahl verwalten"
         )
+        self.cover_button.setToolTip("Cover für Auswahl verwalten")
         self.cover_button.clicked.connect(
             self.manage_cover
         )
@@ -193,6 +204,7 @@ class MainWindow(QMainWindow):
         self.direct_album_button = QPushButton(
             "Album-/Song-Link oder ID laden"
         )
+        self.direct_album_button.setToolTip("Album-/Song-Link oder ID laden")
         self.direct_album_button.clicked.connect(
             self.load_direct_album
         )
@@ -201,6 +213,7 @@ class MainWindow(QMainWindow):
         self.release_text_button = QPushButton(
             "BBCode-Text erstellen"
         )
+        self.release_text_button.setToolTip("BBCode-Text erstellen")
         self.release_text_button.clicked.connect(
             self.create_release_text_file
         )
@@ -216,18 +229,6 @@ class MainWindow(QMainWindow):
             False
         )
 
-        provider_buttons.addWidget(self.proposal_button)
-        provider_buttons.addWidget(self.batch_button)
-        provider_buttons.addWidget(self.cover_button)
-        provider_buttons.addWidget(
-            self.direct_album_button
-        )
-        provider_buttons.addWidget(
-            self.release_text_button
-        )
-        provider_buttons.addWidget(
-            self.more_artist_button
-        )
 
         self.table_fields = (
             "track",
@@ -332,13 +333,34 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.folder_label)
         left_layout.addWidget(self.select_button)
         left_layout.addWidget(self.scan_button)
-        left_layout.addLayout(provider_buttons)
+        self.provider_action_buttons = (
+            self.proposal_button,
+            self.batch_button,
+            self.cover_button,
+            self.direct_album_button,
+            self.release_text_button,
+            self.more_artist_button,
+        )
+        left_layout.addLayout(
+            self.provider_buttons_layout
+        )
+        self._layout_provider_buttons(
+            compact=False
+        )
         left_layout.addLayout(history_buttons)
         left_layout.addWidget(self.table)
 
         right_widget = QWidget()
-        right_widget.setFixedWidth(420)
-        right_widget.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        right_widget.setMinimumWidth(
+            300
+        )
+        right_widget.setMaximumWidth(
+            560
+        )
+        right_widget.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Expanding,
+        )
         right_layout = QVBoxLayout(right_widget)
 
         self.selection_label = QLabel(
@@ -465,6 +487,9 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(right_widget)
         self.splitter.setStretchFactor(0, 1)
         self.splitter.setStretchFactor(1, 0)
+        self.splitter.setChildrenCollapsible(
+            False
+        )
         self.splitter.setCollapsible(0, False)
         self.splitter.setCollapsible(1, False)
         self.splitter.setSizes([1080, 420])
@@ -472,6 +497,13 @@ class MainWindow(QMainWindow):
         container_layout.addWidget(self.splitter)
 
         self.workspace_stack = QStackedWidget()
+        self.workspace_stack.setMinimumWidth(
+            0
+        )
+        self.workspace_stack.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+        )
         self.workspace_stack.addWidget(
             container
         )
@@ -571,7 +603,6 @@ class MainWindow(QMainWindow):
             ("Medienbibliothek", 1),
             ("Audio-Analyse", 2),
             ("Bibliotheksprüfung", 3),
-            ("Einstellungen", 4),
         )
 
         for name, index in workspace_pages:
@@ -601,6 +632,9 @@ class MainWindow(QMainWindow):
         sidebar_layout.addStretch()
 
         shell = QWidget()
+        shell.setMinimumWidth(
+            0
+        )
         shell_layout = QHBoxLayout(
             shell
         )
@@ -663,6 +697,16 @@ class MainWindow(QMainWindow):
         self.workspace_stack.setCurrentIndex(
             index
         )
+        if index == 5:
+            settings = load_settings()
+            self.library_index = update_source_availability(
+                load_library_index(),
+                settings.music_sources,
+            )
+            self.dashboard_workspace.update_library(
+                self.library_index,
+                settings.music_sources,
+            )
         names = {
             0: "Tagger",
             1: "Medienbibliothek",
@@ -693,6 +737,7 @@ class MainWindow(QMainWindow):
         save_settings(
             new_settings
         )
+        self.language = new_settings.language
         app = QApplication.instance()
 
         if isinstance(app, QApplication):
@@ -801,19 +846,84 @@ class MainWindow(QMainWindow):
         )
         self._restore_table_column_widths()
 
+    def _layout_provider_buttons(
+        self,
+        *,
+        compact: bool,
+    ) -> None:
+        while self.provider_buttons_layout.count():
+            item = self.provider_buttons_layout.takeAt(0)
+            if item.widget() is not None:
+                item.widget().setParent(self.provider_buttons_layout.parentWidget())
+
+        labels = (
+            ("Vorschlag …", "Vorschlag für ausgewählten Titel"),
+            ("Mehrfachvorschlag …", "Vorschläge für markierte Titel"),
+            ("Cover …", "Cover für Auswahl verwalten"),
+            ("Link oder ID …", "Album-/Song-Link oder ID laden"),
+            ("BBCode-Text …", "BBCode-Text erstellen"),
+            ("Mehr vom Künstler", "Mehr vom Künstler"),
+        )
+        columns = 3 if compact else 6
+        for index, (button, label_pair) in enumerate(
+            zip(
+                self.provider_action_buttons,
+                labels,
+            )
+        ):
+            short_label, full_label = label_pair
+            button.setText(
+                short_label if compact else full_label
+            )
+            button.setToolTip(
+                full_label
+            )
+            self.provider_buttons_layout.addWidget(
+                button,
+                index // columns,
+                index % columns,
+            )
+
+    def resizeEvent(
+        self,
+        event,
+    ) -> None:
+        super().resizeEvent(
+            event
+        )
+        if hasattr(
+            self,
+            "provider_action_buttons",
+        ):
+            compact = self.width() < 1220
+            if getattr(
+                self,
+                "_compact_provider_buttons",
+                None,
+            ) != compact:
+                self._compact_provider_buttons = compact
+                self._layout_provider_buttons(
+                    compact=compact
+                )
+
     def create_menu(self):
         file_menu = self.menuBar().addMenu(
-            "Datei"
+            tr("file", self.language)
         )
 
         add_folder_action = QAction(
-            "Ordner hinzufügen …",
+            tr("add_folder", self.language),
             self,
         )
         add_folder_action.setShortcut(
             QKeySequence(
                 "Ctrl+O"
             )
+        )
+        add_folder_action.setStatusTip(
+            "Tastenkürzel: Strg+O"
+            if self.language in {"automatic", "de"}
+            else "Shortcut: Ctrl+O"
         )
         add_folder_action.triggered.connect(
             self.select_folder
@@ -823,7 +933,7 @@ class MainWindow(QMainWindow):
         )
 
         rescan_action = QAction(
-            "Neu einlesen",
+            tr("rescan", self.language),
             self,
         )
         rescan_action.setShortcut(
@@ -838,8 +948,49 @@ class MainWindow(QMainWindow):
             rescan_action
         )
 
+        file_menu.addSeparator()
+
+        settings_action = QAction(
+            tr("settings", self.language),
+            self,
+        )
+        settings_action.setShortcut(
+            QKeySequence(
+                "Ctrl+,"
+            )
+        )
+        settings_action.setStatusTip(
+            "Tastenkürzel: Strg+,"
+            if self.language in {"automatic", "de"}
+            else "Shortcut: Ctrl+,"
+        )
+        settings_action.triggered.connect(
+            lambda: self.switch_workspace(
+                4
+            )
+        )
+        file_menu.addAction(
+            settings_action
+        )
+
+        file_menu.addSeparator()
+
+        exit_action = QAction(
+            tr("exit", self.language),
+            self,
+        )
+        exit_action.setShortcut(
+            QKeySequence.StandardKey.Quit
+        )
+        exit_action.triggered.connect(
+            self.close
+        )
+        file_menu.addAction(
+            exit_action
+        )
+
         edit_menu = self.menuBar().addMenu(
-            "Bearbeiten"
+            tr("edit", self.language)
         )
         self.undo_action = QAction(
             "Rückgängig",
@@ -1349,6 +1500,31 @@ class MainWindow(QMainWindow):
             settings.music_sources,
         )
 
+        if sources:
+            self.folder = sources[0].path
+            if len(sources) == 1:
+                self.folder_label.setText(
+                    f"Ordner: {sources[0].path}"
+                )
+            else:
+                names = ", ".join(
+                    source.name
+                    for source in sources
+                )
+                self.folder_label.setText(
+                    f"Musikquellen: {names}"
+                )
+
+        if not settings.music_sources:
+            self.switch_workspace(
+                4
+            )
+            self.statusBar().showMessage(
+                "Bitte zuerst eine Musikquelle hinzufügen.",
+                8000,
+            )
+            return
+
         if not settings.load_sources_on_startup:
             return
 
@@ -1422,23 +1598,87 @@ class MainWindow(QMainWindow):
         self,
         sources: tuple[MusicSource, ...],
     ):
-        return [
-            scan_source(
-                source
+        summaries = []
+        songs: list[Song] = []
+        failures = []
+        detected_files = 0
+
+        for source in sources:
+            result = scan_folder_detailed(
+                source.path
             )
-            for source in sources
-        ]
+            source_songs = list(
+                result.songs
+            )
+            summaries.append(
+                index_songs(
+                    source,
+                    source_songs,
+                )
+            )
+            songs.extend(
+                source_songs
+            )
+            failures.extend(
+                result.failures
+            )
+            detected_files += (
+                result.detected_files
+            )
+
+        return {
+            "sources": sources,
+            "summaries": summaries,
+            "songs": songs,
+            "failures": failures,
+            "detected_files": detected_files,
+        }
 
     def _source_scan_finished(
         self,
-        summaries,
+        payload,
     ) -> None:
         settings = load_settings()
+
+        if isinstance(
+            payload,
+            dict,
+        ):
+            summaries = list(
+                payload.get(
+                    "summaries",
+                    [],
+                )
+            )
+            songs = list(
+                payload.get(
+                    "songs",
+                    [],
+                )
+            )
+            sources = tuple(
+                payload.get(
+                    "sources",
+                    (),
+                )
+            )
+            failures = list(
+                payload.get(
+                    "failures",
+                    [],
+                )
+            )
+        else:
+            summaries = list(
+                payload
+            )
+            songs = []
+            sources = tuple()
+            failures = []
+
         self.library_index = merge_scan_results(
             self.library_index,
-            list(
-                summaries
-            ),
+            summaries,
             settings.music_sources,
         )
         save_library_index(
@@ -1451,11 +1691,47 @@ class MainWindow(QMainWindow):
             self.library_index,
             settings.music_sources,
         )
+
+        if sources:
+            self.folder = sources[0].path
+            if len(sources) == 1:
+                self.folder_label.setText(
+                    f"Ordner: {sources[0].path}"
+                )
+            else:
+                names = ", ".join(
+                    source.name
+                    for source in sources
+                )
+                self.folder_label.setText(
+                    f"Musikquellen: {names}"
+                )
+
+        if songs:
+            self._apply_songs_to_tagger(
+                songs
+            )
+
         self.source_scan_worker = None
         self.statusBar().showMessage(
-            "Bibliotheksindex aktualisiert",
-            5000,
+            (
+                f"Bibliothek aktualisiert: "
+                f"{len(songs)} Titel, "
+                f"{len(self.library_index)} Alben"
+            ),
+            6000,
         )
+
+        if failures:
+            QMessageBox.warning(
+                self,
+                "Einige Audiodateien wurden übersprungen",
+                (
+                    f"{len(failures)} Datei(en) konnten "
+                    "nicht eingelesen werden. "
+                    "Technische Details stehen in den Logs."
+                ),
+            )
 
     def _source_scan_failed(
         self,
@@ -1467,6 +1743,28 @@ class MainWindow(QMainWindow):
             "Musikquellen konnten nicht aktualisiert werden",
             message,
         )
+
+    def rescan_library(
+        self,
+    ) -> None:
+        if not self.confirm_pending_changes():
+            return
+
+        settings = load_settings()
+        sources = tuple(
+            source
+            for source in settings.music_sources
+            if source.enabled
+            and source.available
+        )
+
+        if sources:
+            self.scan_configured_sources(
+                sources
+            )
+            return
+
+        self.scan_music()
 
     def select_folder(self):
         if not self.confirm_pending_changes():
@@ -1503,17 +1801,9 @@ class MainWindow(QMainWindow):
         scan_result = scan_folder_detailed(
             self.folder
         )
-        self.songs = list(
+        songs = list(
             scan_result.songs
         )
-
-        if hasattr(
-            self,
-            "media_library",
-        ):
-            self.media_library.set_local_songs(
-                self.songs
-            )
 
         if scan_result.failures:
             details = "\n\n".join(
@@ -1521,14 +1811,12 @@ class MainWindow(QMainWindow):
                 for failure
                 in scan_result.failures[:20]
             )
-
             if len(scan_result.failures) > 20:
                 details += (
                     "\n\n"
                     f"… und {len(scan_result.failures) - 20} "
                     "weitere Datei(en)."
                 )
-
             QMessageBox.warning(
                 self,
                 "Einige Audiodateien wurden übersprungen",
@@ -1537,55 +1825,129 @@ class MainWindow(QMainWindow):
                     f"Eingelesen: {scan_result.successful_files}\n"
                     f"Übersprungen: {len(scan_result.failures)}"
                     f"\n\n{details}"
-                    "\n\nVollständige technische Details stehen in "
-                    "logs/scanner.log und logs/wavpack.log."
                 ),
             )
-        elif (
-            scan_result.detected_files == 0
-        ):
+        elif scan_result.detected_files == 0:
             QMessageBox.information(
                 self,
                 "Keine Audiodateien gefunden",
                 (
                     "Im gewählten Ordner wurden keine "
-                    "unterstützten Audiodateien gefunden.\n\n"
-                    "Unterstützte Endungen:\n"
-                    ".flac, .wv, .mp3, .ogg, .oga, "
-                    ".opus, .m4a und .mp4"
+                    "unterstützten Audiodateien gefunden."
                 ),
             )
+
+        self._apply_songs_to_tagger(
+            songs
+        )
+
+        settings = load_settings()
+        matching_source = next(
+            (
+                source
+                for source in settings.music_sources
+                if (
+                    Path(self.folder).resolve()
+                    == Path(source.path).resolve()
+                    or Path(source.path).resolve()
+                    in Path(self.folder).resolve().parents
+                )
+            ),
+            None,
+        )
+
+        if matching_source is not None:
+            summary = index_songs(
+                matching_source,
+                songs,
+            )
+            self.library_index = merge_scan_results(
+                self.library_index,
+                [summary],
+                settings.music_sources,
+            )
+            save_library_index(
+                self.library_index
+            )
+            self.media_library.set_library_index(
+                self.library_index
+            )
+            self.dashboard_workspace.update_library(
+                self.library_index,
+                settings.music_sources,
+            )
+
+    def _apply_songs_to_tagger(
+        self,
+        songs: list[Song],
+    ) -> None:
+        self.songs = list(
+            songs
+        )
+        self.media_library.set_local_songs(
+            self.songs
+        )
+
         self.current_row = -1
         self.active_rows = []
         self.previous_rows = []
-
         self.clear_editor()
 
-        self.table.blockSignals(True)
+        self.table.blockSignals(
+            True
+        )
         self.table.clearContents()
-        self.table.setRowCount(len(self.songs))
+        self.table.setRowCount(
+            len(
+                self.songs
+            )
+        )
 
-        for row, song in enumerate(self.songs):
-            self.update_table_row(row, song)
+        for row, song in enumerate(
+            self.songs
+        ):
+            self.update_table_row(
+                row,
+                song,
+            )
 
-        self.table.blockSignals(False)
+        self.table.blockSignals(
+            False
+        )
         self.update_optional_columns()
 
-        enabled = bool(self.songs)
-        self.proposal_button.setEnabled(enabled)
-        self.batch_button.setEnabled(enabled)
-        self.cover_button.setEnabled(enabled)
-        self.direct_album_button.setEnabled(enabled)
+        enabled = bool(
+            self.songs
+        )
+        self.proposal_button.setEnabled(
+            enabled
+        )
+        self.batch_button.setEnabled(
+            enabled
+        )
+        self.cover_button.setEnabled(
+            enabled
+        )
+        self.direct_album_button.setEnabled(
+            enabled
+        )
         self._update_release_text_button()
         self._update_more_artist_button()
 
-        if enabled:
-            self.table.selectRow(0)
-            self.table.setCurrentCell(0, 0)
-            self.handle_selection_changed()
-            self._update_release_text_button()
-            self._update_more_artist_button()
-            self.table.setFocus()
+        if not enabled:
+            return
+
+        self.table.selectRow(
+            0
+        )
+        self.table.setCurrentCell(
+            0,
+            0,
+        )
+        self.handle_selection_changed()
+        self._update_release_text_button()
+        self._update_more_artist_button()
+        self.table.setFocus()
 
     def selected_rows(self) -> list[int]:
         selection_model = self.table.selectionModel()

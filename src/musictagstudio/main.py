@@ -2,6 +2,7 @@ import sys
 
 from PySide6.QtCore import (
     qInstallMessageHandler,
+    Qt,
 )
 from PySide6.QtWidgets import QApplication
 
@@ -66,6 +67,9 @@ def main():
     try:
         logger.info(
             "QApplication wird erstellt"
+        )
+        QApplication.setHighDpiScaleFactorRoundingPolicy(
+            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
         )
         app = QApplication(
             sys.argv

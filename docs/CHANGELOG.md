@@ -1,4 +1,129 @@
+# MusicTagStudio 0.8.3-alpha1
+
+- Neuer Bereich „Verknüpfungen“ in der Medienbibliothek.
+- MusicBrainz-Beziehungen zu Künstlern, Gruppen, Mitgliedern, Labels, Aliasen und Mitwirkenden werden geladen.
+- Ein Klick auf einen verknüpften Künstler öffnet dessen Suche und Diskografie.
+- Lokale Statusanzeige vereinheitlicht: „Lokal verfügbar“, „Externe Quelle nicht erreichbar“, „Nicht vorhanden“.
+- Fehlerhafte Aktualisierung der lokalen Statusspalte im Discografiebaum korrigiert.
+
 # Changelog
+
+## v0.8.2.2
+
+### Medienbibliothek
+
+- fehlende `_artist_text()`-Funktion ergänzt
+- Absturz nach erfolgreicher MusicBrainz-Suche behoben
+- Künstlername und vorhandene Zusatzinformationen werden in der Trefferliste angezeigt
+- realistischeren UI-Regressionstest für geladene Künstler ergänzt
+
+
+
+## v0.8.2.1
+
+### Fehlerkorrektur
+
+- fehlenden Handler für anklickbare Künstlervorschläge ergänzt
+- Startabsturz der Medienbibliothek behoben
+- Vorschlagslink übernimmt den Künstlernamen und startet die Suche erneut
+
+
+
+## v0.8.2
+
+### Medienbibliothek
+
+- neuen MusicBrainzClient eingeführt
+- CatalogSearchController für Künstler und Veröffentlichungen eingeführt
+- dreistufige Künstlersuche mit Fuzzy-Fallback
+- anklickbare Rechtschreibvorschläge
+- sichtbare Diagnoseausgabe in der Medienbibliothek
+- lokaler MusicBrainz-JSON-Cache
+- eigenes MusicBrainz-Diagnoselog
+- eindeutige Netzwerk-, HTTP- und JSON-Fehlertexte
+
+### Roadmap
+
+- Lyrics-Anzeige für den internen Player vorgemerkt
+- optionales Schreiben von Liedtexten in unterstützte Audio-Tags vorgemerkt
+
+
+
+## v0.8.1.2
+
+### Tagger und Musikquellen
+
+- hartcodierten Albumordner entfernt
+- Quellenscan befüllt Bibliotheksindex und Tagger in einem Durchlauf
+- mehrere Musikquellen werden im Tagger zusammengeführt
+- erneutes Einlesen berücksichtigt alle aktiven erreichbaren Quellen
+
+### Medienbibliothek
+
+- MusicBrainz-Künstlersuche auf einfache Standardsuche umgestellt
+- Fuzzy-Fallback mit MusicBrainz/Lucene-Syntax ergänzt
+- anklickbare „Meintest du vielleicht …?“-Vorschläge
+- eindeutige Meldungen bei null Treffern und bei Netzwerkfehlern
+- Online-Timeout auf zwölf Sekunden begrenzt
+
+
+
+## v0.8.1.1
+
+### Fehlerkorrektur
+
+- fehlenden `QGridLayout`-Import ergänzt
+- MusicTagStudio startet wieder
+- responsives Tagger-Layout bleibt erhalten
+
+
+
+## v0.8.1
+
+### Fehlerkorrekturen
+
+- Musikquellen dauerhaft und unabhängig vom Startordner gespeichert
+- Bibliotheksstatistik nach Tagger-Scan und beim Öffnen der Startseite aktualisiert
+- MusicBrainz-Künstlersuche mit weniger strengem Fallback ergänzt
+
+### Bedienung
+
+- Schnellzugriff von der Startseite entfernt
+- Ersteinrichtung führt ohne konfigurierte Quellen direkt zu den Einstellungen
+- responsive Tagger-Aktionsleiste mit verkürzten Beschriftungen und Tooltips
+- DPI-Skalierung für 100, 125, 150 und 200 Prozent vorbereitet
+
+### Mehrsprachigkeit
+
+- Übersetzungsgrundlage und Sprachauswahl ergänzt
+- Automatisch (System), Deutsch, Englisch, Spanisch, Französisch, Italienisch,
+  Portugiesisch (Portugal) und Portugiesisch (Brasilien)
+- Speichern-/Abbrechen-Schaltflächen reagieren auf die Sprachauswahl
+
+
+
+## v0.8.0.4
+
+### Hauptfenster
+
+- horizontale Größenänderung wieder ermöglicht
+- starre Breite des rechten Metadatenbereichs entfernt
+- anpassbaren Bereich zwischen Tabelle und Metadateneditor eingeführt
+- sinnvolle minimale Fenstergröße gesetzt
+
+### Navigation
+
+- Einstellungen aus der Seitenleiste entfernt
+- Einstellungen unter Datei eingeordnet
+- Beenden am Ende des Datei-Menüs ergänzt
+
+### Repository und Releases
+
+- `.gitignore` ergänzt
+- Release-Prüfung bereinigt Python- und pytest-Caches automatisch
+- `.pyc` und `.pyo` werden nicht mehr mit ausgeliefert
+
+
 
 ## v0.8.0.3
 

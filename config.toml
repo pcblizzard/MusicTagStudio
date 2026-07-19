@@ -1,5 +1,6 @@
 [appearance]
 theme = "automatic"
+language = "automatic"
 
 [providers]
 selected = "apple_music"
@@ -30,6 +31,8 @@ artist_folder_levels_up = 2
 [audio_analysis]
 parallel_jobs = 0
 
+[media_library]
+discogs_token = ""
 
 [library]
 load_sources_on_startup = true
@@ -41,8 +44,3 @@ scan_sources_on_startup = false
 # name = "Musik SSD"
 # path = "D:\\Musik"
 # enabled = true
-
-
-[media_library]
-# Optional. Wird nur bei einem manuellen Klick auf „Discogs ergänzen“ benutzt.
-discogs_token = ""

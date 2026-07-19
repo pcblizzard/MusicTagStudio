@@ -30,6 +30,7 @@ from ..cover_source_catalog import COVER_SOURCES
 from ..provider_catalog import PROVIDERS
 from ..library_sources import MusicSource, new_source
 from ..settings import AppSettings
+from ..i18n import SUPPORTED_LANGUAGES, tr
 
 
 STATUS_STYLES = {
@@ -100,6 +101,21 @@ class SettingsDialog(QDialog):
         appearance_form.addRow(
             "Theme:",
             self.theme_combo,
+        )
+
+        self.language_combo = QComboBox()
+        for code, label in SUPPORTED_LANGUAGES:
+            self.language_combo.addItem(
+                label,
+                code,
+            )
+        self._set_combo_value(
+            self.language_combo,
+            settings.language,
+        )
+        appearance_form.addRow(
+            "Sprache:",
+            self.language_combo,
         )
         layout.addWidget(appearance)
 
@@ -475,9 +491,37 @@ class SettingsDialog(QDialog):
             button_box.rejected.connect(
                 self.reject
             )
+        self.button_box = button_box
+        self._update_button_texts()
+        self.language_combo.currentIndexChanged.connect(
+            self._update_button_texts
+        )
         outer_layout.addWidget(
             button_box
         )
+
+    def _update_button_texts(
+        self,
+        _index: int = -1,
+    ) -> None:
+        language = str(
+            self.language_combo.currentData()
+            or "automatic"
+        )
+        save_button = self.button_box.button(
+            QDialogButtonBox.StandardButton.Save
+        )
+        if save_button is not None:
+            save_button.setText(
+                tr("save", language)
+            )
+        cancel_button = self.button_box.button(
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        if cancel_button is not None:
+            cancel_button.setText(
+                tr("cancel", language)
+            )
 
     def _populate_sources(
         self,
@@ -730,6 +774,9 @@ class SettingsDialog(QDialog):
             self.initial_settings,
             theme=str(
                 self.theme_combo.currentData()
+            ),
+            language=str(
+                self.language_combo.currentData()
             ),
             selected_provider=provider,
             enrich_missing_fields=(

@@ -25,9 +25,9 @@ def test_main_toolbar_is_completely_removed():
 def test_file_and_edit_commands_are_in_menus():
     text = source()
 
-    assert 'addMenu(\n            "Datei"' in text
-    assert '"Ordner hinzufügen …"' in text
-    assert '"Neu einlesen"' in text
-    assert 'addMenu(\n            "Bearbeiten"' in text
+    assert 'tr("file", self.language)' in text
+    assert 'tr("add_folder", self.language)' in text
+    assert 'tr("rescan", self.language)' in text
+    assert 'tr("edit", self.language)' in text
     assert '"Rückgängig"' in text
     assert '"Wiederholen"' in text

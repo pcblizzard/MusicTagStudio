@@ -1,10 +1,26 @@
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
-*.egg-info/
+*$py.class
 .pytest_cache/
-.venv/
-venv/
+
+# Packaging and build output
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Local application data
+cache/
+logs/
+.musictagstudio/
+
+# Editors and operating systems
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
-.musictagstudio/
-logs/
+
+# Temporary files
+*.tmp
+*.bak

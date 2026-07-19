@@ -14,9 +14,9 @@ def test_dashboard_workspace_and_toolbar_exist():
 
     assert "DashboardWidget" in main
     assert "def create_toolbar" not in main
-    assert '"Datei"' in main
-    assert '"Ordner hinzufügen …"' in main
-    assert '"Neu einlesen"' in main
+    assert 'tr("file", self.language)' in main
+    assert 'tr("add_folder", self.language)' in main
+    assert 'tr("rescan", self.language)' in main
     assert '"Startseite"' in main
     assert "self.statusBar().showMessage" in main
 

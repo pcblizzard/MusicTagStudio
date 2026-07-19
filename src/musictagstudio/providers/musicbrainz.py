@@ -14,8 +14,8 @@ from ..models.metadata import MetadataCandidate
 
 
 BASE_URL = "https://musicbrainz.org/ws/2"
-USER_AGENT = "MusicTagStudio/0.6.7.6 (https://github.com/pcblizzard/MusicTagStudio)"
-TIMEOUT_SECONDS = 20
+USER_AGENT = "MusicTagStudio/0.8.2 (https://github.com/pcblizzard/MusicTagStudio)"
+TIMEOUT_SECONDS = 12
 _MIN_REQUEST_INTERVAL = 1.05
 _request_lock = threading.Lock()
 _last_request_time = 0.0

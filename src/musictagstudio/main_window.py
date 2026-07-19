@@ -56,10 +56,7 @@ from ..cover_management.batch import build_album_cover_plans
 from ..cover_management.manager import CoverManager
 
 
-DEFAULT_MUSIC_FOLDER = (
-    r"C:\Users\Michael\Music\Stieber Twins\Stieber Twins"
-    r"\Stieber Twins - Fenster zum Hof"
-)
+DEFAULT_MUSIC_FOLDER: str | None = None
 
 COVER_SIZE = 280
 MIXED_VALUE_PLACEHOLDER = "<verschiedene Werte>"

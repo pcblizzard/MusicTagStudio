@@ -7,6 +7,8 @@ from typing import Literal
 
 from .library_sources import MusicSource
 
+DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config.toml"
+
 from .cover_source_catalog import COVER_SOURCES_BY_ID
 from .provider_catalog import PROVIDERS_BY_ID
 
@@ -27,6 +29,7 @@ ThemeMode = Literal[
 @dataclass(frozen=True)
 class AppSettings:
     theme: ThemeMode = "automatic"
+    language: str = "automatic"
     selected_provider: str = "apple_music"
     enrich_missing_fields: bool = True
     apple_country: str = "DE"
@@ -54,7 +57,7 @@ class AppSettings:
 
 
 def load_settings(
-    config_path: str | Path = "config.toml",
+    config_path: str | Path = DEFAULT_CONFIG_PATH,
 ) -> AppSettings:
     path = Path(config_path)
 
@@ -117,6 +120,16 @@ def load_settings(
             "automatic",
         )
     )
+    language = str(
+        appearance.get(
+            "language",
+            "automatic",
+        )
+    )
+    if language not in {
+        "automatic", "de", "en", "es", "fr", "it", "pt_PT", "pt_BR",
+    }:
+        language = "automatic"
 
     if theme not in {
         "automatic",
@@ -245,6 +258,7 @@ def load_settings(
 
     return AppSettings(
         theme=theme,
+        language=language,
         selected_provider=selected_provider,
         enrich_missing_fields=bool(
             providers.get(
@@ -348,11 +362,12 @@ def load_settings(
 
 def save_settings(
     settings: AppSettings,
-    config_path: str | Path = "config.toml",
+    config_path: str | Path = DEFAULT_CONFIG_PATH,
 ) -> None:
     lines = [
         "[appearance]",
         f'theme = "{settings.theme}"',
+        f'language = "{settings.language}"',
         "",
         "[providers]",
         f'selected = "{settings.selected_provider}"',

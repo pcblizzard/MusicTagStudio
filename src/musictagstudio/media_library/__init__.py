@@ -15,6 +15,7 @@ from .discogs import (
 )
 from .service import (
     ArtistCandidate,
+    ArtistSearchResult,
     Edition,
     ReleaseGroup,
     Track,
@@ -22,10 +23,12 @@ from .service import (
     fetch_release_group_editions,
     fetch_release_tracklist,
     search_artists,
+    search_artists_with_fallback,
 )
 
 __all__ = [
     "ArtistCandidate",
+    "ArtistSearchResult",
     "DiscogsArtist",
     "DiscogsCatalogHit",
     "DiscogsProviderError",
@@ -44,6 +47,33 @@ __all__ = [
     "fetch_release_tracklist",
     "release_badges",
     "search_artists",
+    "search_artists_with_fallback",
     "search_discogs_artists",
     "search_catalog",
+    "ArtistRelation",
+    "ArtistRelationsResponse",
+    "ArtistSearchResponse",
+    "CatalogSearchController",
+    "MusicBrainzClient",
+    "MusicBrainzClientError",
+    "ReleaseGroupResponse",
+    "RequestTrace",
+    "default_client",
+    "default_controller",
 ]
+
+
+from .client import (
+    MusicBrainzClient,
+    MusicBrainzClientError,
+    RequestTrace,
+    default_client,
+)
+from .controller import (
+    ArtistRelation,
+    ArtistRelationsResponse,
+    ArtistSearchResponse,
+    CatalogSearchController,
+    ReleaseGroupResponse,
+    default_controller,
+)
