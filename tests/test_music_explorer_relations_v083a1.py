@@ -14,6 +14,17 @@ def test_artist_relations_controller_and_ui_are_present():
     assert "self.search_artist(relation.name)" in widget
 
 
+def test_aliases_and_labels_are_clickable():
+    root = Path(__file__).parents[1]
+    controller = (root / "src" / "musictagstudio" / "media_library" / "controller.py").read_text(encoding="utf-8")
+    widget = (root / "src" / "musictagstudio" / "ui" / "media_library_widget.py").read_text(encoding="utf-8")
+
+    assert 'payload.get("aliases", [])' in controller
+    assert 'target_type="alias"' in controller
+    assert '{"artist", "alias"}' in widget
+    assert 'https://musicbrainz.org/label/' in widget
+
+
 def test_local_status_labels_are_user_friendly():
     root = Path(__file__).parents[1]
     widget = (root / "src" / "musictagstudio" / "ui" / "media_library_widget.py").read_text(encoding="utf-8")

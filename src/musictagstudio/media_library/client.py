@@ -12,12 +12,13 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from .. import __version__
 from ..diagnostics import project_root
 
 
 BASE_URL = "https://musicbrainz.org/ws/2"
 USER_AGENT = (
-    "MusicTagStudio/0.8.2 "
+    f"MusicTagStudio/{__version__} "
     "(https://github.com/pcblizzard/MusicTagStudio; "
     "contact: MusicTagStudio)"
 )

@@ -1031,12 +1031,14 @@ class MediaLibraryWidget(QWidget):
         relation = item.data(0, Qt.ItemDataRole.UserRole)
         if relation is None:
             return
-        if relation.target_type == "artist":
+        if relation.target_type in {"artist", "alias"}:
             self.search_artist(relation.name)
         elif relation.target_type == "label":
-            self.search_edit.setText(relation.name)
             self._set_status(
-                f"Label „{relation.name}“ ausgewählt. Die Label-Suche folgt mit der Discogs-Erweiterung."
+                f"MusicBrainz-Label „{relation.name}“ wird geöffnet …"
+            )
+            webbrowser.open(
+                f"https://musicbrainz.org/label/{relation.target_id}"
             )
 
     def _single_discogs_release_loaded(

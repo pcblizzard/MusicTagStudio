@@ -313,6 +313,25 @@ class CatalogSearchController:
                     disambiguation=str(target.get("disambiguation", "") or ""),
                 )
             )
+
+        # Aliases are part of the artist payload, not the relation list.
+        # Model them like the other links so the UI can group and navigate
+        # them consistently.
+        for alias in payload.get("aliases", []):
+            if not isinstance(alias, dict):
+                continue
+            name = str(alias.get("name", "")).strip()
+            if not name:
+                continue
+            relations.append(
+                ArtistRelation(
+                    relation_type="alias",
+                    target_type="alias",
+                    target_id=artist_id,
+                    name=name,
+                    disambiguation=str(alias.get("type", "") or ""),
+                )
+            )
         unique = {
             (r.target_type, r.target_id, r.relation_type, r.direction): r
             for r in relations

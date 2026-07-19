@@ -1,8 +1,10 @@
-# MusicTagStudio 0.8.3-alpha1
+# MusicTagStudio 0.8.3-alpha2
 
 - Neuer Bereich „Verknüpfungen“ in der Medienbibliothek.
 - MusicBrainz-Beziehungen zu Künstlern, Gruppen, Mitgliedern, Labels, Aliasen und Mitwirkenden werden geladen.
 - Ein Klick auf einen verknüpften Künstler öffnet dessen Suche und Diskografie.
+- MusicBrainz-Aliase werden aus dem Künstlerdatensatz übernommen und sind als interne Suche anklickbar.
+- Verknüpfte Labels öffnen beim Anklicken ihre eindeutige MusicBrainz-Seite.
 - Lokale Statusanzeige vereinheitlicht: „Lokal verfügbar“, „Externe Quelle nicht erreichbar“, „Nicht vorhanden“.
 - Fehlerhafte Aktualisierung der lokalen Statusspalte im Discografiebaum korrigiert.
 
