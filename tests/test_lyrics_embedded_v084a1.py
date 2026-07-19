@@ -1,4 +1,7 @@
-from musictagstudio.lyrics.embedded import lyrics_from_tags
+from musictagstudio.lyrics.embedded import (
+    lyrics_from_tags,
+    lyrics_variants_from_tags,
+)
 
 
 class TextFrame:
@@ -21,3 +24,18 @@ def test_embedded_vorbis_synced_lyrics_are_parsed():
 
     assert document is not None
     assert [line.time_ms for line in document.synced_lines] == [1000, 2000]
+
+
+def test_multiple_embedded_languages_remain_selectable():
+    variants = lyrics_variants_from_tags(
+        {
+            "USLT::deu": TextFrame("Deutscher Text"),
+            "USLT::eng": TextFrame("English lyrics"),
+        }
+    )
+
+    assert [item.plain_text for item in variants] == [
+        "Deutscher Text",
+        "English lyrics",
+    ]
+    assert "USLT::deu" in variants[0].source

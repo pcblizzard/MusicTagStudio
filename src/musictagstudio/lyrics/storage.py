@@ -23,18 +23,25 @@ def save_sidecar(
     audio_path: str | Path,
     document: LyricsDocument,
 ) -> Path:
+    if document.is_empty:
+        raise ValueError("Leere Lyrics werden nicht gespeichert.")
     destination = sidecar_path(audio_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile(
-        "w",
-        encoding="utf-8",
-        newline="\n",
-        dir=destination.parent,
-        prefix=f".{destination.name}.",
-        suffix=".tmp",
-        delete=False,
-    ) as handle:
-        temporary = Path(handle.name)
-        handle.write(render_lrc(document))
-    os.replace(temporary, destination)
+    temporary: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            newline="\n",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(render_lrc(document))
+        os.replace(temporary, destination)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink(missing_ok=True)
     return destination

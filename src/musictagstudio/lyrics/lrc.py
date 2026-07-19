@@ -13,11 +13,13 @@ def parse_lrc(text: str, *, source: str = "LRC") -> LyricsDocument:
     metadata: dict[str, str] = {}
     synced: list[LyricsLine] = []
     plain: list[str] = []
+    synced_plain: list[str] = []
 
     for raw_line in str(text or "").replace("\r\n", "\n").split("\n"):
         timestamps = list(_TIMESTAMP.finditer(raw_line))
         if timestamps:
             lyric = _TIMESTAMP.sub("", raw_line).strip()
+            synced_plain.append(lyric)
             for match in timestamps:
                 fraction = (match.group(3) or "0")
                 fraction_ms = int(fraction.ljust(3, "0")[:3])
@@ -31,31 +33,37 @@ def parse_lrc(text: str, *, source: str = "LRC") -> LyricsDocument:
         tag = _METADATA.match(raw_line.strip())
         if tag:
             metadata[tag.group(1).lower()] = tag.group(2).strip()
-        elif raw_line.strip():
+        else:
             plain.append(raw_line.rstrip())
 
-    offset = _parse_offset(metadata.get("offset", ""))
+    offset = _parse_offset(metadata.pop("offset", ""))
     if offset:
         synced = [
             LyricsLine(max(0, line.time_ms + offset), line.text)
             for line in synced
         ]
     synced.sort()
-    plain_text = "\n".join(plain).strip()
+    plain_text = "\n".join(plain).strip("\n")
     if not plain_text and synced:
-        plain_text = "\n".join(line.text for line in synced).strip()
+        plain_text = "\n".join(synced_plain).strip("\n")
     return LyricsDocument(
         plain_text=plain_text,
         synced_lines=tuple(synced),
         source=source,
         metadata=metadata,
+        instrumental=metadata.get("instrumental", "").casefold() in {
+            "1", "true", "yes", "ja",
+        },
     )
 
 
 def render_lrc(document: LyricsDocument) -> str:
+    metadata = dict(document.metadata)
+    if document.instrumental and not document.plain_text and not document.synced_lines:
+        metadata["instrumental"] = "true"
     lines = [
         f"[{key}:{value}]"
-        for key, value in document.metadata.items()
+        for key, value in metadata.items()
         if key != "offset" and value
     ]
     if lines and (document.synced_lines or document.plain_text):

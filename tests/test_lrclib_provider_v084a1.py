@@ -1,4 +1,5 @@
 import json
+import pytest
 
 from musictagstudio.lyrics.lrclib import LrclibClient, document_from_lrclib
 
@@ -59,5 +60,16 @@ def test_lrclib_uses_cached_endpoint_by_default(monkeypatch):
     )
 
     assert "/api/get-cached?" in captured["url"]
-    assert "MusicTagStudio/0.8.4-alpha1" in captured["user_agent"]
+    assert "MusicTagStudio/0.8.4-alpha1.post1" in captured["user_agent"]
     assert document.source == "LRCLIB"
+
+
+@pytest.mark.parametrize("duration", [0, -1, float("nan")])
+def test_lrclib_rejects_invalid_duration(duration):
+    with pytest.raises(ValueError, match="Titeldauer"):
+        LrclibClient().get(
+            track_name="Titel",
+            artist_name="Künstler",
+            album_name="Album",
+            duration=duration,
+        )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import replace
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -38,13 +39,29 @@ class LrclibClient:
         duration: int | float,
         cached_only: bool = True,
     ) -> LyricsDocument:
+        values = {
+            "Titel": str(track_name or "").strip(),
+            "Künstler": str(artist_name or "").strip(),
+            "Album": str(album_name or "").strip(),
+        }
+        missing = [label for label, value in values.items() if not value]
+        if missing:
+            raise ValueError(
+                "Für LRCLIB fehlen: " + ", ".join(missing) + "."
+            )
+        try:
+            duration_value = float(duration)
+        except (TypeError, ValueError) as error:
+            raise ValueError("Die Titeldauer für LRCLIB ist ungültig.") from error
+        if not math.isfinite(duration_value) or duration_value <= 0:
+            raise ValueError("Die Titeldauer für LRCLIB muss größer als 0 sein.")
         endpoint = "/api/get-cached" if cached_only else "/api/get"
         query = urlencode(
             {
-                "track_name": track_name,
-                "artist_name": artist_name,
-                "album_name": album_name,
-                "duration": round(float(duration), 3),
+                "track_name": values["Titel"],
+                "artist_name": values["Künstler"],
+                "album_name": values["Album"],
+                "duration": round(duration_value, 3),
             }
         )
         payload = self._request_json(f"{endpoint}?{query}")
@@ -75,6 +92,8 @@ class LrclibClient:
 
 
 def document_from_lrclib(payload: dict) -> LyricsDocument:
+    if not isinstance(payload, dict):
+        raise LrclibError("LRCLIB lieferte kein gültiges Lyrics-Objekt.")
     synced_text = str(payload.get("syncedLyrics") or "")
     plain_text = str(payload.get("plainLyrics") or "")
     if synced_text:
@@ -86,10 +105,11 @@ def document_from_lrclib(payload: dict) -> LyricsDocument:
             plain_text=plain_text.strip(),
             source="LRCLIB",
         )
-    return replace(
+    result = replace(
         document,
         instrumental=bool(payload.get("instrumental", False)),
         provider_id=str(payload.get("id") or ""),
+        fetched_at=LyricsDocument.now_iso(),
         metadata={
             **document.metadata,
             "ti": str(payload.get("trackName") or ""),
@@ -97,3 +117,6 @@ def document_from_lrclib(payload: dict) -> LyricsDocument:
             "al": str(payload.get("albumName") or ""),
         },
     )
+    if result.is_empty:
+        raise LyricsNotFound("LRCLIB lieferte keinen Liedtext.")
+    return result

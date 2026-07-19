@@ -1,3 +1,17 @@
+# MusicTagStudio 0.8.4-alpha1.1
+
+## Lyrics-Härtung vor alpha2
+
+- LRC-Strophen und Leerzeilen bleiben beim Lesen und Schreiben erhalten.
+- Mehrere Zeitmarken derselben LRC-Zeile erzeugen keinen doppelten Anzeigetext mehr.
+- Instrumentalstücke werden als gültiger Lyrics-Status behandelt.
+- Leere Lyrics überschreiben keine vorhandene LRC-Datei; temporäre Dateien werden bei Fehlern entfernt.
+- Mehrere eingebettete Lyrics-Frames und Sprachvarianten stehen getrennt zur Auswahl bereit.
+- Die Audiodauer kann direkt aus der Datei für die exakte LRCLIB-Suche ermittelt werden.
+- Ein lokaler SQLite-Lyrics-Cache verhindert unnötige wiederholte Onlineabfragen.
+- Einheitliche Quellenreihenfolge: lokale LRC, eingebettete Varianten, lokaler Cache, bewusste Onlineabfrage.
+- Bei erkannten Live-/Concert-/Unplugged-Versionen warnt die Auflösung, wenn die Lyrics nicht ausdrücklich als Live-Version gekennzeichnet sind.
+
 # MusicTagStudio 0.8.4-alpha1
 
 ## Lyrics-Grundlage
