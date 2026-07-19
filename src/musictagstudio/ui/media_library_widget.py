@@ -1591,6 +1591,15 @@ class MediaLibraryWidget(QWidget):
         li=self.cover_list.item(row)
         if li is not None: li.setIcon(icon)
 
+    def _sync_current_group_thumbnail(self, data: bytes) -> None:
+        if self.current_group is None:
+            return
+        group_id = self.current_group.release_group_id
+        for row, group in enumerate(self.release_groups):
+            if group.release_group_id == group_id:
+                self._apply_release_thumbnail(row, data, group_id)
+                return
+
     def _select_release_index(self, index: int) -> None:
         if self._view_syncing or not (0 <= index < len(self.release_groups)): return
         self._load_group(self.release_groups[index])
@@ -2273,6 +2282,7 @@ class MediaLibraryWidget(QWidget):
                 Qt.TransformationMode.SmoothTransformation,
             )
         )
+        self._sync_current_group_thumbnail(data)
 
     def check_streaming(
         self,

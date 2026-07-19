@@ -134,3 +134,28 @@ def test_late_editions_do_not_replace_current_release():
     widget._editions_loaded(("different-group", [late_edition]))
 
     assert widget.editions == []
+
+
+def test_detail_cover_is_synchronised_to_selected_grid_tile(monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    widget = MediaLibraryWidget()
+    selected = musicbrainz_group()
+    widget.release_groups = [
+        ReleaseGroup(release_group_id="other", title="Other"),
+        selected,
+    ]
+    widget.current_group = selected
+    applied = []
+    monkeypatch.setattr(
+        widget,
+        "_apply_release_thumbnail",
+        lambda row, data, group_id="": applied.append(
+            (row, data, group_id)
+        ),
+    )
+
+    widget._sync_current_group_thumbnail(b"detail-cover")
+
+    assert applied == [
+        (1, b"detail-cover", selected.release_group_id)
+    ]
