@@ -1,4 +1,8 @@
-# MusicTagStudio 0.8.3-beta
+# MusicTagStudio 0.8.3
+
+Die Beta-Phase ist abgeschlossen; die Medienbibliothek mit MusicBrainz-,
+Discogs-, Cache-, Status- und Navigationsfunktionen ist als stabile Version
+freigegeben.
 
 ## UI-Polishing und Navigation
 
