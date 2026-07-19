@@ -4,21 +4,21 @@ import json
 import unicodedata
 from dataclasses import dataclass
 import re
-import threading
-import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from ..models.metadata import MetadataCandidate
+from ..musicbrainz_http import (
+    MUSICBRAINZ_BASE_URL,
+    MUSICBRAINZ_USER_AGENT,
+    wait_for_musicbrainz_slot,
+)
 
 
-BASE_URL = "https://musicbrainz.org/ws/2"
-USER_AGENT = "MusicTagStudio/0.8.2 (https://github.com/pcblizzard/MusicTagStudio)"
+BASE_URL = MUSICBRAINZ_BASE_URL
+USER_AGENT = MUSICBRAINZ_USER_AGENT
 TIMEOUT_SECONDS = 12
-_MIN_REQUEST_INTERVAL = 1.05
-_request_lock = threading.Lock()
-_last_request_time = 0.0
 
 
 class MusicBrainzProviderError(RuntimeError):
@@ -338,29 +338,23 @@ def _candidate_from_recording(recording: dict) -> MetadataCandidate:
 
 
 def _request_json(url: str) -> dict:
-    global _last_request_time
-    with _request_lock:
-        wait = _MIN_REQUEST_INTERVAL - (time.monotonic() - _last_request_time)
-        if wait > 0:
-            time.sleep(wait)
-        request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-        try:
-            with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
-                data = json.load(response)
-        except HTTPError as error:
-            raise MusicBrainzProviderError(
-                f"MusicBrainz antwortete mit HTTP-Fehler {error.code}."
-            ) from error
-        except URLError as error:
-            raise MusicBrainzProviderError(
-                f"Keine Verbindung zu MusicBrainz: {error.reason}"
-            ) from error
-        except (TimeoutError, json.JSONDecodeError) as error:
-            raise MusicBrainzProviderError(
-                "Die MusicBrainz-Antwort konnte nicht verarbeitet werden."
-            ) from error
-        finally:
-            _last_request_time = time.monotonic()
+    wait_for_musicbrainz_slot()
+    request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    try:
+        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+            data = json.load(response)
+    except HTTPError as error:
+        raise MusicBrainzProviderError(
+            f"MusicBrainz antwortete mit HTTP-Fehler {error.code}."
+        ) from error
+    except URLError as error:
+        raise MusicBrainzProviderError(
+            f"Keine Verbindung zu MusicBrainz: {error.reason}"
+        ) from error
+    except (TimeoutError, json.JSONDecodeError) as error:
+        raise MusicBrainzProviderError(
+            "Die MusicBrainz-Antwort konnte nicht verarbeitet werden."
+        ) from error
     return data
 
 

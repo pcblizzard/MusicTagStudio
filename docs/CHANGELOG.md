@@ -10,6 +10,8 @@
 - Nur bei MusicBrainz fehlende Veröffentlichungen erscheinen als zusätzliche Discogs-Einträge.
 - Discogs-Editionen und Tracklisten können direkt in der Medienbibliothek geöffnet werden.
 - Discogs-Anfragen werden gedrosselt, das Token wird im Authorization-Header übertragen und HTTP 429 einmal kontrolliert wiederholt.
+- Alle MusicBrainz-Zugriffe teilen sich gemäß API-Vorgabe ein anwendungsweites Limit von höchstens einem Aufruf pro Sekunde.
+- MusicBrainz-User-Agents verwenden in Explorer, Tagger, Direktabgleich und Coversuche einheitlich die aktuelle Programmversion.
 
 - Neuer Bereich „Verknüpfungen“ in der Medienbibliothek.
 - MusicBrainz-Beziehungen zu Künstlern, Gruppen, Mitgliedern, Labels, Aliasen und Mitwirkenden werden geladen.

@@ -6,23 +6,21 @@ from pathlib import Path
 import json
 import socket
 import ssl
-import threading
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from .. import __version__
 from ..diagnostics import project_root
-
-
-BASE_URL = "https://musicbrainz.org/ws/2"
-USER_AGENT = (
-    f"MusicTagStudio/{__version__} "
-    "(https://github.com/pcblizzard/MusicTagStudio; "
-    "contact: MusicTagStudio)"
+from ..musicbrainz_http import (
+    MUSICBRAINZ_BASE_URL,
+    MUSICBRAINZ_USER_AGENT,
+    wait_for_musicbrainz_slot,
 )
-REQUEST_INTERVAL_SECONDS = 1.05
+
+
+BASE_URL = MUSICBRAINZ_BASE_URL
+USER_AGENT = MUSICBRAINZ_USER_AGENT
 DEFAULT_TIMEOUT_SECONDS = 15
 DEFAULT_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 
@@ -97,8 +95,6 @@ class MusicBrainzClient:
             parents=True,
             exist_ok=True,
         )
-        self._request_lock = threading.Lock()
-        self._last_request_time = 0.0
 
     def get_json(
         self,
@@ -161,35 +157,20 @@ class MusicBrainzClient:
         )
 
         try:
-            with self._request_lock:
-                wait = (
-                    REQUEST_INTERVAL_SECONDS
-                    - (
-                        time.monotonic()
-                        - self._last_request_time
+            wait_for_musicbrainz_slot()
+            context = ssl.create_default_context()
+            with urlopen(
+                request,
+                timeout=self.timeout_seconds,
+                context=context,
+            ) as response:
+                raw = response.read()
+                status_code = int(
+                    getattr(
+                        response,
+                        "status",
+                        200,
                     )
-                )
-                if wait > 0:
-                    time.sleep(
-                        wait
-                    )
-
-                context = ssl.create_default_context()
-                with urlopen(
-                    request,
-                    timeout=self.timeout_seconds,
-                    context=context,
-                ) as response:
-                    raw = response.read()
-                    status_code = int(
-                        getattr(
-                            response,
-                            "status",
-                            200,
-                        )
-                    )
-                self._last_request_time = (
-                    time.monotonic()
                 )
 
             payload = json.loads(
@@ -317,12 +298,6 @@ class MusicBrainzClient:
             raise MusicBrainzClientError(
                 message
             ) from error
-        finally:
-            self._last_request_time = max(
-                self._last_request_time,
-                time.monotonic(),
-            )
-
     def clear_cache(
         self,
     ) -> int:

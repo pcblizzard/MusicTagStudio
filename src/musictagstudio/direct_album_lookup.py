@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
-import threading
-import time
 from functools import lru_cache
 from pathlib import Path
 
@@ -21,16 +19,14 @@ from .diagnostics import (
 from .direct_references import DirectAlbumReference
 from .models.metadata import MetadataCandidate
 from .models.song import Song
-
-
-USER_AGENT = (
-    "MusicTagStudio/0.6.8.5 "
-    "(https://github.com/pcblizzard/MusicTagStudio)"
+from .musicbrainz_http import (
+    MUSICBRAINZ_USER_AGENT,
+    wait_for_musicbrainz_slot,
 )
+
+
+USER_AGENT = MUSICBRAINZ_USER_AGENT
 TIMEOUT_SECONDS = 20
-_MB_REQUEST_INTERVAL = 1.05
-_mb_request_lock = threading.Lock()
-_mb_last_request_time = 0.0
 
 
 @dataclass(frozen=True)
@@ -1607,25 +1603,12 @@ def _lookup_musicbrainz_release(
 
 
 def _get_json(url: str) -> dict:
-    global _mb_last_request_time
-
     is_musicbrainz = url.startswith(
         "https://musicbrainz.org/"
     )
 
     if is_musicbrainz:
-        _mb_request_lock.acquire()
-
-        wait = (
-            _MB_REQUEST_INTERVAL
-            - (
-                time.monotonic()
-                - _mb_last_request_time
-            )
-        )
-
-        if wait > 0:
-            time.sleep(wait)
+        wait_for_musicbrainz_slot()
 
     request = Request(
         url,
@@ -1650,12 +1633,6 @@ def _get_json(url: str) -> dict:
         raise DirectAlbumLookupError(
             f"Die direkte Albumabfrage ist fehlgeschlagen: {error}"
         ) from error
-    finally:
-        if is_musicbrainz:
-            _mb_last_request_time = (
-                time.monotonic()
-            )
-            _mb_request_lock.release()
 
 
 def _artist_credit(value: list[dict]) -> str:

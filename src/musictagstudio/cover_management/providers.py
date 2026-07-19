@@ -8,13 +8,14 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from .models import CoverCandidate
+from ..musicbrainz_http import (
+    MUSICBRAINZ_USER_AGENT,
+    wait_for_musicbrainz_slot,
+)
 
 
 TIMEOUT = 15
-USER_AGENT = (
-    "MusicTagStudio/0.7.1 "
-    "(https://github.com/pcblizzard/MusicTagStudio)"
-)
+USER_AGENT = MUSICBRAINZ_USER_AGENT
 
 
 def search_apple_cover(
@@ -324,6 +325,8 @@ def _caa_release_cover(
 def _json(
     url: str,
 ) -> dict:
+    if url.startswith("https://musicbrainz.org/"):
+        wait_for_musicbrainz_slot()
     request = Request(
         url,
         headers={
