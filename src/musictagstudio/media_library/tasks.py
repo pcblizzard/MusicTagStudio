@@ -273,5 +273,3 @@ def _fetch_release_cover_with_discogs(
             cache_directory / f"discogs-fallback-{hit.kind}-{hit.entity_id}.jpg",
         )
     return None
-
-
