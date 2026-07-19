@@ -68,6 +68,7 @@ class CatalogSearchController:
         query: str,
         *,
         limit: int = 8,
+        preferred_country: str = "",
     ) -> ArtistSearchResponse:
         query = str(query or "").strip()
         if len(query) < 3:
@@ -83,7 +84,11 @@ class CatalogSearchController:
             },
             result_key="artists",
         )
-        artists = self._rank_candidates(query, _artist_candidates(payload))
+        artists = self._rank_candidates(
+            query,
+            _artist_candidates(payload),
+            preferred_country=preferred_country,
+        )
         wanted = _normalise_artist_name(query)
         artists.sort(
             key=lambda artist: (
@@ -105,6 +110,7 @@ class CatalogSearchController:
         query: str,
         *,
         limit: int = 25,
+        preferred_country: str = "",
     ) -> ArtistSearchResponse:
         query = str(
             query or ""
@@ -153,7 +159,11 @@ class CatalogSearchController:
             return ArtistSearchResponse(
                 query=query,
                 artists=tuple(
-                    artists
+                    self._rank_candidates(
+                        query,
+                        artists,
+                        preferred_country=preferred_country,
+                    )
                 ),
                 exact_match=exact,
                 suggestion_mode=False,
@@ -188,7 +198,11 @@ class CatalogSearchController:
             return ArtistSearchResponse(
                 query=query,
                 artists=tuple(
-                    self._rank_candidates(query, field_artists)
+                    self._rank_candidates(
+                        query,
+                        field_artists,
+                        preferred_country=preferred_country,
+                    )
                 ),
                 exact_match=exact,
                 suggestion_mode=False,
@@ -228,6 +242,7 @@ class CatalogSearchController:
         artists = self._rank_candidates(
             query,
             candidates,
+            preferred_country=preferred_country,
         )
 
         return ArtistSearchResponse(
@@ -248,6 +263,8 @@ class CatalogSearchController:
     def _rank_candidates(
         query: str,
         artists: list[ArtistCandidate],
+        *,
+        preferred_country: str = "",
     ) -> list[ArtistCandidate]:
         wanted = _normalise_artist_name(query)
         unique = {
@@ -255,7 +272,9 @@ class CatalogSearchController:
             for artist in artists
         }
 
-        def similarity(artist: ArtistCandidate) -> tuple[float, int]:
+        preferred = str(preferred_country or "").strip().upper()
+
+        def similarity(artist: ArtistCandidate) -> tuple[float, float, int]:
             names = (
                 _normalise_artist_name(artist.name),
                 _normalise_artist_name(artist.sort_name),
@@ -264,7 +283,9 @@ class CatalogSearchController:
                 SequenceMatcher(None, wanted, name).ratio()
                 for name in names
             )
-            return ratio, artist.score
+            regional = int(bool(preferred) and artist.country.upper() == preferred)
+            regional_score = ratio + (0.06 if regional else 0.0)
+            return regional_score, ratio, artist.score
 
         return sorted(
             unique.values(),

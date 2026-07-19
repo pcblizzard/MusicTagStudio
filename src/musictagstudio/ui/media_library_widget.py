@@ -759,6 +759,7 @@ class MediaLibraryWidget(QWidget):
         self._run(
             self.catalog_controller.search_artists,
             query,
+            preferred_country=load_settings().apple_country,
             finished=self._artists_loaded,
         )
 
@@ -2074,9 +2075,13 @@ class MediaLibraryWidget(QWidget):
             return
 
         self._run(
-            _fetch_release_cover,
+            _fetch_release_cover_with_discogs,
             edition.release_id,
             self.cover_cache_directory,
+            self.current_artist_name,
+            edition.title,
+            edition.date[:4],
+            load_settings().discogs_token,
             finished=self._cover_loaded,
             transform=lambda data: (
                 generation,
@@ -2635,7 +2640,11 @@ def _label_artist_statistics(
 
 def _fetch_live_artist_suggestions(controller, query: str) -> list[str]:
     try:
-        musicbrainz = controller.suggest_artists(query, limit=8).artists
+        musicbrainz = controller.suggest_artists(
+            query,
+            limit=8,
+            preferred_country=load_settings().apple_country,
+        ).artists
     except Exception:
         musicbrainz = ()
     deezer = suggest_deezer_artists(query, limit=25)
@@ -2740,6 +2749,47 @@ def _fetch_release_cover(
         pass
 
     return data
+
+
+def _fetch_release_cover_with_discogs(
+    release_id: str,
+    cache_directory: Path,
+    artist: str,
+    title: str,
+    year: str,
+    token: str,
+) -> bytes | None:
+    data = _fetch_release_cover(release_id, cache_directory)
+    if data or not token.strip() or not artist.strip() or not title.strip():
+        return data
+    try:
+        hits = search_catalog(
+            f"{artist} {title}",
+            token,
+            kinds=("master", "release"),
+            limit_per_kind=12,
+        )
+    except Exception:
+        return None
+    wanted_title = _normalized(title)
+    wanted_artist = _normalized(artist)
+    wanted_year = str(year or "")[:4]
+    for hit in hits:
+        hit_title = _discogs_release_title(hit.title)
+        credit = hit.title.split(" - ", 1)[0]
+        if _normalized(hit_title) != wanted_title:
+            continue
+        if wanted_artist not in _normalized(credit):
+            continue
+        if wanted_year and hit.year and hit.year[:4] != wanted_year:
+            continue
+        if not hit.thumb:
+            continue
+        return _fetch_url_cover(
+            hit.thumb,
+            cache_directory / f"discogs-fallback-{hit.kind}-{hit.entity_id}.jpg",
+        )
+    return None
 
 
 def _normalized(

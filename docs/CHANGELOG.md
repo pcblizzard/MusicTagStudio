@@ -15,6 +15,8 @@
 - Die Vorschlagssuche führt begrenzte Künstlerergebnisse aus MusicBrainz und Deezer zusammen und startet noch keine Diskografie- oder Discogs-Abfrage.
 - Anklicken eines Vorschlags öffnet die vollständige Künstleransicht.
 - Suche und Vorschlagsliste erhielten eine ruhigere, abgerundete Darstellung nach dem Vorbild moderner Musikbibliotheken.
+- Bei gleich guten Künstlernamen wird das in den Einstellungen gewählte Land bevorzugt, ohne internationale Treffer auszublenden.
+- Fehlt ein Cover im Cover Art Archive, sucht die Medienbibliothek mit Discogs-Token gezielt nach Künstler, Titel und Jahr und verwendet nur einen exakten Treffer.
 
 # MusicTagStudio 0.8.3
 
