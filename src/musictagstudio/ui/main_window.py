@@ -576,11 +576,18 @@ class MainWindow(QMainWindow):
             """
         )
         sidebar.setFixedWidth(
-            190
+            168
         )
         sidebar_layout = QVBoxLayout(
             sidebar
         )
+        sidebar_layout.setContentsMargins(
+            8,
+            8,
+            8,
+            8,
+        )
+        sidebar_layout.setSpacing(5)
         brand = QLabel(
             "MusicTagStudio"
         )
@@ -613,7 +620,7 @@ class MainWindow(QMainWindow):
                 True
             )
             button.setMinimumHeight(
-                38
+                34
             )
             button.clicked.connect(
                 lambda _checked=False, page=index:
