@@ -14,6 +14,7 @@ from PySide6.QtCore import (
     QSize,
     QRunnable,
     QThreadPool,
+    QTimer,
     Signal,
     Slot,
     Qt,
@@ -81,6 +82,7 @@ from ..providers.apple_music import (
     AppleMusicProviderError,
     search_album as search_apple_album,
 )
+from ..providers.deezer import suggest_artists as suggest_deezer_artists
 
 
 class WorkerSignals(QObject):
@@ -197,6 +199,11 @@ class MediaLibraryWidget(QWidget):
         self.language = load_settings().language
         self.catalog_controller = default_controller
         self.search_debug_lines: list[str] = []
+        self._suggestion_query = ""
+        self._suggestion_timer = QTimer(self)
+        self._suggestion_timer.setSingleShot(True)
+        self._suggestion_timer.setInterval(450)
+        self._suggestion_timer.timeout.connect(self._request_live_suggestions)
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -228,11 +235,15 @@ class MediaLibraryWidget(QWidget):
 
         search_row = QHBoxLayout()
         self.search_edit = QLineEdit()
+        self.search_edit.setObjectName("mediaSearchField")
         self.search_edit.setPlaceholderText(
             tr("search_artist_placeholder", self.language)
         )
         self.search_edit.returnPressed.connect(
             self.search
+        )
+        self.search_edit.textEdited.connect(
+            self._schedule_live_suggestions
         )
         self.search_button = QPushButton(
             tr("search", self.language)
@@ -274,6 +285,18 @@ class MediaLibraryWidget(QWidget):
         root.addLayout(
             search_row
         )
+
+        self.live_suggestions = QListWidget()
+        self.live_suggestions.setObjectName("liveSearchSuggestions")
+        self.live_suggestions.setMaximumHeight(230)
+        self.live_suggestions.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.live_suggestions.itemClicked.connect(
+            self._live_suggestion_selected
+        )
+        self.live_suggestions.hide()
+        root.addWidget(self.live_suggestions)
 
         self.breadcrumb_label = QLabel()
         self.breadcrumb_label.setTextFormat(Qt.TextFormat.RichText)
@@ -692,6 +715,9 @@ class MediaLibraryWidget(QWidget):
         if not query:
             return
 
+        self._suggestion_timer.stop()
+        self.live_suggestions.hide()
+
         self.current_catalog_kind = ""
 
         if not self._preserve_breadcrumbs:
@@ -735,6 +761,48 @@ class MediaLibraryWidget(QWidget):
             query,
             finished=self._artists_loaded,
         )
+
+    def _schedule_live_suggestions(self, text: str) -> None:
+        query = str(text or "").strip()
+        self._suggestion_timer.stop()
+        self._suggestion_query = query
+        if len(query) < 3:
+            self.live_suggestions.clear()
+            self.live_suggestions.hide()
+            return
+        self._suggestion_timer.start()
+
+    def _request_live_suggestions(self) -> None:
+        query = self._suggestion_query
+        if len(query) < 3:
+            return
+        self._run(
+            _fetch_live_artist_suggestions,
+            self.catalog_controller,
+            query,
+            finished=lambda result, wanted=query: self._show_live_suggestions(
+                wanted, result
+            ),
+            failed=lambda _message: self.live_suggestions.hide(),
+        )
+
+    def _show_live_suggestions(self, query: str, result) -> None:
+        if query != self.search_edit.text().strip():
+            return
+        artists = list(result or ())
+        self.live_suggestions.clear()
+        for artist_name in artists:
+            item = QListWidgetItem(f"⌕  {artist_name}")
+            item.setData(Qt.ItemDataRole.UserRole, artist_name)
+            self.live_suggestions.addItem(item)
+        self.live_suggestions.setVisible(bool(artists))
+
+    def _live_suggestion_selected(self, item: QListWidgetItem) -> None:
+        artist_name = str(item.data(Qt.ItemDataRole.UserRole) or "").strip()
+        if not artist_name:
+            return
+        self.live_suggestions.hide()
+        self.search_artist(artist_name)
 
     def _artists_loaded(
         self,
@@ -2304,6 +2372,7 @@ class MediaLibraryWidget(QWidget):
         *args,
         finished,
         transform=None,
+        failed=None,
         **kwargs,
     ) -> None:
         worker = Worker(
@@ -2339,9 +2408,7 @@ class MediaLibraryWidget(QWidget):
         worker.signals.finished.connect(
             release
         )
-        worker.signals.failed.connect(
-            self._failed
-        )
+        worker.signals.failed.connect(failed or self._failed)
         worker.signals.failed.connect(
             release
         )
@@ -2564,6 +2631,17 @@ def _label_artist_statistics(
         result,
         key=lambda item: (-item[1], item[0].casefold()),
     )
+
+
+def _fetch_live_artist_suggestions(controller, query: str) -> list[str]:
+    try:
+        musicbrainz = controller.suggest_artists(query, limit=8).artists
+    except Exception:
+        musicbrainz = ()
+    deezer = suggest_deezer_artists(query, limit=25)
+    combined = [item.name for item in deezer]
+    combined.extend(artist.name for artist in musicbrainz)
+    return list(dict.fromkeys(combined))[:8]
 
 
 def _fetch_url_cover(

@@ -229,6 +229,25 @@ def _light_stylesheet() -> str:
     QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
         border: 1px solid #2f80ed;
     }
+    QLineEdit#mediaSearchField {
+        border-radius: 17px;
+        padding: 8px 14px;
+        font-size: 11pt;
+    }
+    QListWidget#liveSearchSuggestions {
+        border-radius: 12px;
+        padding: 5px;
+        background: #ffffff;
+    }
+    QListWidget#liveSearchSuggestions::item {
+        border-radius: 7px;
+        padding: 9px 11px;
+    }
+    QListWidget#liveSearchSuggestions::item:hover,
+    QListWidget#liveSearchSuggestions::item:selected {
+        background: #edf5ff;
+        color: #174ea6;
+    }
     QComboBox::drop-down {
         border: none;
         width: 24px;
@@ -359,6 +378,27 @@ def _dark_stylesheet() -> str:
     }
     QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
         border: 1px solid #20c7df;
+    }
+    QLineEdit#mediaSearchField {
+        border-radius: 17px;
+        padding: 8px 14px;
+        font-size: 11pt;
+        background: #1c2024;
+    }
+    QListWidget#liveSearchSuggestions {
+        border: 1px solid #3a424a;
+        border-radius: 12px;
+        padding: 5px;
+        background: #202327;
+    }
+    QListWidget#liveSearchSuggestions::item {
+        border-radius: 7px;
+        padding: 9px 11px;
+    }
+    QListWidget#liveSearchSuggestions::item:hover,
+    QListWidget#liveSearchSuggestions::item:selected {
+        background: #30363c;
+        color: #ffffff;
     }
     QComboBox::drop-down {
         border: none;

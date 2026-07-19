@@ -9,6 +9,13 @@
 - LRCLIB ist als schreibgeschützter Provider ohne API-Schlüssel angebunden.
 - Standardmäßig wird der cache-schonende Endpunkt `/api/get-cached` verwendet; eine spätere UI-Aktion kann bewusst eine Live-Abfrage auslösen.
 
+## Suche und Oberfläche
+
+- Ab drei eingegebenen Zeichen erscheinen Künstler-Vorschläge nach einer kurzen Eingabepause.
+- Die Vorschlagssuche führt begrenzte Künstlerergebnisse aus MusicBrainz und Deezer zusammen und startet noch keine Diskografie- oder Discogs-Abfrage.
+- Anklicken eines Vorschlags öffnet die vollständige Künstleransicht.
+- Suche und Vorschlagsliste erhielten eine ruhigere, abgerundete Darstellung nach dem Vorbild moderner Musikbibliotheken.
+
 # MusicTagStudio 0.8.3
 
 Die Beta-Phase ist abgeschlossen; die Medienbibliothek mit MusicBrainz-,

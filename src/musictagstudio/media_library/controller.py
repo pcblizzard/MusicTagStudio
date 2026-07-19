@@ -63,6 +63,43 @@ class CatalogSearchController:
     ) -> None:
         self.client = client or default_client
 
+    def suggest_artists(
+        self,
+        query: str,
+        *,
+        limit: int = 8,
+    ) -> ArtistSearchResponse:
+        query = str(query or "").strip()
+        if len(query) < 3:
+            return ArtistSearchResponse(query, (), False, False, ())
+        request_limit = max(1, min(int(limit), 20))
+        candidate_limit = max(25, request_limit)
+        escaped = self._lucene_escape(query)
+        payload, trace = self.client.get_json(
+            "artist",
+            {
+                "query": f"artist:{escaped}* OR artist:{escaped}",
+                "limit": candidate_limit,
+            },
+            result_key="artists",
+        )
+        artists = self._rank_candidates(query, _artist_candidates(payload))
+        wanted = _normalise_artist_name(query)
+        artists.sort(
+            key=lambda artist: (
+                _live_match_rank(wanted, _normalise_artist_name(artist.name)),
+                -int(artist.score or 0),
+                artist.name.casefold(),
+            )
+        )
+        return ArtistSearchResponse(
+            query=query,
+            artists=tuple(artists[:request_limit]),
+            exact_match=self._has_exact_match(query, artists),
+            suggestion_mode=True,
+            traces=(trace,),
+        )
+
     def search_artists(
         self,
         query: str,
@@ -414,6 +451,16 @@ class CatalogSearchController:
             r"\\\1",
             value.strip(),
         )
+
+
+def _live_match_rank(query: str, name: str) -> int:
+    if name.startswith(query):
+        return 0
+    if any(part.startswith(query) for part in name.split()):
+        return 1
+    if query in name:
+        return 2
+    return 3
 
 
 default_controller = CatalogSearchController()
