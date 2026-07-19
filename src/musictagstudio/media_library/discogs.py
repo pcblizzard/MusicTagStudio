@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import re
+import threading
+import time
 from urllib.parse import quote, urlencode
 import urllib.error
 import urllib.request
@@ -14,6 +16,9 @@ USER_AGENT = (
     f"MusicTagStudio/{__version__} "
     "(https://github.com/pcblizzard/MusicTagStudio)"
 )
+REQUEST_INTERVAL_SECONDS = 1.05
+_request_lock = threading.Lock()
+_last_request_at = 0.0
 
 
 class DiscogsProviderError(RuntimeError):
@@ -1162,7 +1167,6 @@ def _get_json(
         params
         or {}
     )
-    query["token"] = token
     url = (
         BASE_URL
         + endpoint
@@ -1175,45 +1179,66 @@ def _get_json(
         url,
         headers={
             "User-Agent": USER_AGENT,
+            "Authorization": f"Discogs token={token}",
             "Accept": (
                 "application/vnd.discogs.v2.discogs+json"
             ),
         },
     )
 
-    try:
-        with urllib.request.urlopen(
-            request,
-            timeout=20,
-        ) as response:
-            return json.loads(
-                response.read().decode(
-                    "utf-8"
-                )
+    for attempt in range(2):
+        global _last_request_at
+        with _request_lock:
+            delay = REQUEST_INTERVAL_SECONDS - (
+                time.monotonic() - _last_request_at
             )
-    except urllib.error.HTTPError as error:
-        if error.code in {
-            401,
-            403,
-        }:
-            raise DiscogsProviderError(
-                "Discogs hat den Zugriff abgelehnt. "
-                "Bitte den persönlichen Discogs-Token in "
-                "den Einstellungen prüfen."
-            ) from error
-
-        raise DiscogsProviderError(
-            f"Discogs-Fehler HTTP {error.code}."
-        ) from error
-    except (
-        urllib.error.URLError,
-        TimeoutError,
-        json.JSONDecodeError,
-    ) as error:
-        raise DiscogsProviderError(
-            "Discogs konnte nicht erreicht oder die Antwort "
-            "nicht verarbeitet werden."
-        ) from error
+            if delay > 0:
+                time.sleep(delay)
+            try:
+                with urllib.request.urlopen(
+                    request,
+                    timeout=20,
+                ) as response:
+                    return json.loads(
+                        response.read().decode(
+                            "utf-8"
+                        )
+                    )
+            except urllib.error.HTTPError as error:
+                if error.code == 429 and attempt == 0:
+                    retry_after = float(
+                        (error.headers or {}).get("Retry-After", "2")
+                    )
+                    time.sleep(max(1.0, min(retry_after, 30.0)))
+                    continue
+                if error.code in {
+                    401,
+                    403,
+                }:
+                    raise DiscogsProviderError(
+                        "Discogs hat den Zugriff abgelehnt. "
+                        "Bitte den persönlichen Discogs-Token in "
+                        "den Einstellungen prüfen."
+                    ) from error
+                if error.code == 429:
+                    raise DiscogsProviderError(
+                        "Das Discogs-Anfragelimit ist erreicht. "
+                        "Bitte die Suche in Kürze erneut versuchen."
+                    ) from error
+                raise DiscogsProviderError(
+                    f"Discogs-Fehler HTTP {error.code}."
+                ) from error
+            except (
+                urllib.error.URLError,
+                TimeoutError,
+                json.JSONDecodeError,
+            ) as error:
+                raise DiscogsProviderError(
+                    "Discogs konnte nicht erreicht oder die Antwort "
+                    "nicht verarbeitet werden."
+                ) from error
+            finally:
+                _last_request_at = time.monotonic()
 
 
 def _require_token(

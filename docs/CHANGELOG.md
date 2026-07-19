@@ -9,6 +9,7 @@
 - Labels, Formate, Badges und fehlende Cover werden aus Discogs ergänzt.
 - Nur bei MusicBrainz fehlende Veröffentlichungen erscheinen als zusätzliche Discogs-Einträge.
 - Discogs-Editionen und Tracklisten können direkt in der Medienbibliothek geöffnet werden.
+- Discogs-Anfragen werden gedrosselt, das Token wird im Authorization-Header übertragen und HTTP 429 einmal kontrolliert wiederholt.
 
 - Neuer Bereich „Verknüpfungen“ in der Medienbibliothek.
 - MusicBrainz-Beziehungen zu Künstlern, Gruppen, Mitgliedern, Labels, Aliasen und Mitwirkenden werden geladen.
