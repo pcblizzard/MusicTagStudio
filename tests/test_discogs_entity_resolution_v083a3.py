@@ -19,7 +19,9 @@ def test_exact_label_is_used_instead_of_similar_artist(monkeypatch):
     monkeypatch.setattr(
         widget,
         "fetch_label_releases",
-        lambda entity_id, token, maximum: selected.append(entity_id) or [],
+        lambda entity_id, token, maximum, label_name: selected.append(
+            (entity_id, label_name)
+        ) or [],
     )
     monkeypatch.setattr(
         widget,
@@ -28,7 +30,7 @@ def test_exact_label_is_used_instead_of_similar_artist(monkeypatch):
     )
 
     assert widget._fetch_discogs_catalog("Aggro Berlin", "token") == []
-    assert selected == [25833]
+    assert selected == [(25833, "Aggro Berlin")]
 
 
 def test_partial_artist_match_is_not_used_as_fallback(monkeypatch):

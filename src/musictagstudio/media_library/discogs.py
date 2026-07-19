@@ -384,6 +384,7 @@ def fetch_label_releases(
     token: str,
     *,
     maximum: int = 250,
+    label_name: str = "",
 ) -> list[DiscogsRelease]:
     _require_token(token)
     summaries: list[dict] = []
@@ -427,48 +428,58 @@ def fetch_label_releases(
 
         page += 1
 
-    releases: list[DiscogsRelease] = []
-
-    for item in summaries[:maximum]:
-        release_id = _safe_int(
-            item.get(
-                "id"
-            )
-        )
-
-        if not release_id:
-            continue
-
-        try:
-            detail = _get_json(
-                f"/releases/{release_id}",
-                token,
-            )
-        except DiscogsProviderError:
-            detail = {}
-
-        summary = {
-            "id": release_id,
-            "type": "release",
-            "title": item.get(
-                "title",
-                "",
-            ),
-            "year": item.get(
-                "year",
-                "",
-            ),
-            "role": "Main",
-        }
-        releases.append(
-            _release_from_payload(
-                summary,
-                detail,
-            )
-        )
+    releases = [
+        _release_from_label_summary(item, label_name)
+        for item in summaries[:maximum]
+        if _safe_int(item.get("id"))
+    ]
 
     return _deduplicate_releases(
         releases
+    )
+
+
+def _release_from_label_summary(
+    item: dict,
+    label_name: str = "",
+) -> DiscogsRelease:
+    release_id = _safe_int(item.get("id"))
+    title = str(item.get("title", "")).strip()
+    formats = tuple(
+        part.strip()
+        for part in str(item.get("format", "")).split(",")
+        if part.strip()
+    )
+    artist = _clean_artist_name(str(item.get("artist", "")).strip())
+    category = classify_release(
+        title=title,
+        primary_type="release",
+        formats=formats,
+        descriptions=formats,
+        artist_count=1 if artist else 0,
+        label_count=1 if label_name else 0,
+        role="Main",
+    )
+    return DiscogsRelease(
+        source_id=f"discogs:{release_id}",
+        title=title,
+        year=str(item.get("year", "") or ""),
+        role="Main",
+        release_type="release",
+        release_id=release_id,
+        external_url=f"https://www.discogs.com/release/{release_id}",
+        resource_url=str(item.get("resource_url", "")),
+        cover_url=str(item.get("thumb", "")),
+        labels=(label_name,) if label_name else (),
+        formats=formats,
+        format_descriptions=formats,
+        artists=(artist,) if artist else (),
+        category=category,
+        badges=release_badges(
+            formats=formats,
+            descriptions=formats,
+            category=category,
+        ),
     )
 
 

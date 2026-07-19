@@ -2114,6 +2114,7 @@ def _fetch_discogs_catalog(
             hit.entity_id,
             token,
             maximum=100,
+            label_name=hit.title,
         )
     return fetch_discogs_artist_releases(hit.entity_id, token, maximum=100)
 

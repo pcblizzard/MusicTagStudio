@@ -13,6 +13,7 @@
 - Alle MusicBrainz-Zugriffe teilen sich gemäß API-Vorgabe ein anwendungsweites Limit von höchstens einem Aufruf pro Sekunde.
 - MusicBrainz-User-Agents verwenden in Explorer, Tagger, Direktabgleich und Coversuche einheitlich die aktuelle Programmversion.
 - Discogs-Ergänzungen erfordern nun eine exakte Künstler- oder Labelübereinstimmung; ähnlich benannte Mitwirkende werden nicht mehr fälschlich als Hauptkünstler gewählt.
+- Labeldiskografien werden ohne bis zu 100 serielle Detailanfragen geladen; vollständige Release- und Trackdaten folgen erst bei Auswahl eines Eintrags.
 
 - Neuer Bereich „Verknüpfungen“ in der Medienbibliothek.
 - MusicBrainz-Beziehungen zu Künstlern, Gruppen, Mitgliedern, Labels, Aliasen und Mitwirkenden werden geladen.
