@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 import html
-import re
-import urllib.error
-import urllib.request
 import webbrowser
 
 from PySide6.QtCore import (
@@ -82,7 +78,28 @@ from ..providers.apple_music import (
     AppleMusicProviderError,
     search_album as search_apple_album,
 )
-from ..providers.deezer import suggest_artists as suggest_deezer_artists
+from ..media_library import tasks as _catalog_tasks
+from ..media_library.tasks import (
+    _fetch_discogs_hit_catalog,
+    _fetch_live_artist_suggestions,
+    _fetch_release_cover,
+    _fetch_url_cover,
+)
+from ..media_library.presentation import (
+    artist_text as _artist_text,
+    category as _category,
+    category_order as _category_order,
+    discogs_position as _discogs_position,
+    duration as _duration,
+    duration_ms as _duration_ms,
+    label_artist_statistics as _label_artist_statistics,
+    local_status_display as _local_status_display,
+    medium_count as _medium_count,
+    merge_release_groups as _merge_release_groups,
+    normalized as _normalized,
+    track_title as _track_title,
+    type_text as _type_text,
+)
 
 
 class WorkerSignals(QObject):
@@ -2506,56 +2523,12 @@ class MediaLibraryWidget(QWidget):
             text
         )
 
-def _search_exact_discogs_catalog(
-    query: str,
-    token: str,
-) -> list[DiscogsCatalogHit]:
-    wanted = _normalized(query)
-    hits = search_catalog(
-        query,
-        token,
-        kinds=("artist", "label", "master", "release"),
-        limit_per_kind=15,
-    )
-    direct = [
-        hit
-        for hit in hits
-        if wanted in {
-            _normalized(hit.title),
-            _normalized(_discogs_release_title(hit.title)),
-        }
-    ]
-    if direct:
-        return direct
-    return [
-        hit
-        for hit in hits
-        if _normalized(_discogs_entity_name(hit.title)) == wanted
-    ]
 
-
-def _fetch_discogs_hit_catalog(
-    hit: DiscogsCatalogHit,
-    query: str,
-    token: str,
-) -> DiscogsCatalogSnapshot:
-    cached = load_catalog_snapshot(query)
-    if cached is not None:
-        return cached
-    if hit.kind == "label":
-        releases = fetch_label_releases(
-            hit.entity_id,
-            token,
-            maximum=100,
-            label_name=hit.title,
-        )
-    else:
-        releases = fetch_discogs_artist_releases(
-            hit.entity_id,
-            token,
-            maximum=100,
-        )
-    return save_catalog_snapshot(query, releases)
+# Compatibility adapters for callers and tests that historically patched the
+# widget module's provider functions. New code belongs in media_library.tasks.
+def _search_exact_discogs_catalog(query: str, token: str):
+    _catalog_tasks.search_catalog = search_catalog
+    return _catalog_tasks._search_exact_discogs_catalog(query, token)
 
 
 def _fetch_discogs_catalog(
@@ -2563,238 +2536,17 @@ def _fetch_discogs_catalog(
     token: str,
     *,
     force_refresh: bool = False,
-) -> DiscogsCatalogSnapshot:
-    if not force_refresh:
-        cached = load_catalog_snapshot(entity_name)
-        if cached is not None:
-            return cached
-    hits = search_catalog(
+):
+    _catalog_tasks.load_catalog_snapshot = load_catalog_snapshot
+    _catalog_tasks.save_catalog_snapshot = save_catalog_snapshot
+    _catalog_tasks.search_catalog = search_catalog
+    _catalog_tasks.fetch_label_releases = fetch_label_releases
+    _catalog_tasks.fetch_discogs_artist_releases = fetch_discogs_artist_releases
+    return _catalog_tasks._fetch_discogs_catalog(
         entity_name,
         token,
-        kinds=("artist", "label"),
-        limit_per_kind=10,
+        force_refresh=force_refresh,
     )
-    wanted = _normalized(entity_name)
-    exact_hits = [
-        hit
-        for hit in hits
-        if _normalized(_discogs_entity_name(hit.title)) == wanted
-    ]
-    if not exact_hits:
-        return save_catalog_snapshot(entity_name, [])
-    # A label is the more specific interpretation when Discogs contains both
-    # an artist and a label with exactly the requested name.
-    hit = min(exact_hits, key=lambda item: 0 if item.kind == "label" else 1)
-    if hit.kind == "label":
-        releases = fetch_label_releases(
-            hit.entity_id,
-            token,
-            maximum=100,
-            label_name=hit.title,
-        )
-    else:
-        releases = fetch_discogs_artist_releases(
-            hit.entity_id, token, maximum=100
-        )
-    return save_catalog_snapshot(entity_name, releases)
-
-
-def _discogs_entity_name(value: str) -> str:
-    return re.sub(r"\s+\(\d+\)$", "", str(value or "")).strip()
-
-
-def _discogs_release_title(value: str) -> str:
-    text = str(value or "").strip()
-    return text.split(" - ", 1)[-1].strip()
-
-
-def _merge_release_groups(
-    musicbrainz_groups: list[ReleaseGroup],
-    discogs_groups: list[ReleaseGroup],
-) -> list[ReleaseGroup]:
-    merged = list(musicbrainz_groups)
-    positions = {
-        (_normalized(group.title), group.first_release_date[:4]): index
-        for index, group in enumerate(merged)
-    }
-    for discogs_group in discogs_groups:
-        key = (
-            _normalized(discogs_group.title),
-            discogs_group.first_release_date[:4],
-        )
-        index = positions.get(key)
-        if index is None:
-            positions[key] = len(merged)
-            merged.append(discogs_group)
-            continue
-        current = merged[index]
-        merged[index] = replace(
-            current,
-            labels=current.labels or discogs_group.labels,
-            formats=current.formats or discogs_group.formats,
-            badges=tuple(dict.fromkeys((*current.badges, *discogs_group.badges))),
-            external_url=current.external_url or discogs_group.external_url,
-            cover_url=current.cover_url or discogs_group.cover_url,
-            discogs_release_id=(
-                current.discogs_release_id
-                or discogs_group.discogs_release_id
-            ),
-        )
-    return sorted(
-        merged,
-        key=lambda group: (
-            group.first_release_date or "9999",
-            group.title.casefold(),
-        ),
-    )
-
-
-def _label_artist_statistics(
-    releases: list[DiscogsRelease],
-) -> list[tuple[str, int, str, str]]:
-    values: dict[str, dict[str, object]] = {}
-    for release in releases:
-        year = str(release.year or "")[:4]
-        for name in release.artists:
-            name = str(name or "").strip()
-            if not name or _normalized(name) in {"various", "unknownartist"}:
-                continue
-            key = _normalized(name)
-            entry = values.setdefault(
-                key,
-                {"name": name, "count": 0, "years": set()},
-            )
-            entry["count"] = int(entry["count"]) + 1
-            if year.isdigit():
-                entry["years"].add(year)
-    result = []
-    for entry in values.values():
-        years = sorted(entry["years"])
-        result.append(
-            (
-                str(entry["name"]),
-                int(entry["count"]),
-                years[0] if years else "",
-                years[-1] if years else "",
-            )
-        )
-    return sorted(
-        result,
-        key=lambda item: (-item[1], item[0].casefold()),
-    )
-
-
-def _fetch_live_artist_suggestions(controller, query: str) -> list[str]:
-    try:
-        musicbrainz = controller.suggest_artists(
-            query,
-            limit=8,
-            preferred_country=load_settings().apple_country,
-        ).artists
-    except Exception:
-        musicbrainz = ()
-    deezer = suggest_deezer_artists(query, limit=25)
-    combined = [item.name for item in deezer]
-    combined.extend(artist.name for artist in musicbrainz)
-    return list(dict.fromkeys(combined))[:8]
-
-
-def _fetch_url_cover(
-    url: str,
-    cache_path: Path,
-) -> bytes | None:
-    if cache_path.is_file():
-        try:
-            return cache_path.read_bytes()
-        except OSError:
-            pass
-
-    request = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": (
-                "MusicTagStudio/0.7.3.0 "
-                "(https://github.com/pcblizzard/MusicTagStudio)"
-            )
-        },
-    )
-
-    try:
-        with urllib.request.urlopen(
-            request,
-            timeout=12,
-        ) as response:
-            data = response.read()
-    except (
-        urllib.error.HTTPError,
-        urllib.error.URLError,
-        TimeoutError,
-    ):
-        return None
-
-    if data:
-        try:
-            cache_path.write_bytes(
-                data
-            )
-        except OSError:
-            pass
-
-    return data or None
-
-
-def _fetch_release_cover(
-    release_id: str,
-    cache_directory: Path,
-) -> bytes | None:
-    cache_path = (
-        cache_directory
-        / f"{release_id}.jpg"
-    )
-
-    if cache_path.is_file():
-        try:
-            return cache_path.read_bytes()
-        except OSError:
-            pass
-
-    request = urllib.request.Request(
-        (
-            "https://coverartarchive.org/"
-            f"release/{release_id}/front-250"
-        ),
-        headers={
-            "User-Agent": (
-                "MusicTagStudio/0.7.2.1 "
-                "(https://github.com/pcblizzard/MusicTagStudio)"
-            )
-        },
-    )
-
-    try:
-        with urllib.request.urlopen(
-            request,
-            timeout=12,
-        ) as response:
-            data = response.read()
-    except (
-        urllib.error.HTTPError,
-        urllib.error.URLError,
-        TimeoutError,
-    ):
-        return None
-
-    if not data:
-        return None
-
-    try:
-        cache_path.write_bytes(
-            data
-        )
-    except OSError:
-        pass
-
-    return data
 
 
 def _fetch_release_cover_with_discogs(
@@ -2804,290 +2556,15 @@ def _fetch_release_cover_with_discogs(
     title: str,
     year: str,
     token: str,
-) -> bytes | None:
-    data = _fetch_release_cover(release_id, cache_directory)
-    if data or not token.strip() or not artist.strip() or not title.strip():
-        return data
-    try:
-        hits = search_catalog(
-            f"{artist} {title}",
-            token,
-            kinds=("master", "release"),
-            limit_per_kind=12,
-        )
-    except Exception:
-        return None
-    wanted_title = _normalized(title)
-    wanted_artist = _normalized(artist)
-    wanted_year = str(year or "")[:4]
-    for hit in hits:
-        hit_title = _discogs_release_title(hit.title)
-        credit = hit.title.split(" - ", 1)[0]
-        if _normalized(hit_title) != wanted_title:
-            continue
-        if wanted_artist not in _normalized(credit):
-            continue
-        if wanted_year and hit.year and hit.year[:4] != wanted_year:
-            continue
-        if not hit.thumb:
-            continue
-        return _fetch_url_cover(
-            hit.thumb,
-            cache_directory / f"discogs-fallback-{hit.kind}-{hit.entity_id}.jpg",
-        )
-    return None
-
-
-def _normalized(
-    value: str,
-) -> str:
-    return re.sub(
-        r"[^a-z0-9]+",
-        "",
-        str(
-            value or ""
-        ).casefold(),
-    )
-
-
-def _local_status_display(status: str) -> str:
-    return {
-        "Lokal verfügbar": "🟢 Lokal verfügbar",
-        "Externe Quelle nicht erreichbar": "🟡 Externe Quelle nicht erreichbar",
-        "Nicht vorhanden": "⚪ Nicht vorhanden",
-        "Nein": "⚪ Nicht vorhanden",
-    }.get(str(status or ""), "⚪ Nicht vorhanden")
-
-
-def _category(
-    group: ReleaseGroup,
-) -> str:
-    if group.category:
-        return group.category
-
-    secondary = {
-        value.casefold()
-        for value in group.secondary_types
-    }
-
-    if "live" in secondary:
-        return "Live"
-
-    if "soundtrack" in secondary:
-        return "Soundtracks"
-
-    if "compilation" in secondary:
-        return "Compilations"
-
-    mapping = {
-        "Album": "Alben",
-        "EP": "EPs",
-        "Single": "Singles",
-        "Broadcast": "Sonstiges",
-    }
-
-    return mapping.get(
-        group.primary_type,
-        "Sonstiges",
-    )
-
-
-
-def _artist_text(
-    artist: ArtistCandidate,
-) -> str:
-    details: list[str] = []
-
-    if artist.country:
-        details.append(
-            artist.country
-        )
-
-    if artist.artist_type:
-        details.append(
-            artist.artist_type
-        )
-
-    if artist.disambiguation:
-        details.append(
-            artist.disambiguation
-        )
-
-    if not details:
-        return artist.name
-
-    return (
-        f"{artist.name} "
-        f"({' · '.join(details)})"
-    )
-
-def _category_order(
-    category: str,
-) -> int:
-    order = {
-        "Alben": 0,
-        "Live": 1,
-        "EPs": 2,
-        "Singles": 3,
-        "Mixtapes": 4,
-        "Sampler": 5,
-        "Compilations": 6,
-        "Soundtracks": 7,
-        "Boxsets": 8,
-        "Bootlegs": 9,
-        "Sonstiges": 10,
-    }
-
-    return order.get(
-        category,
-        99,
-    )
-
-
-def _medium_count(
-    formats: tuple[str, ...],
-) -> int:
-    total = 0
-
-    for value in formats:
-        match = re.match(
-            r"(\d+)×",
-            value,
-        )
-        total += (
-            int(
-                match.group(1)
-            )
-            if match
-            else 1
-        )
-
-    return max(
-        1,
-        total,
-    )
-
-
-def _discogs_position(
-    value: str,
-    fallback: int,
-) -> tuple[int, int]:
-    value = str(
-        value or ""
-    ).strip()
-    match = re.match(
-        r"(\d+)[-.](\d+)",
-        value,
-    )
-
-    if match:
-        return (
-            int(
-                match.group(1)
-            ),
-            int(
-                match.group(2)
-            ),
-        )
-
-    numbers = re.findall(
-        r"\d+",
-        value,
-    )
-
-    if numbers:
-        return (
-            1,
-            int(
-                numbers[-1]
-            ),
-        )
-
-    return (
-        1,
-        fallback,
-    )
-
-
-def _duration_ms(
-    value: str,
-) -> int | None:
-    parts = str(
-        value or ""
-    ).split(
-        ":"
-    )
-
-    try:
-        if len(parts) == 2:
-            return (
-                int(
-                    parts[0]
-                )
-                * 60
-                + int(
-                    parts[1]
-                )
-            ) * 1000
-
-        if len(parts) == 3:
-            return (
-                int(
-                    parts[0]
-                )
-                * 3600
-                + int(
-                    parts[1]
-                )
-                * 60
-                + int(
-                    parts[2]
-                )
-            ) * 1000
-    except ValueError:
-        return None
-
-    return None
-
-
-def _type_text(
-    group: ReleaseGroup,
-) -> str:
-    values = [
-        group.primary_type,
-        *group.secondary_types,
-    ]
-
-    return ", ".join(
-        value
-        for value in values
-        if value
-    ) or "Unbekannt"
-
-
-def _track_title(
-    track: Track,
-) -> str:
-    if track.artist:
-        return (
-            f"{track.title} — "
-            f"{track.artist}"
-        )
-
-    return track.title
-
-
-def _duration(
-    length_ms: int | None,
-) -> str:
-    if not length_ms:
-        return ""
-
-    seconds = round(
-        length_ms / 1000
-    )
-
-    return (
-        f"{seconds // 60}:"
-        f"{seconds % 60:02d}"
+):
+    _catalog_tasks._fetch_release_cover = _fetch_release_cover
+    _catalog_tasks.search_catalog = search_catalog
+    _catalog_tasks._fetch_url_cover = _fetch_url_cover
+    return _catalog_tasks._fetch_release_cover_with_discogs(
+        release_id,
+        cache_directory,
+        artist,
+        title,
+        year,
+        token,
     )

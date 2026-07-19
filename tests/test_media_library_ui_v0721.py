@@ -13,6 +13,16 @@ def media_source() -> str:
     )
 
 
+def media_tasks_source() -> str:
+    return (
+        Path(__file__).parents[1]
+        / "src"
+        / "musictagstudio"
+        / "media_library"
+        / "tasks.py"
+    ).read_text(encoding="utf-8")
+
+
 def test_category_arrow_is_in_release_column():
     text = media_source()
 
@@ -29,7 +39,7 @@ def test_edition_cover_and_cache_are_present():
     assert "cache/media_library/covers" not in text
     assert '"media_library"' in text
     assert '"covers"' in text
-    assert "front-250" in text
+    assert "front-250" in media_tasks_source()
 
 
 def test_public_artist_search_exists():
