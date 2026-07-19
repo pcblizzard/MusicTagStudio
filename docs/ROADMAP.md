@@ -2,6 +2,17 @@
 
 Ohne feste Termine.
 
+## v0.8.4 — Lyrics
+
+Diese Version bleibt vollständig auf Liedtexte begrenzt.
+
+- **alpha1:** gemeinsames Lyrics-Modell, eingebettete Lyrics lesen, LRC lesen und speichern, LRCLIB-Provider
+- **alpha2:** Lyrics-Ansicht im Tagger, Quellenwahl und bewusste Online-Aktualisierung
+- **alpha3:** Vorschau und bestätigtes Schreiben in unterstützte Audio-Tags
+- **beta:** Fehlerzustände, Quellenangaben, große Bibliotheken und UI-Polishing
+
+Der Player folgt erst mit v0.8.5.
+
 ## Nächste sinnvolle Schritte
 
 - Einstellungen für Hell, Dunkel und Automatisch

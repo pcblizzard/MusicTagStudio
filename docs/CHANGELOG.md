@@ -1,3 +1,14 @@
+# MusicTagStudio 0.8.4-alpha1
+
+## Lyrics-Grundlage
+
+- Einheitliches Modell für synchronisierte und unsynchronisierte Lyrics.
+- Eingebettete Lyrics werden aus ID3-, Vorbis-/FLAC-, MP4- und APE-Tags gelesen.
+- LRC-Dateien werden einschließlich Metadaten, mehreren Zeitmarken und Offset gelesen.
+- Lyrics können atomar als UTF-8-LRC-Datei neben der Audiodatei gespeichert werden.
+- LRCLIB ist als schreibgeschützter Provider ohne API-Schlüssel angebunden.
+- Standardmäßig wird der cache-schonende Endpunkt `/api/get-cached` verwendet; eine spätere UI-Aktion kann bewusst eine Live-Abfrage auslösen.
+
 # MusicTagStudio 0.8.3
 
 Die Beta-Phase ist abgeschlossen; die Medienbibliothek mit MusicBrainz-,
