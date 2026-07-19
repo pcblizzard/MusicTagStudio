@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QApplication
 
 from musictagstudio.lyrics import (
     LyricsDocument,
+    LyricsLine,
     LyricsResolution,
 )
 from musictagstudio.models.song import Song
@@ -45,6 +46,52 @@ def test_dialog_displays_local_lyrics_and_enables_saving(tmp_path, monkeypatch):
     assert dialog.lyrics_text.toPlainText() == "Erste Zeile\n\nZweite Zeile"
     assert dialog.save_button.isEnabled()
     assert dialog.cached_button.isEnabled()
+    dialog.close()
+
+
+def test_synced_lyrics_can_show_timestamps(tmp_path, monkeypatch):
+    app()
+    monkeypatch.setattr(
+        "musictagstudio.ui.lyrics_dialog.read_duration_seconds",
+        lambda _path: 180.0,
+    )
+    song = Song(
+        title="Titel",
+        artist="Künstler",
+        album="Album",
+        path=str(tmp_path / "Titel.flac"),
+    )
+    document = LyricsDocument(
+        plain_text="Hallo",
+        synced_lines=(LyricsLine(1250, "Hallo"),),
+        source="LRCLIB",
+        fetched_at="2026-07-20T10:30:00+00:00",
+    )
+
+    class SyncedResolver:
+        def local(self, request):
+            return LyricsResolution(document, (document,))
+
+    dialog = LyricsDialog(song, resolver=SyncedResolver())
+    dialog.timestamps_checkbox.setChecked(True)
+
+    assert dialog.lyrics_text.toPlainText() == "[00:01.25] Hallo"
+    assert "LRCLIB · lokal zwischengespeichert" in dialog.source_combo.currentText()
+    assert "20.07.2026" in dialog.source_details.text()
+    dialog.close()
+
+
+def test_not_found_and_offline_states_are_distinct(tmp_path):
+    app()
+    dialog = LyricsDialog(
+        Song(path=str(tmp_path / "missing.flac")),
+        resolver=Resolver(),
+    )
+
+    dialog._online_failed("Keine Lyrics bei LRCLIB gefunden.")
+    assert dialog.status_label.property("statusKind") == "not_found"
+    dialog._online_failed("LRCLIB ist nicht erreichbar: offline")
+    assert dialog.status_label.property("statusKind") == "offline"
     dialog.close()
 
 

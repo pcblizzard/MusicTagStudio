@@ -14,3 +14,6 @@ def test_lyrics_dialog_requires_preview_before_embedding():
     assert "LyricsEmbedPreviewDialog" in source
     assert "Bestehende eingebettete Lyrics werden ersetzt" in source
     assert "confirmed=True" in source
+    assert '"Ctrl+L"' in source
+    assert '"Ctrl+S"' in source
+    assert '"Ctrl+E"' in source

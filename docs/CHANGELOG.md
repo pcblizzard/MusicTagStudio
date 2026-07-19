@@ -1,3 +1,15 @@
+# MusicTagStudio 0.8.4-beta
+
+## Lyrics-Polishing und Stabilisierung
+
+- Quellen werden als lokale LRC-Datei, eingebettete Lyrics oder lokal zwischengespeicherte LRCLIB-Daten verständlich bezeichnet.
+- LRCLIB-Abrufzeiten erscheinen im lokalen Datums- und Zeitformat.
+- Synchronisierte Lyrics können wahlweise als Lesetext oder mit LRC-Zeitmarken angezeigt werden.
+- Eigene Statusdarstellungen unterscheiden Erfolg, laufende Abfrage, Offlinezustand, fehlende Treffer und unvollständige Metadaten.
+- Nicht erreichbare Audiodateien verhindern das Einbetten, ohne lokale Lyrics aus dem Dialog zu entfernen.
+- Tastenkürzel: Strg+L für LRCLIB live, Strg+S für LRC-Speicherung und Strg+E für die Einbettungsvorschau.
+- Quellenwahl und Liedtext besitzen zugängliche Bezeichnungen für assistive Bedienung.
+
 # MusicTagStudio 0.8.4-alpha3
 
 ## Bestätigtes Einbetten

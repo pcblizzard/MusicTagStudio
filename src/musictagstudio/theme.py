@@ -256,6 +256,26 @@ def _light_stylesheet() -> str:
         font-family: "Segoe UI";
         font-size: 11pt;
     }
+    QLabel#lyricsStatus {
+        padding: 7px 9px;
+        border-radius: 6px;
+        background: #eef2f7;
+        color: #475569;
+    }
+    QLabel#lyricsStatus[statusKind="success"] {
+        background: #e7f7ed;
+        color: #176b3a;
+    }
+    QLabel#lyricsStatus[statusKind="offline"],
+    QLabel#lyricsStatus[statusKind="error"] {
+        background: #fff0f0;
+        color: #a12626;
+    }
+    QLabel#lyricsStatus[statusKind="not_found"],
+    QLabel#lyricsStatus[statusKind="incomplete"] {
+        background: #fff7df;
+        color: #805b00;
+    }
     QComboBox::drop-down {
         border: none;
         width: 24px;
@@ -415,6 +435,26 @@ def _dark_stylesheet() -> str:
         padding: 14px;
         font-family: "Segoe UI";
         font-size: 11pt;
+    }
+    QLabel#lyricsStatus {
+        padding: 7px 9px;
+        border-radius: 6px;
+        background: #20272d;
+        color: #b8c4cd;
+    }
+    QLabel#lyricsStatus[statusKind="success"] {
+        background: #173a29;
+        color: #8ee0ad;
+    }
+    QLabel#lyricsStatus[statusKind="offline"],
+    QLabel#lyricsStatus[statusKind="error"] {
+        background: #402326;
+        color: #ffaaaa;
+    }
+    QLabel#lyricsStatus[statusKind="not_found"],
+    QLabel#lyricsStatus[statusKind="incomplete"] {
+        background: #3b321b;
+        color: #f1cd72;
     }
     QComboBox::drop-down {
         border: none;

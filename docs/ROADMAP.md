@@ -10,7 +10,7 @@ Diese Version bleibt vollständig auf Liedtexte begrenzt.
 - **alpha1.1:** verlustarmer LRC-Workflow, Quellenpriorität, lokaler Cache, Dauerermittlung und Live-Version-Warnung
 - **alpha2 ✅:** Lyrics-Ansicht im Tagger, Quellenwahl und bewusste Online-Aktualisierung
 - **alpha3 ✅:** Vorschau und bestätigtes Schreiben in unterstützte Audio-Tags
-- **beta:** Fehlerzustände, Quellenangaben, große Bibliotheken und UI-Polishing
+- **beta ✅:** Fehlerzustände, Quellenangaben, Tastaturbedienung und UI-Polishing
 
 Der Player folgt erst mit v0.8.5.
 
