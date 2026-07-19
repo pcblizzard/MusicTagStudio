@@ -14,5 +14,5 @@ def test_search_has_visible_suggestion_and_error_states():
 
     assert "self.suggestion_label" in text
     assert "Kein exakter Treffer." in text
-    assert "Keine Künstler gefunden" in text
+    assert "Keine Treffer gefunden" in text
     assert "Suche fehlgeschlagen" in text

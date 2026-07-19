@@ -9,6 +9,9 @@
 - Status wird ebenfalls in Coverraster, Coverliste und Detailkopf angezeigt.
 - Anklickbare Breadcrumb-Navigation für Künstler, Beziehungen und Veröffentlichungen.
 - Ein Pfad kann beispielsweise „Aggro Berlin › Sido › Maske“ abbilden.
+- Wenn MusicBrainz keinen Künstler findet, sucht die Medienbibliothek nach exakten Discogs-Künstlern, Labels und Veröffentlichungen.
+- Eigenständige Discogs-Labels wie „ersguterjunge“ können direkt geöffnet werden.
+- Alte Verknüpfungen, Editionsdetails und lokale Albumaktionen werden bei einer neuen Suche zuverlässig geleert.
 
 ## Discogs-Erweiterung
 

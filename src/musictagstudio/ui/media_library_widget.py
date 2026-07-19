@@ -51,6 +51,7 @@ from ..media_library import (
     ArtistCandidate,
     ArtistSearchResult,
     DiscogsRelease,
+    DiscogsCatalogHit,
     DiscogsCatalogSnapshot,
     Edition,
     ReleaseGroup,
@@ -63,6 +64,7 @@ from ..media_library import (
     ReleaseGroupResponse,
     default_controller,
     fetch_discogs_artist_releases,
+    fetch_catalog_release,
     fetch_label_releases,
     fetch_discogs_release_tracks,
     load_catalog_snapshot,
@@ -701,15 +703,20 @@ class MediaLibraryWidget(QWidget):
         self.suggestion_label.clear()
         self.suggestion_label.hide()
         self.group_tree.clear()
+        self.relations_tree.clear()
         self.release_table.setRowCount(
             0
         )
         self.cover_model.clear()
         self.cover_list.clear()
         self.edition_combo.clear()
+        self.edition_details.clear()
         self.track_table.setRowCount(
             0
         )
+        self.open_local_button.setProperty("local_path", "")
+        self.open_local_button.setEnabled(False)
+        self._show_cover(None)
         self.group_title.setText(
             tr("search_running", self.language)
         )
@@ -789,21 +796,23 @@ class MediaLibraryWidget(QWidget):
         )
 
         if not self.artists:
-            self.group_title.setText(
-                "Keine Künstler gefunden"
-            )
-            self.group_meta.setText(
-                (
-                    "MusicBrainz lieferte für diese "
-                    "Schreibweise keine Treffer. "
-                    "Öffne bei Bedarf „Debug“, um "
-                    "Anfrage und Antwort zu prüfen."
-                )
-            )
-            self._set_status(
-                "Keine Künstler gefunden."
-            )
             self.suggestion_label.hide()
+            settings = load_settings()
+            if settings.discogs_token.strip():
+                self.group_title.setText("Discogs wird durchsucht …")
+                self.group_meta.setText(
+                    "MusicBrainz lieferte keinen Künstler. Suche nach "
+                    "exakten Künstlern, Labels und Veröffentlichungen bei Discogs."
+                )
+                self._set_status("Exakte Discogs-Katalogsuche läuft …")
+                self._run(
+                    _search_exact_discogs_catalog,
+                    self.search_edit.text().strip(),
+                    settings.discogs_token,
+                    finished=self._exact_catalog_loaded,
+                )
+            else:
+                self._show_no_catalog_results()
             return
 
         self._set_status(
@@ -845,6 +854,21 @@ class MediaLibraryWidget(QWidget):
         self.artist_list.setCurrentRow(
             0
         )
+
+    def _show_no_catalog_results(self) -> None:
+        self.group_title.setText("Keine Treffer gefunden")
+        self.group_meta.setText(
+            "Weder MusicBrainz noch der aktivierte Katalog lieferten "
+            "einen exakten Treffer."
+        )
+        self._set_status("Keine Künstler, Labels oder Veröffentlichungen gefunden.")
+
+    def _exact_catalog_loaded(self, hits) -> None:
+        if hits:
+            self._catalog_loaded(hits)
+        else:
+            self.search_button.setEnabled(True)
+            self._show_no_catalog_results()
 
     def _use_artist_suggestion(
         self,
@@ -968,6 +992,10 @@ class MediaLibraryWidget(QWidget):
             row
         ]
 
+        if result_type.startswith("discogs_"):
+            self._discogs_result_selected(result_type, artist)
+            return
+
         if result_type != "musicbrainz_artist":
             return
 
@@ -1033,6 +1061,50 @@ class MediaLibraryWidget(QWidget):
                 artist.name,
                 settings.discogs_token,
                 finished=self._discogs_catalog_releases_loaded,
+            )
+
+    def _discogs_result_selected(
+        self,
+        result_type: str,
+        hit: DiscogsCatalogHit,
+    ) -> None:
+        settings = load_settings()
+        if not settings.discogs_token.strip():
+            return
+        self.release_groups = []
+        self.musicbrainz_release_groups = []
+        self.discogs_release_groups = []
+        self.current_artist_name = hit.title
+        self.group_tree.clear()
+        self.release_table.setRowCount(0)
+        self.cover_model.clear()
+        self.cover_list.clear()
+        self.relations_tree.clear()
+        self.edition_combo.clear()
+        self.track_table.setRowCount(0)
+        self._show_cover(None)
+        self.group_title.setText(hit.title)
+        self.group_meta.setText(
+            "Discogs-Label" if hit.kind == "label" else "Discogs-Katalogtreffer"
+        )
+        self._push_breadcrumb(hit.kind, hit.title, str(hit.entity_id))
+        self.discogs_refresh_button.setEnabled(hit.kind in {"artist", "label"})
+        self._set_status(f"{hit.title} wird aus Discogs geladen …")
+        if hit.kind in {"artist", "label"}:
+            self._run(
+                _fetch_discogs_hit_catalog,
+                hit,
+                self.search_edit.text().strip(),
+                settings.discogs_token,
+                finished=self._discogs_catalog_releases_loaded,
+            )
+        else:
+            self._run(
+                fetch_catalog_release,
+                hit.kind,
+                hit.entity_id,
+                settings.discogs_token,
+                finished=self._single_discogs_release_loaded,
             )
 
     def _relations_loaded(self, result) -> None:
@@ -2246,6 +2318,58 @@ class MediaLibraryWidget(QWidget):
             text
         )
 
+def _search_exact_discogs_catalog(
+    query: str,
+    token: str,
+) -> list[DiscogsCatalogHit]:
+    wanted = _normalized(query)
+    hits = search_catalog(
+        query,
+        token,
+        kinds=("artist", "label", "master", "release"),
+        limit_per_kind=15,
+    )
+    direct = [
+        hit
+        for hit in hits
+        if wanted in {
+            _normalized(hit.title),
+            _normalized(_discogs_release_title(hit.title)),
+        }
+    ]
+    if direct:
+        return direct
+    return [
+        hit
+        for hit in hits
+        if _normalized(_discogs_entity_name(hit.title)) == wanted
+    ]
+
+
+def _fetch_discogs_hit_catalog(
+    hit: DiscogsCatalogHit,
+    query: str,
+    token: str,
+) -> DiscogsCatalogSnapshot:
+    cached = load_catalog_snapshot(query)
+    if cached is not None:
+        return cached
+    if hit.kind == "label":
+        releases = fetch_label_releases(
+            hit.entity_id,
+            token,
+            maximum=100,
+            label_name=hit.title,
+        )
+    else:
+        releases = fetch_discogs_artist_releases(
+            hit.entity_id,
+            token,
+            maximum=100,
+        )
+    return save_catalog_snapshot(query, releases)
+
+
 def _fetch_discogs_catalog(
     entity_name: str,
     token: str,
@@ -2289,6 +2413,11 @@ def _fetch_discogs_catalog(
 
 def _discogs_entity_name(value: str) -> str:
     return re.sub(r"\s+\(\d+\)$", "", str(value or "")).strip()
+
+
+def _discogs_release_title(value: str) -> str:
+    text = str(value or "").strip()
+    return text.split(" - ", 1)[-1].strip()
 
 
 def _merge_release_groups(
