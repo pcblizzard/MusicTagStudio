@@ -12,6 +12,9 @@
 - Wenn MusicBrainz keinen Künstler findet, sucht die Medienbibliothek nach exakten Discogs-Künstlern, Labels und Veröffentlichungen.
 - Eigenständige Discogs-Labels wie „ersguterjunge“ können direkt geöffnet werden.
 - Alte Verknüpfungen, Editionsdetails und lokale Albumaktionen werden bei einer neuen Suche zuverlässig geleert.
+- Discogs-Labels zeigen automatisch die auf ihren Veröffentlichungen vertretenen Hauptkünstler.
+- Pro Künstler werden Veröffentlichungsanzahl und Zeitraum angezeigt; Einträge sind anklickbar.
+- Die Liste ist ausdrücklich als Discogs-Ableitung und nicht als bestätigtes Vertragsverhältnis gekennzeichnet.
 
 ## Discogs-Erweiterung
 

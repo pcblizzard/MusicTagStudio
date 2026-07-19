@@ -155,6 +155,7 @@ class MediaLibraryWidget(QWidget):
         self.discogs_releases: list[DiscogsRelease] = []
         self.discogs_release_groups: list[ReleaseGroup] = []
         self.current_artist_name = ""
+        self.current_catalog_kind = ""
         self.breadcrumbs: list[tuple[str, str, str]] = []
         self._preserve_breadcrumbs = False
         self.editions: list[
@@ -691,6 +692,8 @@ class MediaLibraryWidget(QWidget):
         if not query:
             return
 
+        self.current_catalog_kind = ""
+
         if not self._preserve_breadcrumbs:
             self.breadcrumbs = []
             self._render_breadcrumbs()
@@ -1003,6 +1006,7 @@ class MediaLibraryWidget(QWidget):
         self.musicbrainz_release_groups = []
         self.discogs_release_groups = []
         self.current_artist_name = artist.name
+        self.current_catalog_kind = "artist"
         self._push_breadcrumb(
             "artist",
             artist.name,
@@ -1075,6 +1079,7 @@ class MediaLibraryWidget(QWidget):
         self.musicbrainz_release_groups = []
         self.discogs_release_groups = []
         self.current_artist_name = hit.title
+        self.current_catalog_kind = hit.kind
         self.group_tree.clear()
         self.release_table.setRowCount(0)
         self.cover_model.clear()
@@ -1172,6 +1177,16 @@ class MediaLibraryWidget(QWidget):
         relation = item.data(0, Qt.ItemDataRole.UserRole)
         if relation is None:
             return
+        if (
+            isinstance(relation, tuple)
+            and len(relation) == 2
+            and relation[0] == "label_artist"
+        ):
+            self.search_artist(
+                relation[1],
+                preserve_breadcrumbs=True,
+            )
+            return
         if relation.target_type in {"artist", "alias"}:
             self.search_artist(
                 relation.name,
@@ -1184,6 +1199,57 @@ class MediaLibraryWidget(QWidget):
             webbrowser.open(
                 f"https://musicbrainz.org/label/{relation.target_id}"
             )
+
+    def _render_discogs_label_artists(
+        self,
+        releases: list[DiscogsRelease],
+    ) -> None:
+        self.relations_tree.clear()
+        statistics = _label_artist_statistics(releases)
+        if not statistics:
+            self.relations_tree.addTopLevelItem(
+                QTreeWidgetItem(
+                    ["Keine Künstlerzuordnungen aus Releases ableitbar"]
+                )
+            )
+            return
+        parent = QTreeWidgetItem(
+            [f"Auf Label-Veröffentlichungen vertreten ({len(statistics)})"]
+        )
+        parent.setToolTip(
+            0,
+            "Quelle: Discogs-Labelveröffentlichungen. Keine bestätigten Vertragsverhältnisse.",
+        )
+        font = parent.font(0)
+        font.setBold(True)
+        parent.setFont(0, font)
+        self.relations_tree.addTopLevelItem(parent)
+        for name, count, first_year, last_year in statistics:
+            if not first_year and not last_year:
+                period = "Zeitraum unbekannt"
+            elif first_year == last_year:
+                period = first_year
+            else:
+                period = f"{first_year or '?'}–{last_year or '?'}"
+            count_text = (
+                "1 Veröffentlichung"
+                if count == 1
+                else f"{count} Veröffentlichungen"
+            )
+            child = QTreeWidgetItem(
+                [f"{name} · {count_text} · {period}"]
+            )
+            child.setData(
+                0,
+                Qt.ItemDataRole.UserRole,
+                ("label_artist", name),
+            )
+            child.setToolTip(
+                0,
+                "Aus den Hauptkünstler-Angaben der Discogs-Releases abgeleitet.",
+            )
+            parent.addChild(child)
+        self.relations_tree.expandAll()
 
     def _single_discogs_release_loaded(
         self,
@@ -1218,6 +1284,10 @@ class MediaLibraryWidget(QWidget):
             )
             for release in self.discogs_releases
         ]
+        if self.current_catalog_kind == "label":
+            self._render_discogs_label_artists(
+                self.discogs_releases
+            )
         self.release_groups = _merge_release_groups(
             self.musicbrainz_release_groups,
             self.discogs_release_groups,
@@ -2458,6 +2528,41 @@ def _merge_release_groups(
             group.first_release_date or "9999",
             group.title.casefold(),
         ),
+    )
+
+
+def _label_artist_statistics(
+    releases: list[DiscogsRelease],
+) -> list[tuple[str, int, str, str]]:
+    values: dict[str, dict[str, object]] = {}
+    for release in releases:
+        year = str(release.year or "")[:4]
+        for name in release.artists:
+            name = str(name or "").strip()
+            if not name or _normalized(name) in {"various", "unknownartist"}:
+                continue
+            key = _normalized(name)
+            entry = values.setdefault(
+                key,
+                {"name": name, "count": 0, "years": set()},
+            )
+            entry["count"] = int(entry["count"]) + 1
+            if year.isdigit():
+                entry["years"].add(year)
+    result = []
+    for entry in values.values():
+        years = sorted(entry["years"])
+        result.append(
+            (
+                str(entry["name"]),
+                int(entry["count"]),
+                years[0] if years else "",
+                years[-1] if years else "",
+            )
+        )
+    return sorted(
+        result,
+        key=lambda item: (-item[1], item[0].casefold()),
     )
 
 
