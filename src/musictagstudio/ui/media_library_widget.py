@@ -155,6 +155,8 @@ class MediaLibraryWidget(QWidget):
         self.thread_pool.setMaxThreadCount(
             3
         )
+        self.thumbnail_pool = QThreadPool(self)
+        self.thumbnail_pool.setMaxThreadCount(4)
         self._workers: set[
             Worker
         ] = set()
@@ -1551,14 +1553,14 @@ class MediaLibraryWidget(QWidget):
                 ); return
         if group.cover_url:
             cache=self.cover_cache_directory / f"view-{group.source}-{group.release_group_id}.jpg"
-            self._run(
+            self._run_thumbnail(
                 _fetch_url_cover,
                 group.cover_url,
                 cache,
                 finished=lambda data,target=row,group_id=group.release_group_id:self._apply_release_thumbnail(target,data,group_id),
             )
         elif group.source == "musicbrainz":
-            self._run(
+            self._run_thumbnail(
                 _fetch_release_group_cover_with_discogs,
                 group.release_group_id,
                 self.cover_cache_directory,
@@ -1629,9 +1631,19 @@ class MediaLibraryWidget(QWidget):
         self.streaming_button.setEnabled(True); self.quality_button.setEnabled(True); self.apple_button.setEnabled(False)
         self.streaming_status.setText("Streaming und Qualität wurden nicht abgefragt.")
         if group.source == "discogs" and group.discogs_release_id:
-            self._run(self._discogs_edition_from_group,group,finished=self._editions_loaded)
+            self._run(
+                self._discogs_edition_from_group,
+                group,
+                finished=self._editions_loaded,
+                transform=lambda editions,group_id=group.release_group_id:(group_id,editions),
+            )
         else:
-            self._run(fetch_release_group_editions,group.release_group_id,finished=self._editions_loaded)
+            self._run(
+                fetch_release_group_editions,
+                group.release_group_id,
+                finished=self._editions_loaded,
+                transform=lambda editions,group_id=group.release_group_id:(group_id,editions),
+            )
 
     def _groups_loaded(
         self,
@@ -1844,6 +1856,17 @@ class MediaLibraryWidget(QWidget):
         self,
         editions,
     ) -> None:
+        if (
+            isinstance(editions, tuple)
+            and len(editions) == 2
+            and isinstance(editions[0], str)
+        ):
+            release_group_id, editions = editions
+            if (
+                self.current_group is None
+                or self.current_group.release_group_id != release_group_id
+            ):
+                return
         self.editions = list(
             editions
         )
@@ -2472,6 +2495,45 @@ class MediaLibraryWidget(QWidget):
         failed=None,
         **kwargs,
     ) -> None:
+        self._start_worker(
+            self.thread_pool,
+            function,
+            *args,
+            finished=finished,
+            transform=transform,
+            failed=failed,
+            **kwargs,
+        )
+
+    def _run_thumbnail(
+        self,
+        function,
+        *args,
+        finished,
+        transform=None,
+        failed=None,
+        **kwargs,
+    ) -> None:
+        self._start_worker(
+            self.thumbnail_pool,
+            function,
+            *args,
+            finished=finished,
+            transform=transform,
+            failed=failed,
+            **kwargs,
+        )
+
+    def _start_worker(
+        self,
+        pool: QThreadPool,
+        function,
+        *args,
+        finished,
+        transform=None,
+        failed=None,
+        **kwargs,
+    ) -> None:
         worker = Worker(
             function,
             *args,
@@ -2509,7 +2571,7 @@ class MediaLibraryWidget(QWidget):
         worker.signals.failed.connect(
             release
         )
-        self.thread_pool.start(
+        pool.start(
             worker
         )
 

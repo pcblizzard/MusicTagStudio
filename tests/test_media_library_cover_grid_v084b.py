@@ -4,7 +4,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
-from musictagstudio.media_library.service import ReleaseGroup
+from musictagstudio.media_library.service import Edition, ReleaseGroup
 from musictagstudio.media_library import tasks
 from musictagstudio.ui import media_library_widget as widget_module
 from musictagstudio.ui.media_library_widget import MediaLibraryWidget
@@ -26,7 +26,7 @@ def test_cover_grid_loads_musicbrainz_release_group_cover():
     widget = MediaLibraryWidget()
     calls = []
 
-    widget._run = lambda function, *args, **kwargs: calls.append(
+    widget._run_thumbnail = lambda function, *args, **kwargs: calls.append(
         (function, args, kwargs)
     )
     widget._load_release_thumbnail(0, musicbrainz_group())
@@ -102,3 +102,35 @@ def test_release_group_cover_does_not_spend_discogs_request_on_archive_hit(
     )
 
     assert result == b"archive-cover"
+
+
+def test_cover_selection_uses_main_worker_pool_for_editions():
+    app = QApplication.instance() or QApplication([])
+    widget = MediaLibraryWidget()
+    calls = []
+    widget._run = lambda function, *args, **kwargs: calls.append(
+        (function, args, kwargs)
+    )
+
+    group = musicbrainz_group()
+    widget._load_group(group)
+
+    assert len(calls) == 1
+    _, args, kwargs = calls[0]
+    assert args == (group.release_group_id,)
+    assert kwargs["transform"]([]) == (group.release_group_id, [])
+
+
+def test_late_editions_do_not_replace_current_release():
+    app = QApplication.instance() or QApplication([])
+    widget = MediaLibraryWidget()
+    widget.current_group = musicbrainz_group()
+    widget.editions = []
+    late_edition = Edition(
+        release_id="late-release",
+        title="Old selection",
+    )
+
+    widget._editions_loaded(("different-group", [late_edition]))
+
+    assert widget.editions == []
