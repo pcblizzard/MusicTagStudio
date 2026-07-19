@@ -17,6 +17,9 @@
 - Suche und Vorschlagsliste erhielten eine ruhigere, abgerundete Darstellung nach dem Vorbild moderner Musikbibliotheken.
 - Bei gleich guten Künstlernamen wird das in den Einstellungen gewählte Land bevorzugt, ohne internationale Treffer auszublenden.
 - Fehlt ein Cover im Cover Art Archive, sucht die Medienbibliothek mit Discogs-Token gezielt nach Künstler, Titel und Jahr und verwendet nur einen exakten Treffer.
+- MusicBrainz-Beziehungen unterscheiden jetzt Künstleridentitäten, bürgerliche Personen und bloße Namensvarianten.
+- Verknüpfte eigenständige Künstler werden über ihre eindeutige MusicBrainz-ID statt über eine erneute unscharfe Namenssuche geöffnet.
+- Rollen, Zeiträume und ehemalige Mitgliedschaften bleiben in der Beziehungsansicht sichtbar; verspätete Antworten eines zuvor geöffneten Künstlers werden verworfen.
 
 # MusicTagStudio 0.8.3
 

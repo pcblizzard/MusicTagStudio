@@ -157,7 +157,9 @@ class MediaLibraryWidget(QWidget):
         self.discogs_releases: list[DiscogsRelease] = []
         self.discogs_release_groups: list[ReleaseGroup] = []
         self.current_artist_name = ""
+        self.current_artist_id = ""
         self.current_catalog_kind = ""
+        self.current_artist_id = ""
         self.breadcrumbs: list[tuple[str, str, str]] = []
         self._preserve_breadcrumbs = False
         self.editions: list[
@@ -1075,6 +1077,7 @@ class MediaLibraryWidget(QWidget):
         self.musicbrainz_release_groups = []
         self.discogs_release_groups = []
         self.current_artist_name = artist.name
+        self.current_artist_id = artist.artist_id
         self.current_catalog_kind = "artist"
         self._push_breadcrumb(
             "artist",
@@ -1148,6 +1151,7 @@ class MediaLibraryWidget(QWidget):
         self.musicbrainz_release_groups = []
         self.discogs_release_groups = []
         self.current_artist_name = hit.title
+        self.current_artist_id = ""
         self.current_catalog_kind = hit.kind
         self.group_tree.clear()
         self.release_table.setRowCount(0)
@@ -1182,6 +1186,11 @@ class MediaLibraryWidget(QWidget):
             )
 
     def _relations_loaded(self, result) -> None:
+        if (
+            isinstance(result, ArtistRelationsResponse)
+            and result.artist_id != self.current_artist_id
+        ):
+            return
         self.relations_tree.clear()
         if isinstance(result, ArtistRelationsResponse):
             self.artist_relations = list(result.relations)
@@ -1202,7 +1211,8 @@ class MediaLibraryWidget(QWidget):
             groups.setdefault(self._relation_category(relation), []).append(relation)
 
         order = (
-            "Mitglieder", "Gruppen", "Kollaborationen", "Aliase",
+            "Künstleridentitäten", "Person", "Mitglieder", "Gruppen",
+            "Kollaborationen", "Namensvarianten",
             "Produzenten / Mitwirkende", "Labels", "Weitere",
         )
         for category in order:
@@ -1216,11 +1226,17 @@ class MediaLibraryWidget(QWidget):
             self.relations_tree.addTopLevelItem(parent)
             for relation in entries:
                 suffix = " (ehemalig)" if relation.ended else ""
-                child = QTreeWidgetItem([f"{relation.name}{suffix}"])
+                role = self._relation_role_text(relation)
+                role_suffix = f" · {role}" if role else ""
+                child = QTreeWidgetItem(
+                    [f"{relation.name}{role_suffix}{suffix}"]
+                )
                 child.setData(0, Qt.ItemDataRole.UserRole, relation)
                 details = [relation.relation_type]
                 if relation.disambiguation:
                     details.append(relation.disambiguation)
+                if relation.attributes:
+                    details.append(", ".join(relation.attributes))
                 if relation.begin or relation.end:
                     details.append(f"{relation.begin or '?'}–{relation.end or 'heute'}")
                 child.setToolTip(0, " · ".join(details))
@@ -1234,13 +1250,26 @@ class MediaLibraryWidget(QWidget):
             return "Labels"
         if relation_type in {"member of band", "founder"}:
             return "Gruppen" if relation.direction == "forward" else "Mitglieder"
-        if "alias" in relation_type or relation_type in {"is person", "performance name"}:
-            return "Aliase"
+        if relation_type in {"is person", "performance name"}:
+            return "Künstleridentitäten" if relation.direction == "forward" else "Person"
+        if "alias" in relation_type:
+            return "Namensvarianten"
         if any(word in relation_type for word in ("producer", "mix", "master", "engineer", "instrument", "vocal")):
             return "Produzenten / Mitwirkende"
         if any(word in relation_type for word in ("collaboration", "collaborated", "supporting musician")):
             return "Kollaborationen"
         return "Weitere"
+
+    @staticmethod
+    def _relation_role_text(relation) -> str:
+        relation_type = relation.relation_type.casefold()
+        if relation_type == "is person":
+            return "Künstleridentität" if relation.direction == "forward" else "bürgerliche Person"
+        if relation_type == "performance name":
+            return "Künstlername"
+        if relation_type in {"member of band", "founder"} and relation.attributes:
+            return ", ".join(relation.attributes)
+        return ""
 
     def _relation_clicked(self, item: QTreeWidgetItem, column: int) -> None:
         relation = item.data(0, Qt.ItemDataRole.UserRole)
@@ -1257,10 +1286,7 @@ class MediaLibraryWidget(QWidget):
             )
             return
         if relation.target_type in {"artist", "alias"}:
-            self.search_artist(
-                relation.name,
-                preserve_breadcrumbs=True,
-            )
+            self._open_related_artist(relation)
         elif relation.target_type == "label":
             self._set_status(
                 f"MusicBrainz-Label „{relation.name}“ wird geöffnet …"
@@ -1268,6 +1294,21 @@ class MediaLibraryWidget(QWidget):
             webbrowser.open(
                 f"https://musicbrainz.org/label/{relation.target_id}"
             )
+
+    def _open_related_artist(self, relation) -> None:
+        artist = ArtistCandidate(
+            artist_id=relation.target_id,
+            name=relation.name,
+            disambiguation=relation.disambiguation,
+        )
+        self.search_edit.setText(relation.name)
+        self.artists = [artist]
+        self.result_items = [("musicbrainz_artist", artist)]
+        self.artist_list.clear()
+        item = QListWidgetItem(_artist_text(artist))
+        item.setToolTip(relation.disambiguation)
+        self.artist_list.addItem(item)
+        self.artist_list.setCurrentRow(0)
 
     def _render_discogs_label_artists(
         self,
@@ -1550,6 +1591,11 @@ class MediaLibraryWidget(QWidget):
         self,
         result,
     ) -> None:
+        if (
+            isinstance(result, ReleaseGroupResponse)
+            and result.artist_id != self.current_artist_id
+        ):
+            return
         if isinstance(
             result,
             ReleaseGroupResponse,

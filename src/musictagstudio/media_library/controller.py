@@ -47,6 +47,7 @@ class ArtistRelation:
     end: str = ""
     ended: bool = False
     disambiguation: str = ""
+    attributes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -405,6 +406,11 @@ class CatalogSearchController:
                     end=str(item.get("end", "") or ""),
                     ended=bool(item.get("ended", False)),
                     disambiguation=str(target.get("disambiguation", "") or ""),
+                    attributes=tuple(
+                        str(value).strip()
+                        for value in item.get("attributes", [])
+                        if str(value).strip()
+                    ),
                 )
             )
 
