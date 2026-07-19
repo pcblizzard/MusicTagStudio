@@ -11,14 +11,14 @@ def source() -> str:
     ).read_text(encoding="utf-8")
 
 
-def test_search_is_single_musicbrainz_artist_search():
+def test_primary_search_remains_musicbrainz_artist_search():
     text = source()
 
     assert "self.search_mode_combo" not in text
     assert '"Discogs ergänzen"' not in text
     assert '"Discogs-Token fehlt"' not in text
-    assert "search_catalog" not in text
-    assert "search_artists" in text
+    assert "self.catalog_controller.search_artists" in text
+    assert "_fetch_discogs_catalog" in text
     assert 'tr("search_artist_placeholder", self.language)' in text
 
 

@@ -11,7 +11,7 @@ def test_discogs_is_integrated_without_a_separate_search_mode():
     ).read_text(encoding="utf-8")
 
     assert "self.search_mode_combo" not in text
-    assert "_fetch_discogs_artist_catalog" in text
+    assert "_fetch_discogs_catalog" in text
     assert "_merge_release_groups" in text
 
 

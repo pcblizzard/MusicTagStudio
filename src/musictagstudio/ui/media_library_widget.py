@@ -62,8 +62,9 @@ from ..media_library import (
     ReleaseGroupResponse,
     default_controller,
     fetch_discogs_artist_releases,
+    fetch_label_releases,
     fetch_discogs_release_tracks,
-    search_discogs_artists,
+    search_catalog,
 )
 from ..diagnostics import project_root
 from ..settings import load_settings
@@ -979,7 +980,7 @@ class MediaLibraryWidget(QWidget):
                 f"Veröffentlichungen von {artist.name} werden aus MusicBrainz und Discogs geladen …"
             )
             self._run(
-                _fetch_discogs_artist_catalog,
+                _fetch_discogs_catalog,
                 artist.name,
                 settings.discogs_token,
                 finished=self._discogs_catalog_releases_loaded,
@@ -2087,30 +2088,38 @@ class MediaLibraryWidget(QWidget):
             text
         )
 
-def _fetch_discogs_artist_catalog(
-    artist_name: str,
+def _fetch_discogs_catalog(
+    entity_name: str,
     token: str,
 ) -> list[DiscogsRelease]:
-    artists = search_discogs_artists(
-        artist_name,
+    hits = search_catalog(
+        entity_name,
         token,
-        limit=5,
+        kinds=("artist", "label"),
+        limit_per_kind=10,
     )
-    if not artists:
+    wanted = _normalized(entity_name)
+    exact_hits = [
+        hit
+        for hit in hits
+        if _normalized(_discogs_entity_name(hit.title)) == wanted
+    ]
+    if not exact_hits:
         return []
-    wanted = _normalized(artist_name)
-    artist = min(
-        artists,
-        key=lambda candidate: (
-            0 if _normalized(candidate.title) == wanted else 1,
-            abs(len(_normalized(candidate.title)) - len(wanted)),
-        ),
-    )
-    return fetch_discogs_artist_releases(
-        artist.artist_id,
-        token,
-        maximum=100,
-    )
+    # A label is the more specific interpretation when Discogs contains both
+    # an artist and a label with exactly the requested name.
+    hit = min(exact_hits, key=lambda item: 0 if item.kind == "label" else 1)
+    if hit.kind == "label":
+        return fetch_label_releases(
+            hit.entity_id,
+            token,
+            maximum=100,
+        )
+    return fetch_discogs_artist_releases(hit.entity_id, token, maximum=100)
+
+
+def _discogs_entity_name(value: str) -> str:
+    return re.sub(r"\s+\(\d+\)$", "", str(value or "")).strip()
 
 
 def _merge_release_groups(
