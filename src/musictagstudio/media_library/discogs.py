@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import json
 import re
+import sqlite3
 import threading
 import time
 from urllib.parse import quote, urlencode
@@ -10,6 +11,7 @@ import urllib.error
 import urllib.request
 
 from .. import __version__
+from ..diagnostics import project_root
 
 BASE_URL = "https://api.discogs.com"
 USER_AGENT = (
@@ -73,6 +75,80 @@ class DiscogsTrack:
     title: str
     artist: str = ""
     duration: str = ""
+
+
+@dataclass(frozen=True)
+class DiscogsCatalogSnapshot:
+    releases: tuple[DiscogsRelease, ...]
+    fetched_at: float
+    from_cache: bool = False
+
+
+def load_catalog_snapshot(query: str) -> DiscogsCatalogSnapshot | None:
+    cache_path = _catalog_cache_path()
+    if not cache_path.is_file():
+        return None
+    try:
+        with sqlite3.connect(cache_path) as connection:
+            row = connection.execute(
+                "SELECT releases_json, fetched_at FROM discogs_catalog WHERE query_key = ?",
+                (_key(query),),
+            ).fetchone()
+        if row is None:
+            return None
+        values = json.loads(row[0])
+        releases = tuple(_release_from_cache(item) for item in values)
+        return DiscogsCatalogSnapshot(
+            releases=releases,
+            fetched_at=float(row[1]),
+            from_cache=True,
+        )
+    except (OSError, sqlite3.Error, json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
+def save_catalog_snapshot(
+    query: str,
+    releases: list[DiscogsRelease],
+) -> DiscogsCatalogSnapshot:
+    cache_path = _catalog_cache_path()
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    fetched_at = time.time()
+    payload = json.dumps(
+        [asdict(release) for release in releases],
+        ensure_ascii=False,
+    )
+    with sqlite3.connect(cache_path) as connection:
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS discogs_catalog ("
+            "query_key TEXT PRIMARY KEY, releases_json TEXT NOT NULL, fetched_at REAL NOT NULL)"
+        )
+        connection.execute(
+            "INSERT INTO discogs_catalog(query_key, releases_json, fetched_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(query_key) DO UPDATE SET releases_json=excluded.releases_json, "
+            "fetched_at=excluded.fetched_at",
+            (_key(query), payload, fetched_at),
+        )
+    return DiscogsCatalogSnapshot(
+        releases=tuple(releases),
+        fetched_at=fetched_at,
+        from_cache=False,
+    )
+
+
+def _catalog_cache_path():
+    return project_root() / "cache" / "media_library" / "discogs_catalog.sqlite3"
+
+
+def _release_from_cache(item: dict) -> DiscogsRelease:
+    tuple_fields = {
+        "labels", "formats", "format_descriptions", "artists", "badges"
+    }
+    values = {
+        key: tuple(value) if key in tuple_fields else value
+        for key, value in item.items()
+    }
+    return DiscogsRelease(**values)
 
 
 def search_artists(

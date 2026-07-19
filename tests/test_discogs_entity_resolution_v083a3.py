@@ -7,6 +7,12 @@ def hit(kind, entity_id, title):
 
 
 def test_exact_label_is_used_instead_of_similar_artist(monkeypatch):
+    monkeypatch.setattr(widget, "load_catalog_snapshot", lambda query: None)
+    monkeypatch.setattr(
+        widget,
+        "save_catalog_snapshot",
+        lambda query, releases: type("Snapshot", (), {"releases": tuple(releases)})(),
+    )
     monkeypatch.setattr(
         widget,
         "search_catalog",
@@ -29,11 +35,17 @@ def test_exact_label_is_used_instead_of_similar_artist(monkeypatch):
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError()),
     )
 
-    assert widget._fetch_discogs_catalog("Aggro Berlin", "token") == []
+    assert widget._fetch_discogs_catalog("Aggro Berlin", "token").releases == ()
     assert selected == [(25833, "Aggro Berlin")]
 
 
 def test_partial_artist_match_is_not_used_as_fallback(monkeypatch):
+    monkeypatch.setattr(widget, "load_catalog_snapshot", lambda query: None)
+    monkeypatch.setattr(
+        widget,
+        "save_catalog_snapshot",
+        lambda query, releases: type("Snapshot", (), {"releases": tuple(releases)})(),
+    )
     monkeypatch.setattr(
         widget,
         "search_catalog",
@@ -45,4 +57,4 @@ def test_partial_artist_match_is_not_used_as_fallback(monkeypatch):
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError()),
     )
 
-    assert widget._fetch_discogs_catalog("Aggro Berlin", "token") == []
+    assert widget._fetch_discogs_catalog("Aggro Berlin", "token").releases == ()

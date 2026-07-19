@@ -51,6 +51,7 @@ from ..media_library import (
     ArtistCandidate,
     ArtistSearchResult,
     DiscogsRelease,
+    DiscogsCatalogSnapshot,
     Edition,
     ReleaseGroup,
     Track,
@@ -64,6 +65,8 @@ from ..media_library import (
     fetch_discogs_artist_releases,
     fetch_label_releases,
     fetch_discogs_release_tracks,
+    load_catalog_snapshot,
+    save_catalog_snapshot,
     search_catalog,
 )
 from ..diagnostics import project_root
@@ -145,9 +148,11 @@ class MediaLibraryWidget(QWidget):
         self.release_groups: list[
             ReleaseGroup
         ] = []
+        self.musicbrainz_release_groups: list[ReleaseGroup] = []
         self.artist_relations = []
         self.discogs_releases: list[DiscogsRelease] = []
         self.discogs_release_groups: list[ReleaseGroup] = []
+        self.current_artist_name = ""
         self.editions: list[
             Edition
         ] = []
@@ -237,6 +242,18 @@ class MediaLibraryWidget(QWidget):
         search_row.addWidget(
             self.search_button
         )
+        self.discogs_refresh_button = QPushButton(
+            "Discogs live aktualisieren"
+        )
+        self.discogs_refresh_button.setToolTip(
+            "Ignoriert die lokale Discogs-Datenbank und lädt die "
+            "Diskografie erneut über die API."
+        )
+        self.discogs_refresh_button.setEnabled(False)
+        self.discogs_refresh_button.clicked.connect(
+            self._refresh_discogs_live
+        )
+        search_row.addWidget(self.discogs_refresh_button)
         self.debug_button = QPushButton(
             "Debug"
         )
@@ -933,7 +950,9 @@ class MediaLibraryWidget(QWidget):
             return
 
         self.release_groups = []
+        self.musicbrainz_release_groups = []
         self.discogs_release_groups = []
+        self.current_artist_name = artist.name
         self.group_tree.clear()
         self.release_table.setRowCount(
             0
@@ -975,6 +994,9 @@ class MediaLibraryWidget(QWidget):
             finished=self._groups_loaded,
         )
         settings = load_settings()
+        self.discogs_refresh_button.setEnabled(
+            bool(settings.discogs_token.strip())
+        )
         if settings.discogs_token.strip():
             self._set_status(
                 f"Veröffentlichungen von {artist.name} werden aus MusicBrainz und Discogs geladen …"
@@ -1073,8 +1095,18 @@ class MediaLibraryWidget(QWidget):
 
     def _discogs_catalog_releases_loaded(
         self,
-        releases,
+        result,
     ) -> None:
+        if isinstance(result, DiscogsCatalogSnapshot):
+            releases = list(result.releases)
+            cache_note = (
+                "lokale Discogs-Datenbank"
+                if result.from_cache
+                else "Discogs live"
+            )
+        else:
+            releases = list(result)
+            cache_note = "Discogs"
         self.discogs_releases = list(
             releases
         )
@@ -1085,13 +1117,29 @@ class MediaLibraryWidget(QWidget):
             for release in self.discogs_releases
         ]
         self.release_groups = _merge_release_groups(
-            self.release_groups,
+            self.musicbrainz_release_groups,
             self.discogs_release_groups,
         )
         self._render_release_groups()
         self._render_alternative_views()
         self._set_status(
-            f"{len(self.release_groups)} zusammengeführte Veröffentlichungen geladen."
+            f"{len(self.release_groups)} zusammengeführte Veröffentlichungen "
+            f"geladen ({cache_note})."
+        )
+        self.discogs_refresh_button.setEnabled(True)
+
+    def _refresh_discogs_live(self) -> None:
+        settings = load_settings()
+        if not self.current_artist_name or not settings.discogs_token.strip():
+            return
+        self.discogs_refresh_button.setEnabled(False)
+        self._set_status("Discogs wird live aktualisiert …")
+        self._run(
+            _fetch_discogs_catalog,
+            self.current_artist_name,
+            settings.discogs_token,
+            force_refresh=True,
+            finished=self._discogs_catalog_releases_loaded,
         )
 
     @staticmethod
@@ -1251,7 +1299,7 @@ class MediaLibraryWidget(QWidget):
             result,
             ReleaseGroupResponse,
         ):
-            self.release_groups = list(
+            self.musicbrainz_release_groups = list(
                 result.release_groups
             )
             for trace in result.traces:
@@ -1259,12 +1307,12 @@ class MediaLibraryWidget(QWidget):
                     trace.as_text()
                 )
         else:
-            self.release_groups = list(
+            self.musicbrainz_release_groups = list(
                 result
             )
 
         self.release_groups = _merge_release_groups(
-            self.release_groups,
+            self.musicbrainz_release_groups,
             self.discogs_release_groups,
         )
 
@@ -2060,6 +2108,10 @@ class MediaLibraryWidget(QWidget):
         self.search_button.setEnabled(
             True
         )
+        self.discogs_refresh_button.setEnabled(
+            bool(load_settings().discogs_token.strip())
+            and bool(self.current_artist_name)
+        )
         self.streaming_button.setEnabled(
             self.current_group
             is not None
@@ -2091,7 +2143,13 @@ class MediaLibraryWidget(QWidget):
 def _fetch_discogs_catalog(
     entity_name: str,
     token: str,
-) -> list[DiscogsRelease]:
+    *,
+    force_refresh: bool = False,
+) -> DiscogsCatalogSnapshot:
+    if not force_refresh:
+        cached = load_catalog_snapshot(entity_name)
+        if cached is not None:
+            return cached
     hits = search_catalog(
         entity_name,
         token,
@@ -2105,18 +2163,22 @@ def _fetch_discogs_catalog(
         if _normalized(_discogs_entity_name(hit.title)) == wanted
     ]
     if not exact_hits:
-        return []
+        return save_catalog_snapshot(entity_name, [])
     # A label is the more specific interpretation when Discogs contains both
     # an artist and a label with exactly the requested name.
     hit = min(exact_hits, key=lambda item: 0 if item.kind == "label" else 1)
     if hit.kind == "label":
-        return fetch_label_releases(
+        releases = fetch_label_releases(
             hit.entity_id,
             token,
             maximum=100,
             label_name=hit.title,
         )
-    return fetch_discogs_artist_releases(hit.entity_id, token, maximum=100)
+    else:
+        releases = fetch_discogs_artist_releases(
+            hit.entity_id, token, maximum=100
+        )
+    return save_catalog_snapshot(entity_name, releases)
 
 
 def _discogs_entity_name(value: str) -> str:

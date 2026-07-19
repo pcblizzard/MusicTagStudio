@@ -14,6 +14,8 @@
 - MusicBrainz-User-Agents verwenden in Explorer, Tagger, Direktabgleich und Coversuche einheitlich die aktuelle Programmversion.
 - Discogs-Ergänzungen erfordern nun eine exakte Künstler- oder Labelübereinstimmung; ähnlich benannte Mitwirkende werden nicht mehr fälschlich als Hauptkünstler gewählt.
 - Labeldiskografien werden ohne bis zu 100 serielle Detailanfragen geladen; vollständige Release- und Trackdaten folgen erst bei Auswahl eines Eintrags.
+- Discogs-Diskografien werden in einer lokalen SQLite-Datenbank zwischengespeichert und bei Folgesuchen ohne API-Anfrage sofort verwendet.
+- „Discogs live aktualisieren“ umgeht den lokalen Cache bewusst und ersetzt ihn durch den aktuellen API-Stand.
 
 - Neuer Bereich „Verknüpfungen“ in der Medienbibliothek.
 - MusicBrainz-Beziehungen zu Künstlern, Gruppen, Mitgliedern, Labels, Aliasen und Mitwirkenden werden geladen.
