@@ -1278,6 +1278,10 @@ class MediaLibraryWidget(QWidget):
         self._cover_generation += 1; self._show_cover(None); self.group_title.setText(group.title)
         key=_normalized(group.title); local_path=self.local_albums.get(key); status=self.local_album_status.get(key,"Nicht vorhanden"); local_online=status == "Lokal verfügbar"
         self.group_meta.setText(" · ".join(v for v in (_type_text(group),group.first_release_date or "Datum unbekannt",status) if v))
+        self.open_local_button.setProperty(
+            "local_path",
+            local_path or "",
+        )
         self.open_local_button.setEnabled(bool(local_path) and local_online)
         self.open_local_button.setToolTip(
             "Lokales Album im Tagger öffnen"

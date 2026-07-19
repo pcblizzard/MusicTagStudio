@@ -16,6 +16,7 @@
 - Labeldiskografien werden ohne bis zu 100 serielle Detailanfragen geladen; vollständige Release- und Trackdaten folgen erst bei Auswahl eines Eintrags.
 - Discogs-Diskografien werden in einer lokalen SQLite-Datenbank zwischengespeichert und bei Folgesuchen ohne API-Anfrage sofort verwendet.
 - „Discogs live aktualisieren“ umgeht den lokalen Cache bewusst und ersetzt ihn durch den aktuellen API-Stand.
+- „Lokales Album im Tagger öffnen“ übergibt den erkannten Albumordner wieder korrekt an das Hauptfenster.
 
 - Neuer Bereich „Verknüpfungen“ in der Medienbibliothek.
 - MusicBrainz-Beziehungen zu Künstlern, Gruppen, Mitgliedern, Labels, Aliasen und Mitwirkenden werden geladen.
