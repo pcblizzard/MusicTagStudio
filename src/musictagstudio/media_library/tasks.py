@@ -234,6 +234,20 @@ def _fetch_release_cover(
     return data
 
 
+def _fetch_release_group_cover(
+    release_group_id: str,
+    cache_directory: Path,
+) -> bytes | None:
+    """Load the representative Cover Art Archive image for a release group."""
+    return _fetch_url_cover(
+        (
+            "https://coverartarchive.org/"
+            f"release-group/{release_group_id}/front-250"
+        ),
+        cache_directory / f"release-group-{release_group_id}.jpg",
+    )
+
+
 def _fetch_release_cover_with_discogs(
     release_id: str,
     cache_directory: Path,

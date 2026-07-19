@@ -83,6 +83,7 @@ from ..media_library.tasks import (
     _fetch_discogs_hit_catalog,
     _fetch_live_artist_suggestions,
     _fetch_release_cover,
+    _fetch_release_group_cover,
     _fetch_url_cover,
 )
 from ..media_library.presentation import (
@@ -1545,13 +1546,37 @@ class MediaLibraryWidget(QWidget):
             try: data=load_cover(local_file)
             except Exception: data=None
             if data:
-                self._apply_release_thumbnail(row,data); return
+                self._apply_release_thumbnail(
+                    row, data, group.release_group_id
+                ); return
         if group.cover_url:
             cache=self.cover_cache_directory / f"view-{group.source}-{group.release_group_id}.jpg"
-            self._run(_fetch_url_cover, group.cover_url, cache, finished=lambda data,target=row:self._apply_release_thumbnail(target,data))
+            self._run(
+                _fetch_url_cover,
+                group.cover_url,
+                cache,
+                finished=lambda data,target=row,group_id=group.release_group_id:self._apply_release_thumbnail(target,data,group_id),
+            )
+        elif group.source == "musicbrainz":
+            self._run(
+                _fetch_release_group_cover,
+                group.release_group_id,
+                self.cover_cache_directory,
+                finished=lambda data,target=row,group_id=group.release_group_id:self._apply_release_thumbnail(target,data,group_id),
+            )
 
-    def _apply_release_thumbnail(self, row: int, data: bytes | None) -> None:
+    def _apply_release_thumbnail(
+        self,
+        row: int,
+        data: bytes | None,
+        release_group_id: str = "",
+    ) -> None:
         if not data or not (0 <= row < len(self.release_groups)): return
+        if (
+            release_group_id
+            and self.release_groups[row].release_group_id != release_group_id
+        ):
+            return
         pix=QPixmap()
         if not pix.loadFromData(data): return
         size,_=self._cover_dimensions(); icon=QIcon(pix.scaled(size,size,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation))
