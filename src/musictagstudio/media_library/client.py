@@ -86,6 +86,7 @@ class MusicBrainzClient:
             0,
             int(cache_ttl_seconds),
         )
+        self._memory_cache: dict[Path, tuple[float, dict]] = {}
         self.debug_log = (
             project_root()
             / "logs"
@@ -301,6 +302,7 @@ class MusicBrainzClient:
     def clear_cache(
         self,
     ) -> int:
+        self._memory_cache.clear()
         removed = 0
         for path in self.cache_directory.glob(
             "*.json"
@@ -330,10 +332,17 @@ class MusicBrainzClient:
         self,
         path: Path,
     ) -> dict | None:
-        if (
-            not path.is_file()
-            or self.cache_ttl_seconds <= 0
-        ):
+        if self.cache_ttl_seconds <= 0:
+            return None
+
+        memory_entry = self._memory_cache.get(path)
+        if memory_entry is not None:
+            stored_at, payload = memory_entry
+            if time.monotonic() - stored_at <= self.cache_ttl_seconds:
+                return payload
+            self._memory_cache.pop(path, None)
+
+        if not path.is_file():
             return None
 
         age = (
@@ -355,20 +364,18 @@ class MusicBrainzClient:
         ):
             return None
 
-        return (
-            payload
-            if isinstance(
-                payload,
-                dict,
-            )
-            else None
-        )
+        if not isinstance(payload, dict):
+            return None
 
-    @staticmethod
+        self._memory_cache[path] = (time.monotonic(), payload)
+        return payload
+
     def _write_cache(
+        self,
         path: Path,
         payload: dict,
     ) -> None:
+        self._memory_cache[path] = (time.monotonic(), payload)
         try:
             path.write_text(
                 json.dumps(
