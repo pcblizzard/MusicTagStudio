@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import html
 import re
@@ -49,6 +50,7 @@ from PySide6.QtWidgets import (
 from ..media_library import (
     ArtistCandidate,
     ArtistSearchResult,
+    DiscogsRelease,
     Edition,
     ReleaseGroup,
     Track,
@@ -59,6 +61,9 @@ from ..media_library import (
     ArtistSearchResponse,
     ReleaseGroupResponse,
     default_controller,
+    fetch_discogs_artist_releases,
+    fetch_discogs_release_tracks,
+    search_discogs_artists,
 )
 from ..diagnostics import project_root
 from ..settings import load_settings
@@ -140,6 +145,8 @@ class MediaLibraryWidget(QWidget):
             ReleaseGroup
         ] = []
         self.artist_relations = []
+        self.discogs_releases: list[DiscogsRelease] = []
+        self.discogs_release_groups: list[ReleaseGroup] = []
         self.editions: list[
             Edition
         ] = []
@@ -925,6 +932,7 @@ class MediaLibraryWidget(QWidget):
             return
 
         self.release_groups = []
+        self.discogs_release_groups = []
         self.group_tree.clear()
         self.release_table.setRowCount(
             0
@@ -965,6 +973,17 @@ class MediaLibraryWidget(QWidget):
             artist.artist_id,
             finished=self._groups_loaded,
         )
+        settings = load_settings()
+        if settings.discogs_token.strip():
+            self._set_status(
+                f"Veröffentlichungen von {artist.name} werden aus MusicBrainz und Discogs geladen …"
+            )
+            self._run(
+                _fetch_discogs_artist_catalog,
+                artist.name,
+                settings.discogs_token,
+                finished=self._discogs_catalog_releases_loaded,
+            )
 
     def _relations_loaded(self, result) -> None:
         self.relations_tree.clear()
@@ -1058,13 +1077,43 @@ class MediaLibraryWidget(QWidget):
         self.discogs_releases = list(
             releases
         )
-        self.release_groups = [
+        self.discogs_release_groups = [
             self._group_from_discogs_release(
                 release
             )
             for release in self.discogs_releases
         ]
+        self.release_groups = _merge_release_groups(
+            self.release_groups,
+            self.discogs_release_groups,
+        )
         self._render_release_groups()
+        self._render_alternative_views()
+        self._set_status(
+            f"{len(self.release_groups)} zusammengeführte Veröffentlichungen geladen."
+        )
+
+    @staticmethod
+    def _discogs_edition_from_group(
+        group: ReleaseGroup,
+    ) -> list[Edition]:
+        return [
+            Edition(
+                release_id=group.release_group_id,
+                title=group.title,
+                date=group.first_release_date,
+                label=", ".join(group.labels),
+                format=", ".join(group.formats),
+                source="discogs",
+                category=group.category,
+                labels=group.labels,
+                formats=group.formats,
+                badges=group.badges,
+                external_url=group.external_url,
+                cover_url=group.cover_url,
+                discogs_release_id=group.discogs_release_id,
+            )
+        ]
 
     def _group_from_discogs_release(
         self,
@@ -1212,6 +1261,11 @@ class MediaLibraryWidget(QWidget):
             self.release_groups = list(
                 result
             )
+
+        self.release_groups = _merge_release_groups(
+            self.release_groups,
+            self.discogs_release_groups,
+        )
 
         self._refresh_debug_output()
         self._render_release_groups()
@@ -1491,7 +1545,8 @@ class MediaLibraryWidget(QWidget):
         ):
             settings = load_settings()
             self._run(
-                            edition.discogs_release_id,
+                fetch_discogs_release_tracks,
+                edition.discogs_release_id,
                 settings.discogs_token,
                 finished=self._discogs_tracks_loaded,
             )
@@ -1544,6 +1599,28 @@ class MediaLibraryWidget(QWidget):
         self._set_status(
             f"{len(tracks)} Titel geladen."
         )
+
+    def _discogs_tracks_loaded(
+        self,
+        result,
+    ) -> None:
+        discogs_tracks, _payload = result
+        tracks = []
+        for fallback, track in enumerate(discogs_tracks, start=1):
+            disc_number, track_number = _discogs_position(
+                track.position,
+                fallback,
+            )
+            tracks.append(
+                Track(
+                    disc_number=disc_number,
+                    track_number=track_number,
+                    title=track.title,
+                    artist=track.artist,
+                    length_ms=_duration_ms(track.duration),
+                )
+            )
+        self._tracks_loaded(tracks)
 
     def _load_category_icons(
         self,
@@ -2010,7 +2087,71 @@ class MediaLibraryWidget(QWidget):
             text
         )
 
+def _fetch_discogs_artist_catalog(
+    artist_name: str,
+    token: str,
+) -> list[DiscogsRelease]:
+    artists = search_discogs_artists(
+        artist_name,
+        token,
+        limit=5,
+    )
+    if not artists:
+        return []
+    wanted = _normalized(artist_name)
+    artist = min(
+        artists,
+        key=lambda candidate: (
+            0 if _normalized(candidate.title) == wanted else 1,
+            abs(len(_normalized(candidate.title)) - len(wanted)),
+        ),
+    )
+    return fetch_discogs_artist_releases(
+        artist.artist_id,
+        token,
+        maximum=100,
+    )
 
+
+def _merge_release_groups(
+    musicbrainz_groups: list[ReleaseGroup],
+    discogs_groups: list[ReleaseGroup],
+) -> list[ReleaseGroup]:
+    merged = list(musicbrainz_groups)
+    positions = {
+        (_normalized(group.title), group.first_release_date[:4]): index
+        for index, group in enumerate(merged)
+    }
+    for discogs_group in discogs_groups:
+        key = (
+            _normalized(discogs_group.title),
+            discogs_group.first_release_date[:4],
+        )
+        index = positions.get(key)
+        if index is None:
+            positions[key] = len(merged)
+            merged.append(discogs_group)
+            continue
+        current = merged[index]
+        merged[index] = replace(
+            current,
+            labels=current.labels or discogs_group.labels,
+            formats=current.formats or discogs_group.formats,
+            badges=tuple(dict.fromkeys((*current.badges, *discogs_group.badges))),
+            external_url=current.external_url or discogs_group.external_url,
+            cover_url=current.cover_url or discogs_group.cover_url,
+            discogs_release_id=(
+                current.discogs_release_id
+                or discogs_group.discogs_release_id
+            ),
+        )
+    return sorted(
+        merged,
+        key=lambda group: (
+            group.first_release_date or "9999",
+            group.title.casefold(),
+        ),
+    )
 
 
 def _fetch_url_cover(

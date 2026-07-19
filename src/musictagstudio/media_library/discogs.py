@@ -7,10 +7,11 @@ from urllib.parse import quote, urlencode
 import urllib.error
 import urllib.request
 
+from .. import __version__
 
 BASE_URL = "https://api.discogs.com"
 USER_AGENT = (
-    "MusicTagStudio/0.7.4.0 "
+    f"MusicTagStudio/{__version__} "
     "(https://github.com/pcblizzard/MusicTagStudio)"
 )
 

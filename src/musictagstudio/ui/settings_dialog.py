@@ -426,6 +426,38 @@ class SettingsDialog(QDialog):
             audio_analysis
         )
 
+        online_catalogs = QGroupBox(
+            "Online-Kataloge"
+        )
+        online_catalogs_form = QFormLayout(
+            online_catalogs
+        )
+        self.discogs_token_edit = QLineEdit(
+            settings.discogs_token
+        )
+        self.discogs_token_edit.setEchoMode(
+            QLineEdit.EchoMode.Password
+        )
+        self.discogs_token_edit.setPlaceholderText(
+            "Persönliches Discogs-Token"
+        )
+        self.discogs_token_edit.setToolTip(
+            "Das Token wird nur lokal in config.toml gespeichert und "
+            "für Anfragen an api.discogs.com verwendet."
+        )
+        online_catalogs_form.addRow(
+            "Discogs-Token:",
+            self.discogs_token_edit,
+        )
+        discogs_info = QLabel(
+            "Ohne Token verwendet die Medienbibliothek ausschließlich "
+            "MusicBrainz. Mit Token ergänzt Discogs Labels, Formate, "
+            "Cover und fehlende Veröffentlichungen."
+        )
+        discogs_info.setWordWrap(True)
+        online_catalogs_form.addRow(discogs_info)
+        layout.addWidget(online_catalogs)
+
         normalization = QGroupBox(
             "Normalisierung"
         )
@@ -812,7 +844,7 @@ class SettingsDialog(QDialog):
             scan_sources_on_startup=(
                 self.scan_sources_checkbox.isChecked()
             ),
-            discogs_token=self.initial_settings.discogs_token,
+            discogs_token=self.discogs_token_edit.text().strip(),
         )
 
     @staticmethod

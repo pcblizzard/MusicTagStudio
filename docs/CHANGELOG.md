@@ -1,4 +1,14 @@
-# MusicTagStudio 0.8.3-alpha2
+# MusicTagStudio 0.8.3-alpha3
+
+## Discogs-Erweiterung
+
+- Persönliches Discogs-API-Token kann in den Einstellungen hinterlegt werden.
+- Ohne Token arbeitet die Medienbibliothek weiterhin ausschließlich mit MusicBrainz.
+- Mit Token ergänzt Discogs die ausgewählte Künstlerdiskografie im Hintergrund.
+- Doppelte Veröffentlichungen werden anhand von Titel und Jahr zusammengeführt.
+- Labels, Formate, Badges und fehlende Cover werden aus Discogs ergänzt.
+- Nur bei MusicBrainz fehlende Veröffentlichungen erscheinen als zusätzliche Discogs-Einträge.
+- Discogs-Editionen und Tracklisten können direkt in der Medienbibliothek geöffnet werden.
 
 - Neuer Bereich „Verknüpfungen“ in der Medienbibliothek.
 - MusicBrainz-Beziehungen zu Künstlern, Gruppen, Mitgliedern, Labels, Aliasen und Mitwirkenden werden geladen.
