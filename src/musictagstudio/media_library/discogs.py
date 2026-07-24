@@ -376,6 +376,44 @@ def search_catalog(
     )
 
 
+def fetch_artist_image(
+    artist: str,
+    token: str,
+) -> tuple[str, str] | None:
+    """Return the primary Discogs artist image and its source page."""
+    if not str(token or "").strip():
+        return None
+    wanted = _key(artist)
+    hits = search_catalog(
+        artist,
+        token,
+        kinds=("artist",),
+        limit_per_kind=15,
+    )
+    exact = [
+        hit
+        for hit in hits
+        if _key(re.sub(r"\s+\(\d+\)$", "", hit.title)) == wanted
+    ]
+    if not exact:
+        return None
+    hit = exact[0]
+    detail = _get_json(f"/artists/{hit.entity_id}", token)
+    images = [
+        image
+        for image in detail.get("images", [])
+        if isinstance(image, dict)
+    ]
+    images.sort(key=lambda image: 0 if image.get("type") == "primary" else 1)
+    for image in images:
+        url = str(image.get("uri") or image.get("resource_url") or "").strip()
+        if url:
+            return url, hit.external_url
+    if hit.thumb:
+        return hit.thumb, hit.external_url
+    return None
+
+
 def fetch_catalog_release(
     kind: str,
     entity_id: int,

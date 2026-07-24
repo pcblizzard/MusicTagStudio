@@ -21,6 +21,8 @@ Module direkt unter `musictagstudio` sind zu vermeiden.
 - `media_library/`: MusicBrainz-/Discogs-Suche und Explorer-Fachlogik.
   `tasks.py` enthält langsame Netzwerk- und Cache-Aufgaben;
   `presentation.py` enthält reine Formatierungs- und Zusammenführungslogik.
+  `streaming/` enthält anbieterneutrale Modelle und den SQLite-Cache für
+  externe IDs und zeitlich begrenzte Verfügbarkeitsprüfungen.
 - `lyrics/`: Lyrics-Modelle, lokale Speicherung, LRC-Verarbeitung und Auswahl.
 - `audio_analysis/`, `library_audit/`, `cover_management/`: eigenständige
   Funktionsbereiche mit ihren jeweiligen Modellen und Abläufen.
@@ -63,3 +65,13 @@ kleinen, getesteten Schritten entlang tatsächlicher Verantwortungen zerlegt:
 Tagger-Aktionen und Workspace-Navigation einerseits, formatspezifische
 Metadaten-Adapter andererseits. Der Player erhält in 0.8.5 ein eigenes Paket
 und wird nicht in `MainWindow` implementiert.
+
+Die globale Windows-Mediensteuerung liegt getrennt in
+`player/windows_media_keys.py`. Sie übersetzt native Hotkey- und
+`APPCOMMAND`-Ereignisse in Aufrufe der Player-Engine und verwaltet deren
+Registrierungslebenszyklus.
+
+`player/windows_smtc.py` veröffentlicht Metadaten, Cover und Wiedergabestatus
+über Windows `SystemMediaTransportControls`. Ist diese optionale Brücke aktiv,
+ersetzt sie den nativen Hotkey-Filter; andernfalls bleibt dieser als Fallback
+zuständig.

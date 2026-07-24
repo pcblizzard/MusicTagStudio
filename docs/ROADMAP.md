@@ -2,7 +2,24 @@
 
 Ohne feste Termine.
 
-## v0.8.4 — Lyrics
+## v0.8.6 — Erweiterte Warteschlange
+
+- **alpha1 ✅:** eigenständiges Warteschlangenfenster, Drag-and-drop,
+  Mehrfachauswahl und Anhängen lokaler Alben
+- **alpha2.1 ✅:** globale Windows-Medientasten
+- **alpha2.2 ✅:** statische und mitlaufende Karaoke-Lyrics
+- **alpha2.3 ✅:** Windows-System-Medienanzeige mit Titel, Künstler und Cover
+- **beta:** gespeicherte Warteschlangen, Fehlerfälle und UI-Polishing
+
+## v0.8.5 — Player
+
+- **alpha1 ✅:** lokaler Player-Kern, Warteschlange und kompakte Playerleiste
+- **alpha2 ✅:** Medienbibliotheks-Wiedergabe, Streaming-Cache, Katalogsuche und redaktionelle Künstler-/Albuminfos
+- **alpha3 ✅:** Wiedergabereihenfolge, Wiederholen, Zufallswiedergabe, Cover und verfeinerte Bedienung
+- **beta ✅:** Player-Zustand speichern, bearbeitbare Warteschlange, Fehlerfälle und UI-Polishing
+- **stabil ✅:** Verlaufskorrekturen, gespeicherte Stummschaltung, Zugänglichkeit und Release-Härtung
+
+## v0.8.4 — Lyrics ✅
 
 Diese Version bleibt vollständig auf Liedtexte begrenzt.
 
@@ -12,7 +29,7 @@ Diese Version bleibt vollständig auf Liedtexte begrenzt.
 - **alpha3 ✅:** Vorschau und bestätigtes Schreiben in unterstützte Audio-Tags
 - **beta ✅:** Fehlerzustände, Quellenangaben, Tastaturbedienung und UI-Polishing
 
-Der Player folgt erst mit v0.8.5.
+Der Player wird seit v0.8.5 schrittweise ergänzt.
 
 ## Nächste sinnvolle Schritte
 

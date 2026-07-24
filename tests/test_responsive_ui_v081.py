@@ -1,13 +1,14 @@
 from pathlib import Path
 
 
-def test_tagger_buttons_have_compact_ellipsis_labels():
+def test_tagger_buttons_have_clear_action_labels():
     text = (
         Path(__file__).parents[1]
         / "src" / "musictagstudio" / "ui" / "main_window.py"
     ).read_text(encoding="utf-8")
-    assert '"Vorschlag …"' in text
-    assert '"Mehrfachvorschlag …"' in text
+    assert '"Metadaten für Titel suchen"' in text
+    assert '"Metadaten für Auswahl suchen"' in text
+    assert '"Album/Song über Link oder ID laden"' in text
     assert "def resizeEvent" in text
     assert "def _layout_provider_buttons" in text
 

@@ -36,11 +36,10 @@ discogs_token = ""
 
 [library]
 load_sources_on_startup = true
-scan_sources_on_startup = false
+scan_sources_on_startup = true
 
-# Beispiel:
-# [[music_sources]]
-# id = "music-ssd"
-# name = "Musik SSD"
-# path = "D:\\Musik"
-# enabled = true
+[[music_sources]]
+id = "example"
+name = "Music"
+path = "C:\\Users\\YourName\\Music"
+enabled = false

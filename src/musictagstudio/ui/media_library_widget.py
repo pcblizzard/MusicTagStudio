@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime
 import html
+import re
 import webbrowser
 
 from PySide6.QtCore import (
@@ -24,6 +26,8 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -32,10 +36,12 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTextBrowser,
     QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
@@ -75,8 +81,20 @@ from ..library_sources import IndexedAlbum
 from ..models.song import Song
 from ..services.cover import load_cover
 from ..providers.apple_music import (
+    AppleAlbumCandidate,
     AppleMusicProviderError,
-    search_album as search_apple_album,
+    MINIMUM_ALBUM_CONFIDENCE,
+    search_album_variants as search_apple_album,
+)
+from ..providers.apple_artist import (
+    ArtistArtwork,
+    fetch_artist_artwork,
+)
+from ..providers.theaudiodb import (
+    EditorialInfo,
+    fetch_album_info_with_apple_fallback,
+    fetch_artist_info,
+    information_language,
 )
 from ..media_library import tasks as _catalog_tasks
 from ..media_library.tasks import (
@@ -98,8 +116,16 @@ from ..media_library.presentation import (
     medium_count as _medium_count,
     merge_release_groups as _merge_release_groups,
     normalized as _normalized,
+    release_source_details as _release_source_details,
+    streaming_artist as _streaming_artist,
     track_title as _track_title,
     type_text as _type_text,
+)
+from ..media_library.streaming import (
+    AvailabilityStatus,
+    StreamingAvailability,
+    StreamingAvailabilityCache,
+    streaming_release_key,
 )
 
 
@@ -141,6 +167,8 @@ class Worker(QRunnable):
 
 class MediaLibraryWidget(QWidget):
     open_local_album = Signal(str)
+    play_local_tracks = Signal(object, int)
+    enqueue_local_tracks = Signal(object)
 
     def __init__(
         self,
@@ -189,6 +217,8 @@ class MediaLibraryWidget(QWidget):
             ReleaseGroup
             | None
         ) = None
+        self.current_tracks: list[Track] = []
+        self._local_songs: list[Song] = []
         self.local_albums: dict[
             str,
             str
@@ -215,6 +245,13 @@ class MediaLibraryWidget(QWidget):
         self._current_cover_data: bytes | None = None
         self._category_icons = self._load_category_icons()
         self.ui_settings = QSettings("MusicTagStudio", "MusicTagStudio")
+        self._streaming_results: dict[str, AppleAlbumCandidate | None] = {}
+        self._streaming_checked_at: dict[str, datetime] = {}
+        self._editorial_request_key = ""
+        self._editorial_heading = ""
+        self._editorial_text = ""
+        self._editorial_source_html = ""
+        self.streaming_cache = StreamingAvailabilityCache()
         self.release_view_mode = str(self.ui_settings.value("media_library/view_mode", "discography"))
         self.cover_size_name = str(self.ui_settings.value("media_library/cover_size", "medium"))
         self._view_syncing = False
@@ -418,6 +455,11 @@ class MediaLibraryWidget(QWidget):
         self.group_tree.setIconSize(QSize(18,18)); self.group_tree.setIndentation(22); self.group_tree.setColumnCount(5)
         self.group_tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.group_tree.currentItemChanged.connect(self._group_selected)
+        self.group_tree.header().sectionClicked.connect(
+            self._sort_discography_column
+        )
+        self._discography_sort_column = 1
+        self._discography_sort_ascending = True
         self.release_view_stack.addWidget(self.group_tree)
         self.release_table = QTableWidget(0,7)
         self.release_table.setHorizontalHeaderLabels(["Titel","Künstler","Jahr","Kategorie","Quelle","Label / Format","Status"])
@@ -441,9 +483,12 @@ class MediaLibraryWidget(QWidget):
         self._apply_cover_size()
 
         detail_panel = QWidget()
-        detail_layout = QVBoxLayout(
-            detail_panel
-        )
+        detail_panel_layout = QVBoxLayout(detail_panel)
+        detail_panel_layout.setContentsMargins(0, 0, 0, 0)
+        metadata_panel = QWidget()
+        detail_layout = QVBoxLayout(metadata_panel)
+        detail_layout.setContentsMargins(0, 0, 4, 0)
+        detail_layout.setSpacing(6)
         detail_header = QHBoxLayout()
         self.cover_label = QLabel(
             "Kein Cover verfügbar"
@@ -466,6 +511,7 @@ class MediaLibraryWidget(QWidget):
         )
 
         detail_text = QVBoxLayout()
+        detail_text.setSpacing(2)
         self.group_title = QLabel(
             "Keine Veröffentlichung ausgewählt"
         )
@@ -486,6 +532,22 @@ class MediaLibraryWidget(QWidget):
         detail_text.addWidget(
             self.group_meta
         )
+
+        self.source_details = QLabel("")
+        self.source_details.setObjectName("releaseSourceDetails")
+        self.source_details.setWordWrap(True)
+        self.source_details.setTextFormat(Qt.TextFormat.RichText)
+        self.source_details.setMinimumHeight(72)
+        self.source_details.setMaximumHeight(96)
+        self.source_details.setStyleSheet(
+            "QLabel#releaseSourceDetails {"
+            "background: palette(alternate-base);"
+            "border: 1px solid palette(mid);"
+            "border-radius: 10px; padding: 4px 8px;"
+            "}"
+        )
+        self.source_details.hide()
+        detail_text.addWidget(self.source_details)
         detail_text.addStretch()
         detail_header.addLayout(
             detail_text,
@@ -546,6 +608,30 @@ class MediaLibraryWidget(QWidget):
             self.streaming_status
         )
 
+        self.editorial_info = QTextBrowser()
+        self.editorial_info.setObjectName("editorialInfo")
+        self.editorial_info.setOpenExternalLinks(True)
+        self.editorial_info.setMinimumHeight(82)
+        self.editorial_info.setMaximumHeight(112)
+        self.editorial_info.setStyleSheet(
+            "QTextBrowser#editorialInfo {"
+            "background: palette(alternate-base);"
+            "border: 1px solid palette(mid);"
+            "border-radius: 10px; padding: 5px;"
+            "}"
+        )
+        self.editorial_info.hide()
+        detail_layout.addWidget(self.editorial_info)
+        self.editorial_more_button = QPushButton("Mehr anzeigen …")
+        self.editorial_more_button.clicked.connect(
+            self._show_full_editorial
+        )
+        self.editorial_more_button.hide()
+        detail_layout.addWidget(
+            self.editorial_more_button,
+            alignment=Qt.AlignmentFlag.AlignLeft,
+        )
+
         edition_form = QFormLayout()
         self.edition_combo = QComboBox()
         self.edition_combo.currentIndexChanged.connect(
@@ -576,15 +662,32 @@ class MediaLibraryWidget(QWidget):
         self.open_local_button.clicked.connect(
             self._open_local
         )
-        detail_layout.addWidget(
-            self.open_local_button
+        self.enqueue_local_button = QPushButton(
+            "Zur Warteschlange"
         )
+        self.enqueue_local_button.setEnabled(False)
+        self.enqueue_local_button.clicked.connect(
+            self._enqueue_local_album
+        )
+        local_actions = QHBoxLayout()
+        local_actions.addWidget(self.open_local_button, 1)
+        local_actions.addWidget(self.enqueue_local_button)
+        detail_layout.addLayout(local_actions)
 
-        detail_layout.addWidget(
-            QLabel(
-                "Trackliste"
-            )
+        metadata_scroll = QScrollArea()
+        metadata_scroll.setObjectName("releaseMetadataScroll")
+        metadata_scroll.setWidgetResizable(True)
+        metadata_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
+        metadata_scroll.setWidget(metadata_panel)
+
+        track_panel = QWidget()
+        self.track_panel = track_panel
+        track_layout = QVBoxLayout(track_panel)
+        track_layout.setContentsMargins(0, 4, 0, 0)
+        track_layout.setSpacing(4)
+        track_layout.addWidget(QLabel("Trackliste"))
         self.track_table = QTableWidget(
             0,
             4,
@@ -603,10 +706,39 @@ class MediaLibraryWidget(QWidget):
         self.track_table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
-        detail_layout.addWidget(
+        self.track_table.cellDoubleClicked.connect(
+            self._play_local_track
+        )
+        self.track_table.setMinimumHeight(190)
+        track_layout.addWidget(
             self.track_table,
             stretch=1,
         )
+
+        self.detail_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.detail_splitter.setChildrenCollapsible(False)
+        self.detail_splitter.addWidget(metadata_scroll)
+        self.detail_splitter.addWidget(track_panel)
+        self.detail_splitter.setStretchFactor(0, 0)
+        self.detail_splitter.setStretchFactor(1, 1)
+        saved_detail_sizes = self.ui_settings.value(
+            "media_library/detail_splitter_sizes",
+            [390, 260],
+        )
+        try:
+            detail_sizes = [int(value) for value in saved_detail_sizes]
+        except (TypeError, ValueError):
+            detail_sizes = [390, 260]
+        self.detail_splitter.setSizes(
+            detail_sizes if len(detail_sizes) == 2 else [390, 260]
+        )
+        self.detail_splitter.splitterMoved.connect(
+            lambda *_args: self.ui_settings.setValue(
+                "media_library/detail_splitter_sizes",
+                self.detail_splitter.sizes(),
+            )
+        )
+        detail_panel_layout.addWidget(self.detail_splitter)
 
         splitter.addWidget(
             artist_panel
@@ -619,11 +751,14 @@ class MediaLibraryWidget(QWidget):
         )
         splitter.setSizes(
             [
-                260,
-                520,
-                650,
+                230,
+                430,
+                770,
             ]
         )
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 2)
         root.addWidget(
             splitter,
             stretch=1,
@@ -675,6 +810,7 @@ class MediaLibraryWidget(QWidget):
         self,
         songs: list[Song],
     ) -> None:
+        self._local_songs = list(songs)
         albums: dict[
             str,
             str
@@ -711,6 +847,126 @@ class MediaLibraryWidget(QWidget):
             for key in albums
         }
         self._refresh_local_markers()
+
+    def _play_local_track(self, row: int, _column: int) -> None:
+        if not (0 <= row < len(self.current_tracks)):
+            return
+        group = self.current_group
+        if group is None:
+            return
+
+        songs = self._current_local_album_songs()
+        if not songs:
+            self._set_status(
+                "Die lokalen Albumdateien sind noch nicht eingelesen. "
+                "Bitte zuerst die Bibliotheksdaten aktualisieren."
+            )
+            return
+
+        track = self.current_tracks[row]
+        start_index = next(
+            (
+                index
+                for index, song in enumerate(songs)
+                if (
+                    _tag_number(song.disc) == int(track.disc_number or 0)
+                    and _tag_number(song.track) == int(track.track_number or 0)
+                )
+            ),
+            -1,
+        )
+        if start_index < 0:
+            wanted_title = _normalized(track.title)
+            start_index = next(
+                (
+                    index
+                    for index, song in enumerate(songs)
+                    if _normalized(song.title) == wanted_title
+                ),
+                -1,
+            )
+        if start_index < 0:
+            self._set_status(
+                "Der ausgewählte Titel konnte keiner lokalen Datei "
+                "zugeordnet werden."
+            )
+            return
+
+        self.play_local_tracks.emit(songs, start_index)
+
+    def _current_local_album_songs(self) -> list[Song]:
+        group = self.current_group
+        if group is None:
+            return []
+        album_key = _normalized(group.title)
+        songs = [
+            song
+            for song in self._local_songs
+            if _normalized(song.album) == album_key
+            and Path(song.path).is_file()
+        ]
+        artist_key = _normalized(self.current_artist_name)
+        artist_songs = [
+            song
+            for song in songs
+            if artist_key in {
+                _normalized(song.album_artist),
+                _normalized(song.artist),
+            }
+        ]
+        if artist_songs:
+            songs = artist_songs
+        songs.sort(key=lambda song: (
+            _tag_number(song.disc),
+            _tag_number(song.track),
+            _normalized(song.title),
+        ))
+        return songs
+
+    def _enqueue_local_album(self) -> None:
+        songs = self._current_local_album_songs()
+        if not songs:
+            self._set_status(
+                "Für dieses Album wurden keine erreichbaren lokalen Titel gefunden."
+            )
+            return
+        self.enqueue_local_tracks.emit(songs)
+
+    def highlight_playing_song(self, song: Song) -> None:
+        group = self.current_group
+        if (
+            group is None
+            or _normalized(song.album) != _normalized(group.title)
+        ):
+            return
+        disc = _tag_number(song.disc)
+        number = _tag_number(song.track)
+        title = _normalized(song.title)
+        row = next(
+            (
+                index
+                for index, track in enumerate(self.current_tracks)
+                if (
+                    int(track.disc_number or 0) == disc
+                    and int(track.track_number or 0) == number
+                )
+            ),
+            -1,
+        )
+        if row < 0:
+            row = next(
+                (
+                    index
+                    for index, track in enumerate(self.current_tracks)
+                    if _normalized(track.title) == title
+                ),
+                -1,
+            )
+        if row >= 0:
+            self.track_table.selectRow(row)
+            item = self.track_table.item(row, 0)
+            if item is not None:
+                self.track_table.scrollToItem(item)
 
     def search_artist(
         self,
@@ -762,11 +1018,18 @@ class MediaLibraryWidget(QWidget):
         self.cover_list.clear()
         self.edition_combo.clear()
         self.edition_details.clear()
+        self.source_details.clear()
+        self.source_details.hide()
+        self._editorial_request_key = ""
+        self.editorial_info.clear()
+        self.editorial_info.hide()
+        self.editorial_more_button.hide()
         self.track_table.setRowCount(
             0
         )
         self.open_local_button.setProperty("local_path", "")
         self.open_local_button.setEnabled(False)
+        self.enqueue_local_button.setEnabled(False)
         self._show_cover(None)
         self.group_title.setText(
             tr("search_running", self.language)
@@ -814,8 +1077,15 @@ class MediaLibraryWidget(QWidget):
             return
         artists = list(result or ())
         self.live_suggestions.clear()
-        for artist_name in artists:
-            item = QListWidgetItem(f"⌕  {artist_name}")
+        for suggestion in artists:
+            artist_name = str(getattr(suggestion, "name", suggestion))
+            correction = bool(getattr(suggestion, "correction", False))
+            label = (
+                f"Meintest du: {artist_name}?"
+                if correction
+                else artist_name
+            )
+            item = QListWidgetItem(f"⌕  {label}")
             item.setData(Qt.ItemDataRole.UserRole, artist_name)
             self.live_suggestions.addItem(item)
         self.live_suggestions.setVisible(bool(artists))
@@ -1094,6 +1364,8 @@ class MediaLibraryWidget(QWidget):
             return
 
         self.release_groups = []
+        self.current_group = None
+        self.track_panel.hide()
         self.musicbrainz_release_groups = []
         self.discogs_release_groups = []
         self.current_artist_name = artist.name
@@ -1118,11 +1390,36 @@ class MediaLibraryWidget(QWidget):
         self._show_cover(
             None
         )
+        self.cover_label.setText("Künstlerbild wird geladen …")
+        settings = load_settings()
+        self._run(
+            fetch_artist_artwork,
+            artist.name,
+            settings.apple_country,
+            self.language,
+            self.cover_cache_directory,
+            settings.discogs_token,
+            finished=self._artist_artwork_loaded,
+            transform=lambda artwork, artist_id=artist.artist_id: (
+                artist_id,
+                artwork,
+            ),
+            failed=lambda _message: self._artist_artwork_failed(
+                artist.artist_id
+            ),
+        )
         self.group_title.setText(
             artist.name
         )
         self.group_meta.setText(
             "MusicBrainz-Künstler"
+        )
+        self._request_editorial(
+            f"artist:{artist.artist_id}",
+            "artist",
+            fetch_artist_info,
+            artist.name,
+            self.language,
         )
         self.relations_tree.clear()
         loading_item = QTreeWidgetItem(["Verknüpfungen werden geladen …"])
@@ -1516,6 +1813,13 @@ class MediaLibraryWidget(QWidget):
     def _apply_cover_size(self) -> None:
         cover, cell = self._cover_dimensions()
         self.cover_view.setIconSize(QSize(cover,cover)); self.cover_view.setGridSize(QSize(cell,cell+54))
+        list_cover = {
+            "small": 44,
+            "medium": 60,
+            "large": 76,
+            "xlarge": 96,
+        }.get(self.cover_size_name, 60)
+        self.cover_list.setIconSize(QSize(list_cover, list_cover))
 
     def _render_alternative_views(self) -> None:
         if not hasattr(self, "release_table"):
@@ -1525,6 +1829,10 @@ class MediaLibraryWidget(QWidget):
         cover_size,_ = self._cover_dimensions(); placeholder=QPixmap(cover_size,cover_size); placeholder.fill(Qt.GlobalColor.transparent)
         for row, group in enumerate(self.release_groups):
             source = "Discogs" if group.source == "discogs" else "MusicBrainz"
+            display_artist = (
+                _streaming_artist(group.artist, self.current_artist_name)
+                or "Unbekannter Künstler"
+            )
             local = _local_status_display(
                 self.local_album_status.get(
                     _normalized(group.title),
@@ -1532,13 +1840,14 @@ class MediaLibraryWidget(QWidget):
                 )
             )
             extra = " · ".join([*group.labels[:2],*group.formats[:3]])
-            values=(group.title,group.artist,group.first_release_date[:4],_category(group),source,extra,local)
+            values=(group.title,display_artist,group.first_release_date[:4],_category(group),source,extra,local)
             for col,value in enumerate(values):
                 item=QTableWidgetItem(str(value or "")); item.setData(Qt.ItemDataRole.UserRole,row); self.release_table.setItem(row,col,item)
-            grid=QStandardItem(QIcon(placeholder), f"{group.title}\n{group.artist or source}\n{group.first_release_date[:4]} · {local}")
+            grid=QStandardItem(QIcon(placeholder), f"{group.title}\n{display_artist}\n{group.first_release_date[:4]} · {local}")
             grid.setData(row,Qt.ItemDataRole.UserRole); grid.setEditable(False); self.cover_model.appendRow(grid)
-            li=QListWidgetItem(QIcon(placeholder), f"{group.title}\n{group.artist or 'Unbekannter Künstler'} · {group.first_release_date[:4] or 'Jahr unbekannt'} · {_category(group)}\n{extra or source} · {local}")
-            li.setData(Qt.ItemDataRole.UserRole,row); li.setSizeHint(QSize(300,max(76,cover_size+12))); self.cover_list.addItem(li)
+            li=QListWidgetItem(QIcon(placeholder), f"{group.title}\n{display_artist} · {group.first_release_date[:4] or 'Jahr unbekannt'} · {_category(group)}\n{extra or source} · {local}")
+            list_cover = self.cover_list.iconSize().height()
+            li.setData(Qt.ItemDataRole.UserRole,row); li.setSizeHint(QSize(300,max(64,list_cover+10))); self.cover_list.addItem(li)
             self._load_release_thumbnail(row,group)
         self.release_table.setSortingEnabled(True); self.release_table.resizeColumnsToContents(); self._view_syncing=False
 
@@ -1617,8 +1926,35 @@ class MediaLibraryWidget(QWidget):
         item=self.cover_list.item(row)
         if item is not None and item.data(Qt.ItemDataRole.UserRole) is not None: self._select_release_index(int(item.data(Qt.ItemDataRole.UserRole)))
 
+    def _sort_discography_column(self, column: int) -> None:
+        if column == self._discography_sort_column:
+            self._discography_sort_ascending = not self._discography_sort_ascending
+        else:
+            self._discography_sort_column = column
+            self._discography_sort_ascending = True
+
+        reverse = not self._discography_sort_ascending
+        for parent_index in range(self.group_tree.topLevelItemCount()):
+            parent = self.group_tree.topLevelItem(parent_index)
+            children = parent.takeChildren()
+            children.sort(
+                key=lambda item: item.text(column).casefold(),
+                reverse=reverse,
+            )
+            parent.addChildren(children)
+
+        self.group_tree.header().setSortIndicator(
+            column,
+            (
+                Qt.SortOrder.AscendingOrder
+                if self._discography_sort_ascending
+                else Qt.SortOrder.DescendingOrder
+            ),
+        )
+
     def _load_group(self, group: ReleaseGroup) -> None:
-        self.current_group=group; self.editions=[]; self.edition_combo.clear(); self.track_table.setRowCount(0)
+        self.track_panel.show()
+        self.current_group=group; self.current_tracks=[]; self.editions=[]; self.edition_combo.clear(); self.track_table.setRowCount(0)
         self._cover_generation += 1; self._show_cover(None); self.group_title.setText(group.title)
         key=_normalized(group.title); local_path=self.local_albums.get(key); status=self.local_album_status.get(key,"Nicht vorhanden"); local_online=status == "Lokal verfügbar"
         self._push_breadcrumb(
@@ -1627,18 +1963,47 @@ class MediaLibraryWidget(QWidget):
             group.release_group_id,
         )
         self.group_meta.setText(" · ".join(v for v in (_type_text(group),group.first_release_date or "Datum unbekannt",_local_status_display(status)) if v))
+        self._render_source_details(group, status)
         self.open_local_button.setProperty(
             "local_path",
             local_path or "",
         )
         self.open_local_button.setEnabled(bool(local_path) and local_online)
+        self.enqueue_local_button.setEnabled(
+            bool(local_path) and local_online
+        )
         self.open_local_button.setToolTip(
             "Lokales Album im Tagger öffnen"
             if local_online
             else "Das Album ist indiziert, die Musikquelle ist momentan nicht erreichbar."
         )
         self.streaming_button.setEnabled(True); self.quality_button.setEnabled(True); self.apple_button.setEnabled(False)
-        self.streaming_status.setText("Streaming und Qualität wurden nicht abgefragt.")
+        cached_streaming = self._streaming_results.get(group.release_group_id)
+        if group.release_group_id not in self._streaming_results:
+            cached_streaming = self._load_saved_streaming_result(group)
+            if cached_streaming is not None:
+                self._streaming_results[group.release_group_id] = cached_streaming
+        if cached_streaming is not None:
+            self._show_streaming_result(group, cached_streaming, saved=True)
+        elif group.release_group_id in self._streaming_results:
+            self._show_no_streaming_result(group)
+        else:
+            self.streaming_status.setText("Streaming und Qualität wurden nicht abgefragt.")
+        apple_url = (
+            "https://music.apple.com/de/album/"
+            f"id{cached_streaming.collection_id}"
+            if cached_streaming is not None
+            else ""
+        )
+        self._request_editorial(
+            f"album:{group.release_group_id}",
+            "album",
+            fetch_album_info_with_apple_fallback,
+            self.current_artist_name or group.artist,
+            group.title,
+            self.language,
+            apple_url,
+        )
         if group.source == "discogs" and group.discogs_release_id:
             self._run(
                 self._discogs_edition_from_group,
@@ -1844,6 +2209,14 @@ class MediaLibraryWidget(QWidget):
         self.group_tree.resizeColumnToContents(
             3
         )
+        self.group_tree.header().setSortIndicator(
+            self._discography_sort_column,
+            (
+                Qt.SortOrder.AscendingOrder
+                if self._discography_sort_ascending
+                else Qt.SortOrder.DescendingOrder
+            ),
+        )
         categories = sum(
             1
             for category in category_order
@@ -1994,6 +2367,7 @@ class MediaLibraryWidget(QWidget):
         tracks = list(
             tracks
         )
+        self.current_tracks = tracks
         self.track_table.setRowCount(
             len(tracks)
         )
@@ -2284,6 +2658,41 @@ class MediaLibraryWidget(QWidget):
         )
         self._sync_current_group_thumbnail(data)
 
+    def _artist_artwork_loaded(self, result) -> None:
+        artist_id, artwork = result
+        if artist_id != self.current_artist_id or self.current_group is not None:
+            return
+        if not isinstance(artwork, ArtistArtwork):
+            self._artist_artwork_failed(artist_id)
+            return
+        pixmap = QPixmap()
+        if not pixmap.loadFromData(artwork.data):
+            self._artist_artwork_failed(artist_id)
+            return
+        size = self.cover_label.size()
+        scaled = pixmap.scaled(
+            size,
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        x = max(0, (scaled.width() - size.width()) // 2)
+        y = max(0, (scaled.height() - size.height()) // 2)
+        self.cover_label.setText("")
+        self.cover_label.setPixmap(scaled.copy(x, y, size.width(), size.height()))
+        self.cover_label.setToolTip(
+            f"Künstlerbild von {artwork.source}\n{artwork.artist_url}"
+        )
+
+    def _artist_artwork_failed(self, artist_id: str) -> None:
+        if artist_id != self.current_artist_id or self.current_group is not None:
+            return
+        self.cover_label.setPixmap(QPixmap())
+        self.cover_label.setText("Kein Künstlerbild verfügbar")
+        self.cover_label.setToolTip(
+            "Weder Apple Music noch Discogs stellen ein geeignetes "
+            "Künstlerbild bereit."
+        )
+
     def check_streaming(
         self,
     ) -> None:
@@ -2298,10 +2707,16 @@ class MediaLibraryWidget(QWidget):
         self.streaming_status.setText(
             "Apple Music wird auf ausdrücklichen Wunsch geprüft …"
         )
+        expected_track_count = None
+        edition_index = self.edition_combo.currentIndex()
+        if 0 <= edition_index < len(self.editions):
+            expected_track_count = self.editions[edition_index].track_count or None
         self._run(
             search_apple_album,
             group.title,
-            group.artist,
+            _streaming_artist(group.artist, self.current_artist_name),
+            expected_track_count=expected_track_count,
+            track_titles=tuple(track.title for track in self.current_tracks),
             wanted_year=(
                 group.first_release_date[
                     :4
@@ -2310,29 +2725,63 @@ class MediaLibraryWidget(QWidget):
             country="DE",
             limit=10,
             finished=self._streaming_loaded,
+            transform=lambda candidates, group_id=group.release_group_id: (
+                group_id,
+                candidates,
+            ),
         )
 
     def _streaming_loaded(
         self,
-        candidates,
+        result,
     ) -> None:
+        group_id, candidates = result
+        if (
+            self.current_group is None
+            or self.current_group.release_group_id != group_id
+        ):
+            return
         self.streaming_button.setEnabled(
             True
         )
-        candidates = list(
-            candidates
-        )
+        candidates = [
+            candidate
+            for candidate in candidates
+            if candidate.confidence >= MINIMUM_ALBUM_CONFIDENCE
+        ]
 
         if not candidates:
-            self.streaming_status.setText(
-                "Bei Apple Music wurde keine eindeutige Ausgabe gefunden. "
-                "Weitere Dienste wurden noch nicht abgefragt."
-            )
+            self._streaming_results[group_id] = None
+            self._show_no_streaming_result(self.current_group)
             return
 
         best = candidates[
             0
         ]
+        self._streaming_results[group_id] = best
+        self._streaming_checked_at[group_id] = datetime.now().astimezone()
+        self._save_streaming_result(self.current_group, best)
+        self._show_streaming_result(self.current_group, best)
+        self._request_editorial(
+            f"album:{self.current_group.release_group_id}",
+            "album",
+            fetch_album_info_with_apple_fallback,
+            self.current_artist_name or self.current_group.artist,
+            self.current_group.title,
+            self.language,
+            (
+                "https://music.apple.com/de/album/"
+                f"id{best.collection_id}"
+            ),
+        )
+
+    def _show_streaming_result(
+        self,
+        group: ReleaseGroup,
+        best: AppleAlbumCandidate,
+        *,
+        saved: bool = False,
+    ) -> None:
         url = (
             "https://music.apple.com/de/album/"
             f"id{best.collection_id}"
@@ -2348,8 +2797,113 @@ class MediaLibraryWidget(QWidget):
             "Apple Music: gefunden · "
             f"{best.track_count} Titel · "
             f"Übereinstimmung {best.confidence} %. "
-            "Qobuz, TIDAL und Deezer folgen in späteren Ausbaustufen."
+            + (
+                "Gespeichertes Ergebnis · zuletzt geprüft: "
+                + self._streaming_checked_at.get(
+                    group.release_group_id,
+                    datetime.now().astimezone(),
+                ).astimezone().strftime("%d.%m.%Y, %H:%M")
+                + ". "
+                if saved
+                else ""
+            )
+            + "Qobuz, TIDAL und Deezer folgen in späteren Ausbaustufen."
         )
+        status = self.local_album_status.get(_normalized(group.title), "Nicht vorhanden")
+        self._render_source_details(group, status, apple_music_status="found")
+
+    def _show_no_streaming_result(self, group: ReleaseGroup) -> None:
+        self.apple_button.setEnabled(False)
+        self.streaming_status.setText(
+            "Bei Apple Music wurde keine eindeutige Ausgabe gefunden. "
+            "Weitere Dienste wurden noch nicht abgefragt."
+        )
+        status = self.local_album_status.get(_normalized(group.title), "Nicht vorhanden")
+        self._render_source_details(group, status, apple_music_status="not_found")
+
+    def _streaming_release_key(self, group: ReleaseGroup) -> str:
+        return streaming_release_key(
+            _streaming_artist(group.artist, self.current_artist_name),
+            group.title,
+            group.first_release_date[:4],
+        )
+
+    def _save_streaming_result(
+        self, group: ReleaseGroup, result: AppleAlbumCandidate
+    ) -> None:
+        cached = StreamingAvailability.available(
+            provider="apple_music",
+            release_key=self._streaming_release_key(group),
+            external_id=result.collection_id,
+            external_url=(
+                "https://music.apple.com/de/album/"
+                f"id{result.collection_id}"
+            ),
+            album=result.album,
+            artist=result.artist,
+            year=result.year,
+            track_count=result.track_count,
+            confidence=result.confidence,
+            country=result.country or "DE",
+            ttl_days=7,
+        )
+        self.streaming_cache.put(cached)
+        self._streaming_checked_at[group.release_group_id] = datetime.fromisoformat(
+            cached.checked_at
+        )
+
+    def _load_saved_streaming_result(
+        self, group: ReleaseGroup
+    ) -> AppleAlbumCandidate | None:
+        cached = self.streaming_cache.get(
+            "apple_music",
+            self._streaming_release_key(group),
+            "DE",
+        )
+        if cached is None or cached.status is not AvailabilityStatus.AVAILABLE:
+            return None
+        checked_at = datetime.fromisoformat(cached.checked_at)
+        self._streaming_checked_at[group.release_group_id] = checked_at
+        return AppleAlbumCandidate(
+            collection_id=cached.external_id,
+            album=cached.album or group.title,
+            artist=cached.artist or group.artist,
+            track_count=cached.track_count,
+            year=cached.year,
+            country=cached.country,
+            confidence=cached.confidence,
+        )
+
+    def _render_source_details(
+        self,
+        group: ReleaseGroup,
+        local_status: str,
+        *,
+        apple_music_status: str = "not_checked",
+    ) -> None:
+        rows = _release_source_details(
+            group,
+            local_status,
+            apple_music_status=apple_music_status,
+        )
+        compact_rows = []
+        tooltip_rows = []
+        for source, detail in rows:
+            compact_detail = detail
+            parts = [part.strip() for part in detail.split(",") if part.strip()]
+            if source == "Discogs" and len(parts) > 2:
+                compact_detail = (
+                    f"{parts[0]}, {parts[1]} + {len(parts) - 2} weitere"
+                )
+            compact_rows.append((source, compact_detail))
+            tooltip_rows.append(f"{source}: {detail}")
+        content = "".join(
+            f"<div><b>{html.escape(source)}</b> · {html.escape(detail)}</div>"
+            for source, detail in compact_rows
+        )
+        self.source_details.setText(f"<b>Quellen</b>{content}")
+        self.source_details.setToolTip("\n".join(tooltip_rows))
+        self.source_details.show()
 
     def check_quality(
         self,
@@ -2616,6 +3170,105 @@ class MediaLibraryWidget(QWidget):
             + message
         )
 
+    def _request_editorial(
+        self,
+        key: str,
+        kind: str,
+        function,
+        *args,
+    ) -> None:
+        language = information_language(self.language)
+        request_key = f"{key}:{language}"
+        self._editorial_request_key = request_key
+        self._editorial_heading = ""
+        self._editorial_text = ""
+        self._editorial_source_html = ""
+        self.editorial_more_button.hide()
+        heading = (
+            "Künstlerbiografie" if kind == "artist" else "Über dieses Album"
+        ) if language == "de" else (
+            "Artist biography" if kind == "artist" else "About this album"
+        )
+        loading = "Wird geladen …" if language == "de" else "Loading …"
+        self.editorial_info.setHtml(
+            f"<b>{html.escape(heading)}</b><p>{loading}</p>"
+        )
+        self.editorial_info.show()
+        self._run(
+            function,
+            *args,
+            finished=lambda info, current=request_key, title=heading:
+                self._editorial_loaded(current, title, info),
+            failed=lambda _message, current=request_key:
+                self._editorial_failed(current),
+        )
+
+    def _editorial_loaded(
+        self,
+        request_key: str,
+        heading: str,
+        info: EditorialInfo | None,
+    ) -> None:
+        if request_key != self._editorial_request_key:
+            return
+        if info is None:
+            self.editorial_info.hide()
+            self.editorial_more_button.hide()
+            return
+        requested = information_language(self.language)
+        if requested == "de":
+            language_note = (
+                "Deutsch" if info.language == "de" else "Englisch (Fallback)"
+            )
+            source_label = "Quelle"
+        else:
+            language_note = "English"
+            source_label = "Source"
+        body = html.escape(info.text).replace("\n", "<br>")
+        source_html = (
+            f'{source_label}: <a href="{html.escape(info.source_url)}">'
+            f"{html.escape(info.source)}</a> · {language_note}"
+        )
+        self._editorial_heading = heading
+        self._editorial_text = info.text
+        self._editorial_source_html = source_html
+        self.editorial_info.setHtml(
+            f"<b>{html.escape(heading)}</b>"
+            f"<p>{body}</p>"
+            f"<small>{source_html}</small>"
+        )
+        self.editorial_info.show()
+        self.editorial_more_button.setText(
+            "Mehr anzeigen …" if requested == "de" else "Show more …"
+        )
+        self.editorial_more_button.setVisible(len(info.text) > 180)
+
+    def _editorial_failed(self, request_key: str) -> None:
+        if request_key == self._editorial_request_key:
+            self.editorial_info.hide()
+            self.editorial_more_button.hide()
+
+    def _show_full_editorial(self) -> None:
+        if not self._editorial_text:
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self._editorial_heading)
+        dialog.resize(720, 520)
+        layout = QVBoxLayout(dialog)
+        browser = QTextBrowser()
+        browser.setOpenExternalLinks(True)
+        body = html.escape(self._editorial_text).replace("\n", "<br>")
+        browser.setHtml(
+            f"<h2>{html.escape(self._editorial_heading)}</h2>"
+            f"<p>{body}</p><hr><small>{self._editorial_source_html}</small>"
+        )
+        layout.addWidget(browser)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject)
+        buttons.accepted.connect(dialog.accept)
+        layout.addWidget(buttons)
+        dialog.exec()
+
     def _set_status(
         self,
         text: str,
@@ -2627,6 +3280,15 @@ class MediaLibraryWidget(QWidget):
 
 # Compatibility adapters for callers and tests that historically patched the
 # widget module's provider functions. New code belongs in media_library.tasks.
+
+
+def _tag_number(value: str) -> int:
+    """Return the leading tag number from values such as ``02/14``."""
+    text = str(value or "").strip()
+    match = re.match(r"\d+", text)
+    return int(match.group()) if match else 0
+
+
 def _search_exact_discogs_catalog(query: str, token: str):
     _catalog_tasks.search_catalog = search_catalog
     return _catalog_tasks._search_exact_discogs_catalog(query, token)

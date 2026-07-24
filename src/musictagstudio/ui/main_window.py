@@ -15,6 +15,7 @@ from PySide6.QtGui import (
     QKeySequence,
     QIcon,
     QPixmap,
+    QShortcut,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -92,6 +93,11 @@ from .history_dialog import HistoryDialog
 from .media_library_widget import MediaLibraryWidget
 from .lyrics_dialog import LyricsDialog
 from .dashboard_widget import DashboardWidget
+from ..player import (
+    PlayerBar,
+    WindowsMediaKeyController,
+    WindowsSystemMediaBridge,
+)
 from ..cover_management.batch import build_album_cover_plans
 from ..cover_management.manager import CoverManager
 
@@ -159,6 +165,7 @@ class MainWindow(QMainWindow):
         container_layout = QVBoxLayout(container)
 
         left_widget = QWidget()
+        self.tagger_left_widget = left_widget
         left_layout = QVBoxLayout(left_widget)
 
         self.folder_label = QLabel(f"Ordner: {self.folder}")
@@ -209,10 +216,17 @@ class MainWindow(QMainWindow):
         self.lyrics_button.clicked.connect(self.show_lyrics)
         self.lyrics_button.setEnabled(False)
 
+        self.player_button = QPushButton("Titel abspielen")
+        self.player_button.setToolTip("Ausgewählten lokalen Titel abspielen")
+        self.player_button.clicked.connect(self.play_selected_song)
+        self.player_button.setEnabled(False)
+
         self.direct_album_button = QPushButton(
-            "Album-/Song-Link oder ID laden"
+            "Album/Song über Link oder ID laden"
         )
-        self.direct_album_button.setToolTip("Album-/Song-Link oder ID laden")
+        self.direct_album_button.setToolTip(
+            "Album oder Song über eine URL beziehungsweise ID laden"
+        )
         self.direct_album_button.clicked.connect(
             self.load_direct_album
         )
@@ -274,6 +288,9 @@ class MainWindow(QMainWindow):
 
         self.table.itemSelectionChanged.connect(
             self.handle_selection_changed
+        )
+        self.table.cellDoubleClicked.connect(
+            lambda row, _column: self.play_song_row(row)
         )
         self.table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
@@ -339,14 +356,17 @@ class MainWindow(QMainWindow):
         )
 
         left_layout.addWidget(self.folder_label)
-        left_layout.addWidget(self.select_button)
-        left_layout.addWidget(self.scan_button)
+        library_actions = QHBoxLayout()
+        library_actions.addWidget(self.select_button, 1)
+        library_actions.addWidget(self.scan_button, 1)
+        library_actions.addWidget(self.direct_album_button, 1)
+        left_layout.addLayout(library_actions)
         self.provider_action_buttons = (
             self.proposal_button,
             self.batch_button,
             self.cover_button,
             self.lyrics_button,
-            self.direct_album_button,
+            self.player_button,
             self.release_text_button,
             self.more_artist_button,
         )
@@ -354,7 +374,6 @@ class MainWindow(QMainWindow):
             self.provider_buttons_layout
         )
         self._layout_provider_buttons(
-            compact=False
         )
         left_layout.addLayout(history_buttons)
         left_layout.addWidget(self.table)
@@ -501,7 +520,19 @@ class MainWindow(QMainWindow):
         )
         self.splitter.setCollapsible(0, False)
         self.splitter.setCollapsible(1, False)
-        self.splitter.setSizes([1080, 420])
+        saved_splitter_sizes = self._column_settings.value(
+            "main/splitter_sizes", [1080, 420]
+        )
+        try:
+            splitter_sizes = [int(value) for value in saved_splitter_sizes]
+        except (TypeError, ValueError):
+            splitter_sizes = [1080, 420]
+        self.splitter.setSizes(splitter_sizes)
+        self.splitter.splitterMoved.connect(
+            lambda *_: self._column_settings.setValue(
+                "main/splitter_sizes", self.splitter.sizes()
+            )
+        )
 
         container_layout.addWidget(self.splitter)
 
@@ -522,6 +553,12 @@ class MainWindow(QMainWindow):
         )
         self.media_library.open_local_album.connect(
             self.open_local_album_from_library
+        )
+        self.media_library.play_local_tracks.connect(
+            self._play_media_library_tracks
+        )
+        self.media_library.enqueue_local_tracks.connect(
+            self._enqueue_media_library_tracks
         )
         self.workspace_stack.addWidget(
             self.media_library
@@ -667,9 +704,36 @@ class MainWindow(QMainWindow):
             self.workspace_stack,
             stretch=1,
         )
-        self.setCentralWidget(
-            shell
+        self.player_bar = PlayerBar(self)
+        self.windows_media_keys = WindowsMediaKeyController(
+            self.player_bar.engine
         )
+        self.windows_media_keys.start(int(self.winId()))
+        self.windows_system_media = WindowsSystemMediaBridge(
+            self.player_bar.engine,
+            self,
+        )
+        if self.windows_system_media.start():
+            # SMTC receives the same hardware buttons and must be the single
+            # handler; otherwise Play/Pause could be executed twice.
+            self.windows_media_keys.stop()
+        self.player_bar.engine.song_changed.connect(
+            self._player_song_changed
+        )
+        self.play_pause_shortcut = QShortcut(
+            QKeySequence(Qt.Key.Key_Space),
+            self,
+        )
+        self.play_pause_shortcut.activated.connect(
+            self._toggle_player_from_shortcut
+        )
+        application_shell = QWidget()
+        application_layout = QVBoxLayout(application_shell)
+        application_layout.setContentsMargins(0, 0, 0, 0)
+        application_layout.setSpacing(0)
+        application_layout.addWidget(shell, stretch=1)
+        application_layout.addWidget(self.player_bar)
+        self.setCentralWidget(application_shell)
         self.workspace_buttons.button(
             5
         ).setChecked(
@@ -754,6 +818,7 @@ class MainWindow(QMainWindow):
             new_settings
         )
         self.language = new_settings.language
+        self.media_library.language = new_settings.language
         app = QApplication.instance()
 
         if isinstance(app, QApplication):
@@ -864,8 +929,6 @@ class MainWindow(QMainWindow):
 
     def _layout_provider_buttons(
         self,
-        *,
-        compact: bool,
     ) -> None:
         while self.provider_buttons_layout.count():
             item = self.provider_buttons_layout.takeAt(0)
@@ -873,28 +936,23 @@ class MainWindow(QMainWindow):
                 item.widget().setParent(self.provider_buttons_layout.parentWidget())
 
         labels = (
-            ("Vorschlag …", "Vorschlag für ausgewählten Titel"),
-            ("Mehrfachvorschlag …", "Vorschläge für markierte Titel"),
-            ("Cover …", "Cover für Auswahl verwalten"),
-            ("Lyrics …", "Lyrics anzeigen"),
-            ("Link oder ID …", "Album-/Song-Link oder ID laden"),
-            ("BBCode-Text …", "BBCode-Text erstellen"),
-            ("Mehr vom Künstler", "Mehr vom Künstler"),
+            "Metadaten für Titel suchen",
+            "Metadaten für Auswahl suchen",
+            "Cover für Auswahl verwalten",
+            "Lyrics anzeigen",
+            "Titel abspielen",
+            "BBCode-Text erstellen",
+            "Mehr vom Künstler",
         )
-        columns = 3 if compact else 6
-        for index, (button, label_pair) in enumerate(
+        columns = 4
+        for index, (button, label) in enumerate(
             zip(
                 self.provider_action_buttons,
                 labels,
             )
         ):
-            short_label, full_label = label_pair
-            button.setText(
-                short_label if compact else full_label
-            )
-            button.setToolTip(
-                full_label
-            )
+            button.setText(label)
+            button.setToolTip(label)
             self.provider_buttons_layout.addWidget(
                 button,
                 index // columns,
@@ -908,20 +966,6 @@ class MainWindow(QMainWindow):
         super().resizeEvent(
             event
         )
-        if hasattr(
-            self,
-            "provider_action_buttons",
-        ):
-            compact = self.width() < 1220
-            if getattr(
-                self,
-                "_compact_provider_buttons",
-                None,
-            ) != compact:
-                self._compact_provider_buttons = compact
-                self._layout_provider_buttons(
-                    compact=compact
-                )
 
     def create_menu(self):
         file_menu = self.menuBar().addMenu(
@@ -1204,12 +1248,89 @@ class MainWindow(QMainWindow):
             if enabled
             else "Bitte genau einen Titel auswählen."
         )
+        self.player_button.setEnabled(enabled)
+        self.player_button.setToolTip(
+            "Ausgewählten lokalen Titel abspielen"
+            if enabled
+            else "Bitte genau einen Titel auswählen."
+        )
+
+    def play_selected_song(self) -> None:
+        rows = self.selected_rows()
+        if len(rows) == 1:
+            self.play_song_row(rows[0])
+
+    def play_song_row(self, row: int) -> None:
+        if not (0 <= row < len(self.songs)):
+            return
+        if not self.player_bar.play_songs(self.songs, row):
+            self.statusBar().showMessage(
+                "Die ausgewählte Audiodatei ist nicht erreichbar.",
+                5000,
+            )
+            return
+        song = self.songs[row]
+        self.statusBar().showMessage(
+            f"Wiedergabe: {song.title or Path(song.path).name}",
+            3000,
+        )
+
+    def _play_media_library_tracks(
+        self,
+        songs: list[Song],
+        start_index: int,
+    ) -> None:
+        if not self.player_bar.play_songs(songs, start_index):
+            self.statusBar().showMessage(
+                "Die ausgewählte Audiodatei ist nicht erreichbar.",
+                5000,
+            )
+            return
+        song = songs[start_index]
+        self.statusBar().showMessage(
+            f"Wiedergabe: {song.title or Path(song.path).name}",
+            3000,
+        )
+
+    def _enqueue_media_library_tracks(self, songs: list[Song]) -> None:
+        count = self.player_bar.engine.enqueue_songs(songs)
+        self.statusBar().showMessage(
+            f"{count} Titel zur Warteschlange hinzugefügt.",
+            4000,
+        )
+
+    def _toggle_player_from_shortcut(self) -> None:
+        focus = QApplication.focusWidget()
+        if focus is not None and (
+            focus.inherits("QLineEdit")
+            or focus.inherits("QTextEdit")
+            or focus.inherits("QPlainTextEdit")
+        ):
+            return
+        self.player_bar.engine.toggle()
+
+    def _player_song_changed(self, song: Song | None) -> None:
+        if song is None:
+            return
+        wanted_path = str(Path(song.path)).casefold()
+        for row, candidate in enumerate(self.songs):
+            if str(Path(candidate.path)).casefold() == wanted_path:
+                self.table.selectRow(row)
+                item = self.table.item(row, 0)
+                if item is not None:
+                    self.table.scrollToItem(item)
+                break
+        self.media_library.highlight_playing_song(song)
 
     def show_lyrics(self) -> None:
         rows = self.selected_rows()
         if len(rows) != 1 or not (0 <= rows[0] < len(self.songs)):
             return
-        dialog = LyricsDialog(self.songs[rows[0]], self)
+        dialog = LyricsDialog(
+            self.songs[rows[0]],
+            self,
+            player_engine=self.player_bar.engine,
+        )
         dialog.exec()
 
     def create_release_text_file(
@@ -2903,6 +3024,9 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent):
         if self.confirm_pending_changes():
+            self.windows_system_media.stop()
+            self.windows_media_keys.stop()
+            self.player_bar.engine.stop()
             event.accept()
         else:
             event.ignore()

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from difflib import SequenceMatcher
 from pathlib import Path
 import re
 import urllib.error
@@ -17,6 +19,12 @@ from .discogs import (
 from .presentation import normalized as _normalized
 from ..providers.deezer import suggest_artists as suggest_deezer_artists
 from ..settings import load_settings
+
+
+@dataclass(frozen=True)
+class LiveArtistSuggestion:
+    name: str
+    correction: bool = False
 
 
 def _search_exact_discogs_catalog(
@@ -121,7 +129,9 @@ def _discogs_release_title(value: str) -> str:
     return text.split(" - ", 1)[-1].strip()
 
 
-def _fetch_live_artist_suggestions(controller, query: str) -> list[str]:
+def _fetch_live_artist_suggestions(
+    controller, query: str
+) -> list[LiveArtistSuggestion]:
     try:
         musicbrainz = controller.suggest_artists(
             query,
@@ -133,7 +143,63 @@ def _fetch_live_artist_suggestions(controller, query: str) -> list[str]:
     deezer = suggest_deezer_artists(query, limit=25)
     combined = [item.name for item in deezer]
     combined.extend(artist.name for artist in musicbrainz)
-    return list(dict.fromkeys(combined))[:8]
+    wanted = _normalized(query)
+    has_direct_match = any(
+        _normalized(name) == wanted or _normalized(name).startswith(wanted)
+        for name in combined
+    )
+    correction_names: set[str] = set()
+    if not has_direct_match:
+        try:
+            fuzzy = controller.search_artists(
+                query,
+                # The normal search deliberately asks MusicBrainz for a
+                # broader candidate set than the compact suggestion panel.
+                # Otherwise the intended artist can be hidden behind several
+                # literal but obscure spelling matches (for example
+                # ``Cluoes`` -> ``Clues`` instead of ``Clueso``).
+                limit=25,
+                preferred_country=load_settings().apple_country,
+            ).artists
+        except Exception:
+            fuzzy = ()
+        for artist in fuzzy:
+            normalized_name = _normalized(artist.name)
+            combined.append(artist.name)
+            correction_names.add(normalized_name)
+    unique: dict[str, str] = {}
+    for name in combined:
+        unique.setdefault(_normalized(name), name)
+    ordered = sorted(
+        unique.values(),
+        key=lambda name: (
+            0 if _normalized(name) == wanted
+            else 1 if _normalized(name).startswith(wanted)
+            else 2 if wanted in _normalized(name)
+            else 3,
+            0 if (
+                _normalized(name)
+                and wanted
+                and _normalized(name)[0] == wanted[0]
+            ) else 1,
+            # A swapped pair of letters normally preserves the input length.
+            # Prefer that over shorter/longer names which merely happen to
+            # receive a slightly better SequenceMatcher score.
+            abs(len(_normalized(name)) - len(wanted)),
+            -SequenceMatcher(None, wanted, _normalized(name)).ratio(),
+            name.casefold(),
+        ),
+    )[:8]
+    return [
+        LiveArtistSuggestion(
+            name=name,
+            correction=(
+                _normalized(name) in correction_names
+                and _normalized(name) != wanted
+            ),
+        )
+        for name in ordered
+    ]
 
 
 def _fetch_url_cover(

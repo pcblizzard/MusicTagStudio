@@ -13,4 +13,4 @@ def test_tagger_exposes_single_track_lyrics_dialog():
     assert 'QPushButton("Lyrics anzeigen")' in source
     assert "def _update_lyrics_button" in source
     assert "len(rows) == 1" in source
-    assert "LyricsDialog(self.songs[rows[0]], self)" in source
+    assert "player_engine=self.player_bar.engine" in source

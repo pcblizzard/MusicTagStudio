@@ -272,6 +272,124 @@ def search_album(
     return ordered
 
 
+def search_album_variants(
+    album: str,
+    artist: str = "",
+    *,
+    expected_track_count: int | None = None,
+    wanted_year: str = "",
+    country: str = DEFAULT_COUNTRY,
+    limit: int = 25,
+    track_titles: tuple[str, ...] = (),
+) -> list[AppleAlbumCandidate]:
+    """Search punctuation variants and merge candidates by collection ID."""
+    variants: list[str] = []
+    for value in (
+        album,
+        album.replace("/", " "),
+        album.replace("/", "-"),
+        re.sub(r"[/_-]+", " ", album),
+    ):
+        value = re.sub(r"\s+", " ", value).strip()
+        if value and value.casefold() not in {
+            existing.casefold() for existing in variants
+        }:
+            variants.append(value)
+
+    by_id: dict[str, AppleAlbumCandidate] = {}
+    for variant in variants:
+        candidates = search_album(
+            variant,
+            artist,
+            expected_track_count=expected_track_count,
+            wanted_year=wanted_year,
+            country=country,
+            limit=limit,
+        )
+        for candidate in candidates:
+            current = by_id.get(candidate.collection_id)
+            if current is None or candidate.confidence > current.confidence:
+                by_id[candidate.collection_id] = candidate
+        if any(
+            candidate.confidence >= MINIMUM_ALBUM_CONFIDENCE
+            for candidate in candidates
+        ):
+            break
+
+    ordered = sorted(
+        by_id.values(),
+        key=lambda candidate: (-candidate.confidence, candidate.album.casefold()),
+    )
+    if any(candidate.confidence >= MINIMUM_ALBUM_CONFIDENCE for candidate in ordered):
+        return ordered
+    recovered = _recover_album_from_track_searches(
+        album=album,
+        artist=artist,
+        track_titles=track_titles,
+        expected_track_count=expected_track_count,
+        wanted_year=wanted_year,
+        country=country,
+    )
+    if recovered is not None:
+        by_id[recovered.collection_id] = recovered
+    return sorted(
+        by_id.values(),
+        key=lambda candidate: (-candidate.confidence, candidate.album.casefold()),
+    )
+
+
+def _recover_album_from_track_searches(
+    *, album: str, artist: str, track_titles: tuple[str, ...],
+    expected_track_count: int | None, wanted_year: str, country: str,
+) -> AppleAlbumCandidate | None:
+    titles = sorted(
+        {str(title or "").strip() for title in track_titles if str(title or "").strip()},
+        key=lambda title: (-len(_normalize(title)), title.casefold()),
+    )[:5]
+    if not titles:
+        return None
+    wanted_album = _normalize(album)
+    wanted_artist = _normalize(artist)
+    voters: dict[str, set[int]] = {}
+    examples: dict[str, MetadataCandidate] = {}
+    for index, title in enumerate(titles):
+        try:
+            results = search_song(title, artist, album, country=country, limit=100)
+        except AppleMusicProviderError:
+            continue
+        for candidate in results:
+            candidate_artist = candidate.album_artist or candidate.artist
+            candidate_count = _optional_int(candidate.total_tracks)
+            if candidate.confidence < MINIMUM_TRACK_CONFIDENCE:
+                continue
+            if not candidate.release_id or _normalize(candidate.album) != wanted_album:
+                continue
+            if wanted_artist and _normalize(candidate_artist) != wanted_artist:
+                continue
+            if expected_track_count is not None and candidate_count is not None and candidate_count != expected_track_count:
+                continue
+            voters.setdefault(candidate.release_id, set()).add(index)
+            examples.setdefault(candidate.release_id, candidate)
+    if not voters:
+        return None
+    ranked = sorted(voters.items(), key=lambda item: (-len(item[1]), item[0]))
+    best_id, votes = ranked[0]
+    second_votes = len(ranked[1][1]) if len(ranked) > 1 else 0
+    minimum_votes = 2 if len(titles) > 1 else 1
+    if len(votes) < minimum_votes or len(votes) <= second_votes:
+        return None
+    example = examples[best_id]
+    return AppleAlbumCandidate(
+        collection_id=best_id,
+        album=example.album or album,
+        artist=example.album_artist or example.artist or artist,
+        track_count=_optional_int(example.total_tracks) or expected_track_count or 0,
+        year=_extract_year(example.year) or wanted_year,
+        country=country.upper(),
+        confidence=min(99, 85 + len(votes) * 3),
+    )
+
+
 def _album_match_score(
     *,
     wanted_album: str,

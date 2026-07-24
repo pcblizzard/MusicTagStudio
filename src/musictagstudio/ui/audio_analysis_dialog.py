@@ -64,25 +64,26 @@ from ..settings import load_settings
 
 
 NORMAL_BACKGROUND = QColor(
-    43,
-    78,
-    55,
+    214,
+    245,
+    222,
 )
 ELEVATED_BACKGROUND = QColor(
-    86,
-    78,
-    38,
+    255,
+    239,
+    184,
 )
 CRITICAL_BACKGROUND = QColor(
-    112,
-    42,
-    42,
+    255,
+    205,
+    210,
 )
 ERROR_BACKGROUND = QColor(
-    100,
-    45,
-    45,
+    255,
+    205,
+    210,
 )
+STATUS_FOREGROUND = QColor(35, 42, 38)
 
 
 class AnalysisWorker(QObject):
@@ -1081,6 +1082,9 @@ class AudioAnalysisDialog(QDialog):
                     item.setBackground(
                         ERROR_BACKGROUND
                     )
+                    item.setForeground(
+                        STATUS_FOREGROUND
+                    )
                 elif column in {
                     9,
                     10,
@@ -1092,6 +1096,9 @@ class AudioAnalysisDialog(QDialog):
                     if color is not None:
                         item.setBackground(
                             color
+                        )
+                        item.setForeground(
+                            STATUS_FOREGROUND
                         )
 
                 self.track_table.setItem(
@@ -1167,6 +1174,9 @@ class AudioAnalysisDialog(QDialog):
                             summary.health_score
                         )
                     )
+                    item.setForeground(
+                        STATUS_FOREGROUND
+                    )
                 elif (
                     summary.has_warnings
                     and column in {
@@ -1177,6 +1187,9 @@ class AudioAnalysisDialog(QDialog):
                 ):
                     item.setBackground(
                         ELEVATED_BACKGROUND
+                    )
+                    item.setForeground(
+                        STATUS_FOREGROUND
                     )
 
                 tooltip_lines: list[str] = []

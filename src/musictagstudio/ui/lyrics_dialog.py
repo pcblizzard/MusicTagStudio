@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from datetime import datetime
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
-from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
+from bisect import bisect_right
+
+from PySide6.QtCore import QObject, QRunnable, QSettings, QThreadPool, Signal, Slot
+from PySide6.QtGui import QAction, QCloseEvent, QKeySequence, QTextCursor, QTextFormat
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -15,6 +17,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QTextEdit,
     QVBoxLayout,
 )
 
@@ -61,10 +64,14 @@ class LyricsDialog(QDialog):
         parent=None,
         *,
         resolver: LyricsResolver | None = None,
+        player_engine=None,
     ) -> None:
         super().__init__(parent)
         self.song = song
         self.resolver = resolver or LyricsResolver()
+        self.player_engine = player_engine
+        self.settings = QSettings("MusicTagStudio", "MusicTagStudio")
+        self._karaoke_line = -1
         self.thread_pool = QThreadPool.globalInstance()
         self._workers: set[LyricsWorker] = set()
         self._closing = False
@@ -106,6 +113,15 @@ class LyricsDialog(QDialog):
         self.timestamps_checkbox.toggled.connect(self._refresh_display)
         self.timestamps_checkbox.setEnabled(False)
         source_row.addWidget(self.timestamps_checkbox)
+        source_row.addWidget(QLabel("Ansicht:"))
+        self.view_combo = QComboBox()
+        self.view_combo.addItems(["Textansicht", "Karaoke"])
+        self.view_combo.setAccessibleName("Lyrics-Ansicht")
+        self.view_combo.setToolTip(
+            "Karaoke hebt synchronisierte Zeilen passend zur Wiedergabe hervor."
+        )
+        self.view_combo.currentIndexChanged.connect(self._view_changed)
+        source_row.addWidget(self.view_combo)
         layout.addLayout(source_row)
 
         self.source_details = QLabel()
@@ -172,6 +188,14 @@ class LyricsDialog(QDialog):
 
         self._add_shortcuts()
 
+        if self.player_engine is not None:
+            self.player_engine.position_changed.connect(
+                self._update_karaoke
+            )
+            self.player_engine.song_changed.connect(
+                self._player_song_changed
+            )
+
         self._apply_resolution(self.resolver.local(self.request))
         if not self.documents and self._lrclib_ready:
             self._set_status(
@@ -226,21 +250,25 @@ class LyricsDialog(QDialog):
             self.timestamps_checkbox.setEnabled(False)
             self.save_button.setEnabled(False)
             self.embed_button.setEnabled(False)
+            self.view_combo.setCurrentIndex(0)
+            self.view_combo.setEnabled(False)
         else:
             if not document.is_synced and self.timestamps_checkbox.isChecked():
                 self.timestamps_checkbox.blockSignals(True)
                 self.timestamps_checkbox.setChecked(False)
                 self.timestamps_checkbox.blockSignals(False)
             self.timestamps_checkbox.setEnabled(document.is_synced)
-            self.lyrics_text.setPlainText(
-                _document_display_text(
-                    document,
-                    show_timestamps=(
-                        self.timestamps_checkbox.isChecked()
-                        and document.is_synced
-                    ),
-                )
+            self.view_combo.setEnabled(
+                document.is_synced and self.player_engine is not None
             )
+            wanted_karaoke = (
+                self.settings.value("lyrics/view_mode", "text") == "karaoke"
+                and self.view_combo.isEnabled()
+            )
+            self.view_combo.blockSignals(True)
+            self.view_combo.setCurrentIndex(1 if wanted_karaoke else 0)
+            self.view_combo.blockSignals(False)
+            self._render_document(document)
             details = [_source_display_name(document)]
             if document.provider_id:
                 details.append(f"ID {document.provider_id}")
@@ -261,6 +289,101 @@ class LyricsDialog(QDialog):
             )
         self.warning_label.setText(warning)
         self.warning_label.setVisible(bool(warning))
+
+    def _render_document(self, document: LyricsDocument) -> None:
+        karaoke = self.view_combo.currentIndex() == 1 and document.is_synced
+        self.timestamps_checkbox.setEnabled(document.is_synced and not karaoke)
+        if karaoke:
+            self.lyrics_text.setPlainText(
+                "\n".join(line.text for line in document.synced_lines)
+            )
+            self._karaoke_line = -1
+            position = (
+                self.player_engine.media_player.position()
+                if self.player_engine is not None
+                else 0
+            )
+            self._update_karaoke(position)
+            return
+        self.lyrics_text.setExtraSelections([])
+        self._karaoke_line = -1
+        self.lyrics_text.setPlainText(
+            _document_display_text(
+                document,
+                show_timestamps=(
+                    self.timestamps_checkbox.isChecked()
+                    and document.is_synced
+                ),
+            )
+        )
+
+    def _view_changed(self, index: int) -> None:
+        document = self.current_document()
+        if document is None:
+            return
+        karaoke = index == 1 and document.is_synced
+        self.settings.setValue(
+            "lyrics/view_mode", "karaoke" if karaoke else "text"
+        )
+        self._render_document(document)
+
+    def _player_song_changed(self, _song: Song | None) -> None:
+        if self.view_combo.currentIndex() == 1:
+            position = (
+                self.player_engine.media_player.position()
+                if self.player_engine is not None
+                else 0
+            )
+            self._update_karaoke(position)
+
+    def _player_matches_song(self) -> bool:
+        if self.player_engine is None or self.player_engine.current_song is None:
+            return False
+        return (
+            Path(self.player_engine.current_song.path)
+            == Path(self.song.path)
+        )
+
+    def _update_karaoke(self, position_ms: int) -> None:
+        document = self.current_document()
+        if (
+            document is None
+            or not document.synced_lines
+            or self.view_combo.currentIndex() != 1
+        ):
+            return
+        if not self._player_matches_song():
+            self.lyrics_text.setExtraSelections([])
+            self._karaoke_line = -1
+            return
+        times = [line.time_ms for line in document.synced_lines]
+        line_index = bisect_right(times, max(0, int(position_ms))) - 1
+        if line_index < 0 or line_index == self._karaoke_line:
+            return
+        cursor = self.lyrics_text.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
+        cursor.movePosition(
+            QTextCursor.MoveOperation.Down,
+            QTextCursor.MoveMode.MoveAnchor,
+            line_index,
+        )
+        cursor.select(QTextCursor.SelectionType.LineUnderCursor)
+        selection = QTextEdit.ExtraSelection()
+        selection.cursor = cursor
+        selection.format.setBackground(
+            self.palette().highlight().color()
+        )
+        selection.format.setForeground(
+            self.palette().highlightedText().color()
+        )
+        selection.format.setProperty(
+            QTextFormat.Property.FullWidthSelection,
+            True,
+        )
+        self.lyrics_text.setExtraSelections([selection])
+        self.lyrics_text.setTextCursor(cursor)
+        self.lyrics_text.centerCursor()
+        self._karaoke_line = line_index
 
     def _load_online(self, *, live: bool) -> None:
         if not self._lrclib_ready:
@@ -363,6 +486,16 @@ class LyricsDialog(QDialog):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._closing = True
+        if self.player_engine is not None:
+            try:
+                self.player_engine.position_changed.disconnect(
+                    self._update_karaoke
+                )
+                self.player_engine.song_changed.disconnect(
+                    self._player_song_changed
+                )
+            except (RuntimeError, TypeError):
+                pass
         super().closeEvent(event)
 
     def _refresh_display(self, _checked: bool = False) -> None:

@@ -35,25 +35,21 @@ from ..models.song import Song
 
 
 ERROR_COLOR = QColor(
-    105,
-    42,
-    42,
+    255,
+    205,
+    210,
 )
 WARNING_COLOR = QColor(
-    95,
-    76,
-    35,
-)
-INFO_COLOR = QColor(
-    42,
-    69,
-    92,
+    255,
+    239,
+    184,
 )
 GOOD_COLOR = QColor(
-    41,
-    83,
-    54,
+    214,
+    245,
+    222,
 )
+STATUS_FOREGROUND = QColor(35, 42, 38)
 
 
 class AuditSignals(QObject):
@@ -393,11 +389,14 @@ class LibraryAuditDialog(QDialog):
                     32,
                     issue.details,
                 )
-                item.setBackground(
-                    severity_color(
-                        issue.severity
-                    )
+                color = severity_color(
+                    issue.severity
                 )
+                if color is not None:
+                    item.setBackground(color)
+                    item.setForeground(
+                        STATUS_FOREGROUND
+                    )
                 self.table.setItem(
                     row,
                     column,
@@ -432,11 +431,11 @@ def severity_label(
 
 def severity_color(
     severity: str,
-) -> QColor:
+) -> QColor | None:
     return {
         "error": ERROR_COLOR,
         "warning": WARNING_COLOR,
-        "info": INFO_COLOR,
+        "info": None,
     }.get(
         severity,
         GOOD_COLOR,

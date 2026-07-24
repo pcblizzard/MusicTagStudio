@@ -2,6 +2,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication
 
 from musictagstudio.lyrics import (
@@ -10,6 +11,7 @@ from musictagstudio.lyrics import (
     LyricsResolution,
 )
 from musictagstudio.models.song import Song
+from musictagstudio.player import PlayerEngine
 from musictagstudio.ui.lyrics_dialog import LyricsDialog
 
 
@@ -44,6 +46,7 @@ def test_dialog_displays_local_lyrics_and_enables_saving(tmp_path, monkeypatch):
     assert dialog.source_combo.count() == 1
     assert "LRC-Datei" in dialog.source_combo.currentText()
     assert dialog.lyrics_text.toPlainText() == "Erste Zeile\n\nZweite Zeile"
+    assert dialog.view_combo.isEnabled() is False
     assert dialog.save_button.isEnabled()
     assert dialog.cached_button.isEnabled()
     dialog.close()
@@ -79,6 +82,52 @@ def test_synced_lyrics_can_show_timestamps(tmp_path, monkeypatch):
     assert "LRCLIB · lokal zwischengespeichert" in dialog.source_combo.currentText()
     assert "20.07.2026" in dialog.source_details.text()
     dialog.close()
+
+
+def test_karaoke_mode_follows_player_position(tmp_path, monkeypatch):
+    app()
+    QSettings("MusicTagStudio", "MusicTagStudio").setValue(
+        "lyrics/view_mode", "text"
+    )
+    monkeypatch.setattr(
+        "musictagstudio.ui.lyrics_dialog.read_duration_seconds",
+        lambda _path: 180.0,
+    )
+    song = Song(
+        title="Titel",
+        artist="Künstler",
+        album="Album",
+        path=str(tmp_path / "Titel.flac"),
+    )
+    document = LyricsDocument(
+        plain_text="Eins\nZwei\nDrei",
+        synced_lines=(
+            LyricsLine(0, "Eins"),
+            LyricsLine(1000, "Zwei"),
+            LyricsLine(2000, "Drei"),
+        ),
+        source="LRCLIB",
+    )
+
+    class SyncedResolver:
+        def local(self, request):
+            return LyricsResolution(document, (document,))
+
+    engine = PlayerEngine()
+    engine.queue.replace([song], 0)
+    dialog = LyricsDialog(
+        song,
+        resolver=SyncedResolver(),
+        player_engine=engine,
+    )
+    dialog.view_combo.setCurrentIndex(1)
+    engine.position_changed.emit(1500)
+
+    assert dialog._karaoke_line == 1
+    assert dialog.lyrics_text.extraSelections()
+    assert dialog.timestamps_checkbox.isEnabled() is False
+    dialog.close()
+    engine.deleteLater()
 
 
 def test_not_found_and_offline_states_are_distinct(tmp_path):

@@ -339,10 +339,17 @@ def merge_scan_results(
         summary.source.source_id
         for summary in summaries
     }
+    configured_ids = {
+        source.source_id
+        for source in sources
+    }
     retained = [
         album
         for album in existing
-        if album.source_id not in scanned_ids
+        if (
+            album.source_id in configured_ids
+            and album.source_id not in scanned_ids
+        )
     ]
 
     for summary in summaries:

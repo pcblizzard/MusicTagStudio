@@ -3,6 +3,7 @@ from pathlib import Path
 from musictagstudio.library_sources import (
     IndexedAlbum,
     MusicSource,
+    SourceScanSummary,
     merge_scan_results,
     update_source_availability,
 )
@@ -84,3 +85,51 @@ def test_offline_album_is_retained(
 
     assert len(updated) == 1
     assert updated[0].source_online is False
+
+
+def test_refresh_removes_albums_from_deleted_source(tmp_path):
+    current_source = MusicSource(
+        source_id="current",
+        name="Music",
+        path=str(tmp_path),
+    )
+    stale_album = IndexedAlbum(
+        key="old|album|folder",
+        album="Old Album",
+        album_artist="Old Artist",
+        folder=str(tmp_path / "old"),
+        representative_file=str(tmp_path / "old" / "01.flac"),
+        source_id="removed-source",
+        source_name="Old Music",
+        source_path=str(tmp_path / "old-source"),
+        source_online=False,
+        track_count=100,
+        last_seen="2026-01-01",
+    )
+    current_album = IndexedAlbum(
+        key="new|album|folder",
+        album="New Album",
+        album_artist="New Artist",
+        folder=str(tmp_path / "new"),
+        representative_file=str(tmp_path / "new" / "01.flac"),
+        source_id="current",
+        source_name="Music",
+        source_path=str(tmp_path),
+        source_online=True,
+        track_count=14,
+        last_seen="2026-07-22",
+    )
+    summary = SourceScanSummary(
+        source=current_source,
+        albums=(current_album,),
+        song_count=14,
+        failure_count=0,
+    )
+
+    merged = merge_scan_results(
+        [stale_album],
+        [summary],
+        (current_source,),
+    )
+
+    assert merged == [current_album]

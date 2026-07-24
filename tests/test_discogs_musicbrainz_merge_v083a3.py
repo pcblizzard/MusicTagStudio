@@ -32,6 +32,7 @@ def test_discogs_enriches_matching_musicbrainz_release():
     assert merged[0].labels == ("Aggro Berlin",)
     assert merged[0].formats == ("CD",)
     assert merged[0].discogs_release_id == 123
+    assert merged[0].discogs_contributions == ("Editionen", "Labels", "Formate")
 
 
 def test_discogs_only_release_is_kept_as_additional_entry():
@@ -42,3 +43,21 @@ def test_discogs_only_release_is_kept_as_additional_entry():
 
     assert len(merged) == 2
     assert {item.source for item in merged} == {"musicbrainz", "discogs"}
+
+
+def test_discogs_replaces_unknown_musicbrainz_artist():
+    merged = _merge_release_groups(
+        [group("Deja Vu 1/2", "2026", artist="Unbekannter Künstler")],
+        [
+            group(
+                "Deja Vu 1/2",
+                "2026",
+                source="discogs",
+                artist="Clueso",
+                discogs_release_id=4147642,
+            )
+        ],
+    )
+
+    assert merged[0].artist == "Clueso"
+    assert "Künstler" in merged[0].discogs_contributions

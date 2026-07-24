@@ -50,6 +50,7 @@ class ReleaseGroup:
     external_url: str = ""
     cover_url: str = ""
     discogs_release_id: int = 0
+    discogs_contributions: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

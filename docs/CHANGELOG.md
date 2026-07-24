@@ -1,3 +1,124 @@
+# MusicTagStudio 0.8.6-alpha2.3
+
+## Windows-Systemmedienanzeige
+
+- Der laufende Titel erscheint mit Titel, Künstler und Album in der
+  Windows-Systemmedienanzeige.
+- Eingebettete beziehungsweise lokale Cover werden als Albumthumbnail
+  bereitgestellt und hashbasiert im App-Cache wiederverwendet.
+- Wiedergabe und Pause werden an Windows gemeldet.
+- Die Schaltflächen der Windows-Mediensitzung steuern Play/Pause, Vor, Zurück
+  und Stop.
+- Ist Windows Runtime nicht verfügbar, bleibt der bisherige globale
+  Medientasten-Controller als Fallback aktiv.
+- Bei aktiver Systemmediensitzung wird der ältere Hotkey-Handler deaktiviert,
+  damit ein Tastendruck nicht doppelt ausgeführt wird.
+- Die Windows-Runtime-Pakete werden ausschließlich unter Windows installiert.
+
+# MusicTagStudio 0.8.6-alpha2.2
+
+## Statische und mitlaufende Lyrics
+
+- Der Lyrics-Dialog bietet eine Auswahl zwischen Textansicht und Karaoke.
+- Der Karaoke-Modus ist nur für synchronisierte Lyrics verfügbar.
+- Die zur Playerposition gehörende Zeile wird hervorgehoben und automatisch
+  mittig ins Sichtfeld gescrollt.
+- Bei einem anderen oder nicht geladenen Player-Titel wird keine falsche Zeile
+  markiert.
+- Unsynchronisierte Lyrics bleiben automatisch in der bisherigen Textansicht.
+- Die zuletzt gewählte Lyrics-Ansicht wird gespeichert.
+
+# MusicTagStudio 0.8.6-alpha2.1
+
+## Globale Windows-Medientasten
+
+- Play/Pause, nächster Titel, vorheriger Titel und Stop lassen sich über
+  Medientasten steuern.
+- Unterstützt werden Windows-Hotkeys und `APPCOMMAND`-Ereignisse von
+  Tastaturen, Headsets und Bluetooth-Geräten.
+- Erfolgreiche globale Registrierungen funktionieren auch bei einem nicht
+  fokussierten MusicTagStudio-Fenster.
+- Bereits anderweitig belegte Tasten verhindern den App-Start nicht und werden
+  im Anwendungsprotokoll vermerkt.
+- Beim Schließen werden sämtliche globalen Hotkeys und nativen Ereignisfilter
+  zuverlässig freigegeben.
+
+# MusicTagStudio 0.8.6-alpha1
+
+## Eigenständige Warteschlangenansicht
+
+- Der Warteschlangenknopf öffnet ein eigenes, in der Größe gespeichertes Fenster.
+- Titel lassen sich per Drag-and-drop umsortieren, ohne den laufenden Titel zu verlieren.
+- Mehrere Titel können gemeinsam markiert und aus der Warteschlange entfernt werden.
+- Einzelne Titel lassen sich sofort starten oder direkt hinter den laufenden Titel verschieben.
+- Ein Doppelklick startet den gewählten Titel.
+- Lokale Alben können aus der Medienbibliothek an eine bestehende Warteschlange angehängt werden.
+- Der laufende Titel wird fett und mit Wiedergabesymbol hervorgehoben.
+
+# MusicTagStudio 0.8.5
+
+## Stabiler Player-Release
+
+- Die Zufallswiedergabe mit Verlauf unterstützt nun einen echten Vorwärts- und Rückwärtsverlauf.
+- Lautstärke, Stummschaltung, Wiederholungsmodus und Zufallsart bleiben nach Neustarts erhalten.
+- Fehlende Dateien werden gemeldet und zugängliche Folgetitel automatisch geladen.
+- Die Warteschlangenanzeige nennt ihre Titelanzahl und sämtliche Player-Schaltflächen besitzen verständliche zugängliche Namen.
+- Zusätzliche Regressionstests sichern Zufallsrunden, Verlaufssprünge, Warteschlangenänderungen und fehlende Dateien ab.
+
+# MusicTagStudio 0.8.5-beta
+
+## Gespeicherter Playerzustand und bearbeitbare Warteschlange
+
+- Lautstärke, Wiederholungsmodus und gewählte Zufallsart bleiben nach einem Neustart erhalten.
+- Die Warteschlange lässt sich leeren; einzelne Titel können entfernt oder als Nächstes einsortiert werden.
+- Nicht mehr erreichbare Audiodateien werden beim normalen Titelwechsel gemeldet und automatisch übersprungen.
+- Der alternative Würfelmodus lost bei Vor und Zurück jeweils einen neuen Titel aus, ohne innerhalb einer Runde Titel zu wiederholen.
+- Statusfarben der Audioanalyse verwenden im hellen Theme gut lesbare Pastelltöne.
+- Informationszeilen der Bibliotheksprüfung erhalten keinen störenden dunklen Hintergrund mehr.
+
+# MusicTagStudio 0.8.5-alpha3
+
+## Player und Detailansicht
+
+- Die Playerleiste zeigt Cover, Albumname und die aktuelle Warteschlange.
+- Die Zufallswiedergabe bietet einen navigierbaren Verlauf und einen Modus, der bei Vor und Zurück jeweils neu auslost.
+- Wiederholung eines Titels oder der gesamten Warteschlange ist verfügbar.
+- Titel können direkt aus dem Warteschlangenmenü angesprungen werden.
+- Die Leertaste schaltet Wiedergabe und Pause um, solange keine Texteingabe aktiv ist.
+- Der aktuell wiedergegebene Titel wird im Tagger und in der Album-Trackliste hervorgehoben.
+- Lange Künstlerbiografien und Albuminformationen lassen sich in einer eigenen, gut lesbaren Ansicht vollständig öffnen.
+- Die Künstlerübersicht blendet die leere Trackliste aus; bei ausgewählten Veröffentlichungen erscheint sie wieder.
+- Die Aufteilung der Tagger- und Medienbibliotheksbereiche wird über Neustarts hinweg gespeichert.
+
+# MusicTagStudio 0.8.5-alpha2
+
+## Medienbibliothek, Player und redaktionelle Informationen
+
+- Lokale Titel lassen sich direkt aus der Album-Trackliste der Medienbibliothek per Doppelklick abspielen.
+- Die gemeinsame Playerleiste übernimmt dabei die lokalen Titel des Albums als Warteschlange.
+- Die Apple-Music-Albumsuche berücksichtigt Künstler, Titel, Jahr, Trackanzahl und Trackkonsens zuverlässiger.
+- Bestätigte Streaming-Ergebnisse werden dienstübergreifend vorbereitet und für sieben Tage gespeichert.
+- Ansichtswechsel lösen dadurch keine unnötigen erneuten Streaming-Prüfungen mehr aus.
+- Künstler- und Albumsuche priorisieren exakte beziehungsweise plausible Treffer; Tippfehlerkorrekturen werden verständlich gekennzeichnet.
+- Künstlerbiografien und Albuminformationen werden abhängig von App- oder Systemsprache auf Deutsch beziehungsweise Englisch dargestellt.
+- Echte Apple-Music-Künstler-Heros werden in der Künstlerübersicht angezeigt; fehlt das Hero, dient das primäre Discogs-Künstlerbild als Fallback. Video- und sonstige Vorschaubilder bleiben ausgeschlossen.
+- TheAudioDB dient als strukturierte Informationsquelle; fehlende deutsche Texte fallen sichtbar auf Englisch zurück.
+- Eindeutig bestätigte Apple-Music-Alben können deren redaktionellen Albumtext als Fallback anzeigen.
+- Der Apple-Extraktor unterstützt Beschreibungsblöcke, `HTML_TAG_START`/`HTML_TAG_END`, JSON-LD und entfernt ausgewählte Songparameter aus Albumlinks.
+- Die Detailansicht zeigt kompaktere Quellenangaben und mehr gleichzeitig sichtbare Trackzeilen.
+- Ein Bibliotheks-Refresh entfernt verwaiste Indexeinträge nicht mehr konfigurierter Musikquellen, behält eingerichtete Offlinequellen aber bei.
+
+# MusicTagStudio 0.8.5-alpha1
+
+## Lokaler Player – Grundlage
+
+- Ausgewählte lokale Titel lassen sich im Tagger über „Titel abspielen“ oder per Doppelklick starten.
+- Eine kompakte Playerleiste bleibt am unteren Fensterrand sichtbar.
+- Wiedergabe/Pause, vorheriger und nächster Titel sowie eine Warteschlange aus der aktuellen Titelliste sind verfügbar.
+- Position, Titeldauer, Suche innerhalb des Titels, Lautstärke und Stummschaltung werden unterstützt.
+- Fehlende oder verschobene Audiodateien werden verständlich gemeldet.
+- Player-Engine, Warteschlange und Oberfläche liegen im eigenständigen `player`-Modul.
+
 # MusicTagStudio 0.8.4-beta
 
 ## Lyrics-Polishing und Stabilisierung
@@ -122,6 +243,58 @@ freigegeben.
 - Fehlerhafte Aktualisierung der lokalen Statusspalte im Discografiebaum korrigiert.
 
 # Changelog
+
+## Quellentransparenz in der Medienbibliothek
+
+- Die Detailansicht weist MusicBrainz, Discogs, Apple Music und die lokale
+  Bibliothek als getrennte Quellen aus.
+- Bei zusammengeführten Veröffentlichungen werden nur die tatsächlich von
+  Discogs ergänzten Angaben wie Labels, Formate, Kategorien oder Cover genannt.
+- Das Ergebnis einer bewussten Apple-Music-Prüfung wird direkt in der
+  Quellenübersicht aktualisiert.
+- Die Detailspalte erhält mehr Platz; die Quellenkarte sitzt kompakt neben dem
+  Cover und die Trackliste bleibt für mehrere sichtbare Titel hoch genug.
+- Apple-Music-Links werden nur noch bei ausreichend sicherer Albumzuordnung
+  aktiviert. Künstler, Jahr und bekannte Titelzahl fließen in die Prüfung ein;
+  verspätete Ergebnisse eines zuvor ausgewählten Albums werden verworfen.
+- Platzhalter wie „Unbekannter Künstler“ werden bei der Apple-Suche durch den
+  aktuell ausgewählten Künstler ersetzt.
+- Die Quellenkarte besitzt genug Mindesthöhe, damit auch der lokale
+  Bibliotheksstatus vollständig sichtbar bleibt.
+- Albumtitel mit Schrägstrichen werden bei Apple Music zusätzlich mit Leerraum-
+  und Bindestrichvarianten gesucht, beispielsweise `Deja Vu 1/2` und
+  `Deja Vu 1 2`.
+- Die Spaltenköpfe der Discografie sortieren die Veröffentlichungen innerhalb
+  ihrer jeweiligen Kategorie auf- oder absteigend.
+- Liefert Apples Albumsuche keinen sicheren Treffer, wird die Collection-ID
+  durch übereinstimmende Treffer mehrerer bereits geladener Albumtitel
+  ermittelt; Album, Künstler und Titelzahl müssen weiterhin exakt passen.
+- Exakte Künstlernamen stehen in den Live-Vorschlägen immer vor populären,
+  aber nur indirekt verwandten Deezer-Treffern.
+- Fehlt in der schnellen Präfixsuche ein direkter Treffer, startet die
+  Vorschlagsleiste einen begrenzten Fuzzy-Fallback. Wahrscheinliche
+  Schreibkorrekturen erscheinen als „Meintest du: …?“.
+- Fehlende oder als unbekannt markierte Künstlerangaben einer Veröffentlichung
+  werden in den Explorer-Ansichten aus dem eindeutig ausgewählten
+  Künstlerkontext ergänzt.
+- Beim Zusammenführen ersetzt ein strukturierter Discogs-Hauptkünstler einen
+  fehlenden MusicBrainz-Künstlerwert; die Herkunft wird in der Quellenkarte
+  ausgewiesen. Normalisierung mit Umlauten funktioniert dabei zuverlässig.
+- Die Quellenkarte berücksichtigt mehrzeilige Discogs-Herkunftsangaben auch
+  im Dark Theme vollständig.
+- Lange Discogs-Herkunftslisten erscheinen kompakt mit der Zahl weiterer
+  Ergänzungen; der Tooltip enthält weiterhin sämtliche Details. Reduzierte
+  Abstände verhindern Überschneidungen mit der Aktionsleiste.
+- Apple-Music-Prüfergebnisse gelten gemeinsam für alle Explorer-Ansichten und
+  werden für spätere Programmstarts gespeichert. Die Schaltfläche zur
+  bewussten erneuten Prüfung bleibt verfügbar.
+- Erfolgreiche Apple-Prüfungen zeigen ihren letzten Prüfzeitpunkt und verfallen
+  automatisch nach sieben Tagen. Uneindeutige Ergebnisse werden nicht über
+  den aktuellen Programmstart hinaus gespeichert.
+- Der bisher Apple-spezifische UI-Speicher wurde durch einen allgemeinen
+  SQLite-Cache für Streaming-Verfügbarkeiten ersetzt. Anbieter, Land, Status,
+  externe ID, URL, Prüfzeitpunkt und Ablaufzeit sind getrennt modelliert;
+  weitere Dienste können dieselbe Infrastruktur verwenden.
 
 ## v0.8.2.2
 

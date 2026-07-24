@@ -57,12 +57,17 @@ class FunctionWorker(QRunnable):
                 **self.kwargs,
             )
         except Exception as error:
-            self.signals.failed.emit(
-                str(error)
-            )
+            try:
+                self.signals.failed.emit(str(error))
+            except RuntimeError:
+                pass
             return
 
-        self.signals.finished.emit(result)
+        try:
+            self.signals.finished.emit(result)
+        except RuntimeError:
+            # The dialog may already have been closed while the worker finished.
+            pass
 
 
 class CoverSelectionDialog(QDialog):

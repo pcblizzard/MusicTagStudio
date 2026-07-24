@@ -115,8 +115,13 @@ def test_cover_selection_uses_main_worker_pool_for_editions():
     group = musicbrainz_group()
     widget._load_group(group)
 
-    assert len(calls) == 1
-    _, args, kwargs = calls[0]
+    assert len(calls) == 2
+    editorial_call, edition_call = calls
+    assert editorial_call[1][:2] == (
+        "Die Toten Hosen",
+        group.title,
+    )
+    _, args, kwargs = edition_call
     assert args == (group.release_group_id,)
     assert kwargs["transform"]([]) == (group.release_group_id, [])
 
