@@ -207,7 +207,12 @@ def test_player_bar_exposes_basic_controls(monkeypatch):
     was_muted = bar.engine.audio_output.isMuted()
     bar.engine.toggle_mute()
     assert bar.engine.audio_output.isMuted() is not was_muted
-    assert bar.mute_button.text() == ("🔊" if was_muted else "🔇")
+    # Knöpfe nutzen jetzt Icons statt Emoji-Text; der Zustand steckt im Tooltip.
+    assert not bar.mute_button.icon().isNull()
+    now_muted = bar.engine.audio_output.isMuted()
+    assert bar.mute_button.toolTip() == (
+        "Ton einschalten" if now_muted else "Stummschalten"
+    )
     bar.close()
     bar.deleteLater()
     app.processEvents()

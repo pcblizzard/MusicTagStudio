@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QSettings, Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QEvent, QSettings, QSize, Qt
+from PySide6.QtGui import QPalette, QPixmap
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..models.song import Song
+from ..icons import make_icon
 from .engine import PlayerEngine
 from .model import format_milliseconds
 from .queue_dialog import QueueDialog
@@ -57,12 +58,12 @@ class PlayerBar(QWidget):
         self.cover_label.setStyleSheet(
             "border: 1px solid palette(mid); background: palette(base);"
         )
-        self.shuffle_button = QPushButton("🔀")
-        self.previous_button = QPushButton("◀")
-        self.play_button = QPushButton("▶")
-        self.next_button = QPushButton("▶|")
-        self.repeat_button = QPushButton("↻")
-        self.queue_button = QPushButton("☷")
+        self.shuffle_button = QPushButton()
+        self.previous_button = QPushButton()
+        self.play_button = QPushButton()
+        self.next_button = QPushButton()
+        self.repeat_button = QPushButton()
+        self.queue_button = QPushButton()
         self.shuffle_button.setToolTip("Zufallswiedergabe: Aus")
         self.previous_button.setToolTip("Vorheriger Titel")
         self.play_button.setToolTip("Wiedergabe/Pause")
@@ -88,8 +89,7 @@ class PlayerBar(QWidget):
         self.position_slider = QSlider(Qt.Orientation.Horizontal)
         self.position_slider.setRange(0, 0)
         self.duration_label = QLabel("0:00")
-        self.volume_label = QLabel("Lautstärke")
-        self.mute_button = QPushButton("🔊")
+        self.mute_button = QPushButton()
         self.mute_button.setToolTip("Stummschaltung")
         self.mute_button.setFixedWidth(38)
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
@@ -117,7 +117,6 @@ class PlayerBar(QWidget):
         layout.addWidget(self.duration_label)
         self.queue_button.setFixedWidth(42)
         layout.addWidget(self.queue_button)
-        layout.addWidget(self.volume_label)
         layout.addWidget(self.mute_button)
         layout.addWidget(self.volume_slider)
 
@@ -148,6 +147,74 @@ class PlayerBar(QWidget):
         ).casefold() in {"1", "true", "yes"}
         self.engine.audio_output.setMuted(saved_muted)
         self._muted_changed(saved_muted)
+        self._apply_icons()
+        self._icons_ready = True
+
+    # -- Icons ---------------------------------------------------------------
+
+    def _icon_color(self) -> str:
+        return self.palette().color(QPalette.ColorRole.ButtonText).name()
+
+    def _current_playing(self) -> bool:
+        if self._preview_mode and self.preview_player is not None:
+            return self.preview_player.is_playing()
+        return (
+            self.engine.media_player.playbackState()
+            == QMediaPlayer.PlaybackState.PlayingState
+        )
+
+    def _set_play_icon(self, playing: bool) -> None:
+        self.play_button.setIcon(
+            make_icon("pause" if playing else "play", self._icon_color())
+        )
+
+    def _set_repeat_icon(self, mode: str) -> None:
+        name = "repeat_one" if mode == "one" else "repeat"
+        self.repeat_button.setIcon(make_icon(name, self._icon_color()))
+
+    def _set_shuffle_icon(self) -> None:
+        self.shuffle_button.setIcon(make_icon("shuffle", self._icon_color()))
+
+    def _set_mute_icon(self, muted: bool) -> None:
+        self.mute_button.setIcon(
+            make_icon("mute" if muted else "volume", self._icon_color())
+        )
+
+    def _apply_icons(self) -> None:
+        """Setzt alle Icons in der aktuellen Palette-Farbe (auch bei Theme-
+        Wechsel neu)."""
+        size = QSize(18, 18)
+        for button in (
+            self.shuffle_button,
+            self.previous_button,
+            self.play_button,
+            self.next_button,
+            self.repeat_button,
+            self.queue_button,
+            self.mute_button,
+        ):
+            button.setIconSize(size)
+
+        color = self._icon_color()
+        self.previous_button.setIcon(make_icon("previous", color))
+        self.next_button.setIcon(make_icon("next", color))
+        self.queue_button.setIcon(make_icon("queue", color))
+        self._set_play_icon(self._current_playing())
+        self._set_repeat_icon(self.engine.queue.repeat_mode)
+        self._set_shuffle_icon()
+        self._set_mute_icon(self.engine.audio_output.isMuted())
+
+    def changeEvent(self, event) -> None:
+        super().changeEvent(event)
+        # Kann während der Konstruktion feuern, bevor die Knöpfe existieren.
+        if not getattr(self, "_icons_ready", False):
+            return
+        if event.type() in (
+            QEvent.Type.PaletteChange,
+            QEvent.Type.StyleChange,
+            QEvent.Type.ApplicationPaletteChange,
+        ):
+            self._apply_icons()
 
     def play_songs(self, songs: list[Song], start_index: int = 0) -> bool:
         return self.engine.set_queue(songs, start_index, autoplay=True)
@@ -191,7 +258,7 @@ class PlayerBar(QWidget):
             self.position_slider.setRange(0, 0)
             self.position_label.setText("0:00")
             self.duration_label.setText("0:00")
-            self.play_button.setText("Ⅱ")
+            self._set_play_icon(True)
             self._set_queue_controls_enabled(False)
 
             if self.preview_player is not None:
@@ -221,7 +288,7 @@ class PlayerBar(QWidget):
 
     def _preview_state_changed(self, _url: str, playing: bool) -> None:
         if self._preview_mode:
-            self.play_button.setText("Ⅱ" if playing else "▶")
+            self._set_play_icon(playing)
 
     def _preview_position_changed(self, position: int) -> None:
         if self._preview_mode:
@@ -263,7 +330,7 @@ class PlayerBar(QWidget):
     def _playback_changed(self, playing: bool) -> None:
         if self._preview_mode:
             return
-        self.play_button.setText("Ⅱ" if playing else "▶")
+        self._set_play_icon(playing)
 
     def _position_changed(self, position: int) -> None:
         if self._preview_mode:
@@ -279,36 +346,34 @@ class PlayerBar(QWidget):
         self.duration_label.setText(format_milliseconds(duration))
 
     def _muted_changed(self, muted: bool) -> None:
-        self.mute_button.setText("🔇" if muted else "🔊")
+        self._set_mute_icon(muted)
         self.mute_button.setToolTip(
             "Ton einschalten" if muted else "Stummschalten"
         )
         self.settings.setValue("player/muted", muted)
 
     def _repeat_changed(self, mode: str) -> None:
-        labels = {
-            "off": ("↻", "Wiederholen: Aus"),
-            "all": ("↻", "Wiederholen: Album/Warteschlange"),
-            "one": ("↻¹", "Wiederholen: Aktueller Titel"),
+        tooltips = {
+            "off": "Wiederholen: Aus",
+            "all": "Wiederholen: Album/Warteschlange",
+            "one": "Wiederholen: Aktueller Titel",
         }
-        text, tooltip = labels.get(mode, labels["off"])
-        self.repeat_button.setText(text)
-        self.repeat_button.setToolTip(tooltip)
+        self._set_repeat_icon(mode)
+        self.repeat_button.setToolTip(tooltips.get(mode, tooltips["off"]))
         self.repeat_button.setProperty("active", mode != "off")
         self.settings.setValue("player/repeat_mode", mode)
         self.repeat_button.style().unpolish(self.repeat_button)
         self.repeat_button.style().polish(self.repeat_button)
 
     def _shuffle_changed(self, mode: str) -> None:
-        labels = {
-            "off": ("🔀", "Zufallswiedergabe: Aus"),
-            "history": ("🔀", "Zufallswiedergabe: Mit Verlauf"),
-            "fresh": ("🎲", "Zufallswiedergabe: Immer neu auslosen"),
+        tooltips = {
+            "off": "Zufallswiedergabe: Aus",
+            "history": "Zufallswiedergabe: Mit Verlauf",
+            "fresh": "Zufallswiedergabe: Immer neu auslosen",
         }
-        text, tooltip = labels.get(mode, labels["off"])
-        self.shuffle_button.setText(text)
+        self._set_shuffle_icon()
         self.shuffle_button.setProperty("active", mode != "off")
-        self.shuffle_button.setToolTip(tooltip)
+        self.shuffle_button.setToolTip(tooltips.get(mode, tooltips["off"]))
         self.settings.setValue("player/shuffle_mode", mode)
         self.shuffle_button.style().unpolish(self.shuffle_button)
         self.shuffle_button.style().polish(self.shuffle_button)
@@ -371,4 +436,4 @@ class PlayerBar(QWidget):
 
     def _show_error(self, message: str) -> None:
         self.title_label.setText(message)
-        self.play_button.setText("▶")
+        self._set_play_icon(False)

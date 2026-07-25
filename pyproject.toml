@@ -58,6 +58,7 @@ python_version = "3.12"
 files = [
     "src/musictagstudio/database.py",
     "src/musictagstudio/history.py",
+    "src/musictagstudio/icons.py",
     "src/musictagstudio/direct_references.py",
     "src/musictagstudio/local_track.py",
     "src/musictagstudio/musicbrainz_http.py",

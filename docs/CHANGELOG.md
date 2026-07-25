@@ -58,6 +58,17 @@
   Fundstücke werden zusätzlich verworfen. Angezeigt wird nun die saubere
   Album-Beschreibung.
 
+## GUI-Refresh: einheitliche Icons in der Wiedergabe-Leiste
+
+- Die gemischten Emoji (🔀 ◀ ▶ ▶| ↻ ☷ 🔊) und das „Ⅱ" der Wiedergabe-Leiste
+  weichen einem **einheitlichen, monochromen SVG-Iconsatz** (Zufall, Zurück,
+  Wiedergabe/Pause, Weiter, Wiederholen, Warteschlange, Lautstärke/Stumm).
+- Die Icons passen sich dem hellen/dunklen Theme an (sie werden in der
+  Palette-Farbe gerendert und bei Theme-Wechsel neu gezeichnet).
+- Das reine Text-Label „Lautstärke" entfällt zugunsten des Lautsprecher-Icons.
+- Neues Modul `icons.py` mit den Inline-SVG-Icons (kein externes Asset-/CDN-
+  Handling).
+
 ## „Song über Text finden" in die Seitennavigation verschoben
 
 - Der Knopf „Song über Text finden" sitzt jetzt in der linken Navigationsleiste
