@@ -29,3 +29,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+
+# Test-Scratch-Verzeichnis
+.codex-test-temp/
+.codex-test-settings/
