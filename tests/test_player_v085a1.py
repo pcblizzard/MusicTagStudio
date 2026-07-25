@@ -218,6 +218,17 @@ def test_player_bar_exposes_basic_controls(monkeypatch):
     app.processEvents()
 
 
+def test_shuffle_modes_use_distinct_icons():
+    from musictagstudio.icons import make_icon
+
+    history_icon = make_icon("shuffle", "#ffffff")
+    fresh_icon = make_icon("shuffle_fresh", "#ffffff")
+    assert (
+        history_icon.pixmap(18, 18).toImage()
+        != fresh_icon.pixmap(18, 18).toImage()
+    )
+
+
 def test_queue_dialog_has_one_row_per_song_and_all_actions():
     app = QApplication.instance() or QApplication([])
     engine = PlayerEngine()

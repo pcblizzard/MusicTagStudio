@@ -1,5 +1,12 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Zufallswiedergabe: eigenes Icon je Modus
+
+- „Mit Verlauf“ und „Immer neu auslosen“ teilten sich in der Wiedergabe-Leiste
+  dasselbe Symbol. „Immer neu auslosen“ bekommt jetzt ein Punkt-Badge (analog
+  zum Punkt bei „ein Titel wiederholen“), sodass sich die beiden Modi optisch
+  unterscheiden.
+
 ## Apple-Album per Link direkt im Batch-Vergleich laden
 
 - Erkennt Apple Music ein Album nicht (die iTunes-Suche indexiert manche

@@ -172,8 +172,11 @@ class PlayerBar(QWidget):
         name = "repeat_one" if mode == "one" else "repeat"
         self.repeat_button.setIcon(make_icon(name, self._icon_color()))
 
-    def _set_shuffle_icon(self) -> None:
-        self.shuffle_button.setIcon(make_icon("shuffle", self._icon_color()))
+    def _set_shuffle_icon(self, mode: str | None = None) -> None:
+        if mode is None:
+            mode = self.engine.queue.shuffle_mode
+        name = "shuffle_fresh" if mode == "fresh" else "shuffle"
+        self.shuffle_button.setIcon(make_icon(name, self._icon_color()))
 
     def _set_mute_icon(self, muted: bool) -> None:
         self.mute_button.setIcon(
@@ -371,7 +374,7 @@ class PlayerBar(QWidget):
             "history": "Zufallswiedergabe: Mit Verlauf",
             "fresh": "Zufallswiedergabe: Immer neu auslosen",
         }
-        self._set_shuffle_icon()
+        self._set_shuffle_icon(mode)
         self.shuffle_button.setProperty("active", mode != "off")
         self.shuffle_button.setToolTip(tooltips.get(mode, tooltips["off"]))
         self.settings.setValue("player/shuffle_mode", mode)
