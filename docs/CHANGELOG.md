@@ -21,6 +21,20 @@
   dem lokalen Wert, bleibt die Auswahl auf „Lokal“ und zeigt keinen
   irreführenden Änderungshinweis mehr an.
 
+## Rückgängig-Verlauf spart massiv Speicherplatz
+
+- Der Verlauf sicherte bisher bei **jedem** Tag-/Cover-Vorgang **komplette
+  Kopien der Audiodateien** (before + after). Bei großen, verlustfreien
+  Dateien wuchs `.musictagstudio/history` so schnell auf viele Gigabyte.
+- Jetzt wird pro Datei nur der Zustand **Tags + Cover** gesichert – Cover
+  dedupliziert als Blob (gleiches Cover nur einmal). Beim Rückgängigmachen
+  werden die Tags zurückgeschrieben und das Cover nur dann neu eingebettet
+  bzw. entfernt, wenn es sich tatsächlich unterscheidet.
+- Aus zuvor mehreren Gigabyte pro Vorgang werden wenige Kilobyte. Undo/Redo
+  von Tag-Änderungen schreiben die Datei gar nicht mehr komplett neu.
+- Neu: `remove_cover()` zum Entfernen eines eingebetteten Covers (für den
+  Undo-Fall „vorher war kein Cover vorhanden").
+
 ## Fehlerbehebung: „Über dieses Album" zeigte rohes JSON
 
 - Bei manchen Apple-Music-Alben wurde in „Über dieses Album" das rohe

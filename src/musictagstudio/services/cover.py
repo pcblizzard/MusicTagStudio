@@ -102,6 +102,33 @@ def embed_cover(filepath: str | Path, jpeg_data: bytes) -> None:
     raise ValueError(f"Cover-Einbettung für {suffix} wird nicht unterstützt.")
 
 
+def remove_cover(filepath: str | Path) -> None:
+    """Entfernt ein eingebettetes Frontcover (für Undo „vorher kein Cover")."""
+    path=Path(filepath); suffix=path.suffix.lower()
+    if suffix==".flac":
+        audio=FLAC(path); audio.clear_pictures(); audio.save(); return
+    if suffix==".wv":
+        try: tags=APEv2(path)
+        except Exception: return
+        for key in list(tags.keys()):
+            if str(key).casefold() in {"cover art (front)","cover art (front cover)","cover art (frontcover)"}:
+                del tags[key]
+        tags.save(path); return
+    if suffix==".mp3":
+        try: tags=ID3(path)
+        except ID3NoHeaderError: return
+        tags.delall("APIC"); tags.save(path,v2_version=3); return
+    if suffix in {".ogg",".oga",".opus"}:
+        audio=OggOpus(path) if suffix==".opus" else OggVorbis(path)
+        if "metadata_block_picture" in audio: del audio["metadata_block_picture"]; audio.save()
+        return
+    if suffix in {".m4a",".mp4"}:
+        audio=MP4(path)
+        if audio.tags is not None and "covr" in audio.tags: del audio.tags["covr"]; audio.save()
+        return
+    raise ValueError(f"Cover-Entfernung für {suffix} wird nicht unterstützt.")
+
+
 
 def _load_wavpack_cover(
     path: Path,
