@@ -24,14 +24,16 @@ _ICONS: dict[str, str] = {
         '<path d="M16 4h4v4"/><path d="M4 20 20 4"/>'
         '<path d="M16 20h4v-4"/><path d="m4 4 5 5"/><path d="m15 15 5 5"/></g>'
     ),
-    # Wie "shuffle", aber mit Punkt-Badge unten – kennzeichnet "immer neu
-    # auslosen" (analog zum Punkt bei "repeat_one").
+    # Würfel = "immer neu auslosen" (neu auswürfeln); klar unterscheidbar von
+    # den Shuffle-Pfeilen des Verlauf-Modus.
     "shuffle_fresh": (
-        '<g fill="none" stroke="{color}" stroke-width="1.8" '
-        'stroke-linecap="round" stroke-linejoin="round">'
-        '<path d="M16 4h4v4"/><path d="M4 20 20 4"/>'
-        '<path d="M16 20h4v-4"/><path d="m4 4 5 5"/><path d="m15 15 5 5"/></g>'
-        '<circle cx="12" cy="21" r="1.8" fill="{color}" stroke="none"/>'
+        '<rect x="4" y="4" width="16" height="16" rx="3.5" fill="none" '
+        'stroke="{color}" stroke-width="1.8"/>'
+        '<g fill="{color}" stroke="none">'
+        '<circle cx="8.5" cy="8.5" r="1.5"/><circle cx="15.5" cy="8.5" r="1.5"/>'
+        '<circle cx="12" cy="12" r="1.5"/>'
+        '<circle cx="8.5" cy="15.5" r="1.5"/><circle cx="15.5" cy="15.5" r="1.5"/>'
+        '</g>'
     ),
     "repeat": (
         '<g fill="none" stroke="{color}" stroke-width="1.8" '
