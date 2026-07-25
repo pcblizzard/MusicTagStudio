@@ -153,21 +153,26 @@ py -3.13 -m pip install -e .
 py -3.13 -m musictagstudio.main
 ```
 
-Für Audioanalyse und ReplayGain müssen `ffmpeg` und `ffprobe` installiert und
-über `PATH` erreichbar sein. Die übrigen Tagging- und Katalogfunktionen können
-auch ohne FFmpeg verwendet werden.
+Für Audioanalyse, ReplayGain und den akustischen Fingerabdruck werden
+`ffmpeg`, `ffprobe` und `fpcalc` benötigt. Die übrigen Tagging-, Katalog-,
+Lyrics- und Player-Funktionen laufen auch ohne diese Werkzeuge.
 
-Beide Werkzeuge sind im FFmpeg-Paket enthalten:
+**Empfohlen** – die Werkzeuge einmalig nach `tools/` laden (die App findet
+sie dort automatisch, kein PATH nötig):
+
+```powershell
+py -3.13 scripts/fetch_tools.py
+```
+
+Damit landen `ffmpeg.exe`, `ffprobe.exe` und `fpcalc.exe` unter `tools/`
+(gitignoriert). Ein Portable-/Setup-Build liefert diesen Ordner mit, sodass
+Endnutzer nichts installieren müssen.
+
+Alternativ lässt sich FFmpeg systemweit installieren (dann greift der
+PATH-Fallback):
 
 ```powershell
 winget install --id Gyan.FFmpeg --exact
-```
-
-Danach Terminal und MusicTagStudio neu öffnen und die Installation prüfen:
-
-```powershell
-ffmpeg -version
-ffprobe -version
 ```
 
 ## Einrichtung

@@ -129,6 +129,19 @@ def read_ffmpeg_version(
     )
 
 
+def find_ffprobe() -> str:
+    """Pfad zu ffprobe: mitgeliefert (tools/ffmpeg/) bevorzugt, sonst PATH."""
+    bundled = (
+        application_root()
+        / "tools"
+        / "ffmpeg"
+        / executable_name("ffprobe")
+    )
+    if bundled.is_file():
+        return str(bundled)
+    return shutil.which("ffprobe") or ""
+
+
 def application_root() -> Path:
     return Path(__file__).resolve().parents[3]
 

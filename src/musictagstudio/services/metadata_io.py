@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
-import shutil
 import subprocess
 
 from mutagen.apev2 import APEv2, APETextValue
@@ -489,11 +488,11 @@ def _song_from_ape_tags(
 def _read_ffprobe_tags(
     path: Path,
 ) -> dict[str, str]:
-    executable = shutil.which(
-        "ffprobe"
-    )
+    from ..audio_analysis.ffmpeg_tools import find_ffprobe
 
-    if executable is None:
+    executable = find_ffprobe()
+
+    if not executable:
         return {}
 
     command = [

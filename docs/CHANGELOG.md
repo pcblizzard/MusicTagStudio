@@ -21,6 +21,19 @@
   dem lokalen Wert, bleibt die Auswahl auf „Lokal“ und zeigt keinen
   irreführenden Änderungshinweis mehr an.
 
+## Externe Werkzeuge werden mitgeliefert statt manuell installiert
+
+- FFmpeg/ffprobe (Audio-Analyse, ReplayGain, Spektrogramm) und fpcalc
+  (Fingerabdruck) liegen jetzt einheitlich unter `tools/` und werden von der
+  App **zuerst dort** gesucht (PATH bleibt Fallback). Ein Portable-/Setup-Build
+  kann den Ordner mitliefern, sodass Endnutzer nichts installieren müssen.
+- Neues Skript `scripts/fetch_tools.py` lädt die Werkzeuge einmalig nach
+  `tools/` (FFmpeg von gyan.dev, fpcalc von acoustid).
+- `tools/` ist gitignoriert – die großen Binärdateien blähen das Repository
+  nicht auf; auch die zuvor eingecheckte `fpcalc.exe` wurde aus Git entfernt.
+- Auch die WavPack-ffprobe-Fallback-Leseroutine nutzt jetzt die mitgelieferte
+  ffprobe-Version statt ausschließlich den PATH.
+
 ## Rückgängig-Verlauf spart massiv Speicherplatz
 
 - Der Verlauf sicherte bisher bei **jedem** Tag-/Cover-Vorgang **komplette

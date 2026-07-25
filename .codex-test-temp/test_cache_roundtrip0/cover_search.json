@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "entries": {
+    "artist|album": {
+      "timestamp": 1784897772.2807033,
+      "candidates": [
+        {
+          "source": "apple_music",
+          "source_label": "Apple Music",
+          "url": "https://example.test/original.jpg",
+          "width": 3000,
+          "height": 3000,
+          "mime": "image/jpeg",
+          "release_id": "123",
+          "score": 95,
+          "preview_url": "https://example.test/preview.jpg",
+          "album": "Album",
+          "artist": "Artist",
+          "is_local": false,
+          "file_size": 0,
+          "md5": ""
+        }
+      ]
+    }
+  }
+}

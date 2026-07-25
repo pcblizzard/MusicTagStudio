@@ -16,6 +16,10 @@ logs/
 .musictagstudio/
 config.toml
 
+# Mitgelieferte externe Werkzeuge (ffmpeg/ffprobe/fpcalc) – Build-Artefakte,
+# per scripts/fetch_tools.py befüllt, nicht im Repo.
+tools/
+
 # Editors and operating systems
 .vscode/
 .idea/
