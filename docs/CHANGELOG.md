@@ -58,6 +58,12 @@
   Fundstücke werden zusätzlich verworfen. Angezeigt wird nun die saubere
   Album-Beschreibung.
 
+## „Song über Text finden" in die Seitennavigation verschoben
+
+- Der Knopf „Song über Text finden" sitzt jetzt in der linken Navigationsleiste
+  (unter „Bibliotheksprüfung") statt in der Tagger-Werkzeugleiste. Die
+  Werkzeugleiste ist dadurch wieder auf zwei saubere Vierer-Reihen aufgeräumt.
+
 ## Fehlerbehebung: vertauschte Beschriftungen der Tagger-Knöpfe
 
 - Nach Aufnahme des Knopfes „Nach Klang identifizieren" waren die

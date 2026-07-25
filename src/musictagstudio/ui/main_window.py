@@ -437,7 +437,6 @@ class MainWindow(QMainWindow):
             self.player_button,
             self.release_text_button,
             self.more_artist_button,
-            self.lyrics_search_button,
         )
         left_layout.addLayout(
             self.provider_buttons_layout
@@ -750,6 +749,12 @@ class MainWindow(QMainWindow):
             sidebar_layout.addWidget(
                 button
             )
+
+        # Aktions-Knopf (kein Workspace) unter der Navigation.
+        self.lyrics_search_button.setMinimumHeight(34)
+        sidebar_layout.addWidget(
+            self.lyrics_search_button
+        )
 
         sidebar_layout.addStretch()
 
