@@ -1,7 +1,9 @@
+import json
+
 from musictagstudio.history import HistoryManager
 
 
-def _manager(tmp_path, store):
+def _manager(tmp_path, store, max_entries=50):
     """HistoryManager mit In-Memory-Zustand statt echter Audio-I/O."""
 
     def read_state(path):
@@ -11,7 +13,12 @@ def _manager(tmp_path, store):
     def write_state(path, tags, cover):
         store[path] = (dict(tags), cover)
 
-    return HistoryManager(tmp_path, read_state=read_state, write_state=write_state)
+    return HistoryManager(
+        tmp_path,
+        read_state=read_state,
+        write_state=write_state,
+        max_entries=max_entries,
+    )
 
 
 def _real_file(tmp_path, name):
@@ -90,3 +97,47 @@ def test_identical_cover_is_deduplicated(tmp_path):
     blobs = list((tmp_path / ".musictagstudio" / "history" / "blobs").glob("*"))
     # Fünf Titel mit identischem Cover -> genau ein Blob.
     assert len(blobs) == 1
+
+
+def test_prune_keeps_only_recent_entries_on_start(tmp_path):
+    # Fünf alte Vorgänge früherer Sitzungen auf der Platte.
+    root = tmp_path / ".musictagstudio" / "history"
+    blobs = root / "blobs"
+    blobs.mkdir(parents=True)
+    for i in range(5):
+        entry = root / f"2020010{i}-000000-{i:08d}"
+        entry.mkdir()
+        digest = f"hash{i}"
+        (blobs / digest).write_bytes(b"c")
+        (entry / "before.json").write_text(
+            json.dumps([{"path": "x", "tags": {}, "cover": digest}]),
+            encoding="utf-8",
+        )
+
+    # Neuer Manager mit Deckel 3 räumt beim Start auf.
+    _manager(tmp_path, {}, max_entries=3)
+
+    remaining = sorted(
+        p.name for p in root.iterdir() if p.is_dir() and p.name != "blobs"
+    )
+    assert remaining == [
+        "20200102-000000-00000002",
+        "20200103-000000-00000003",
+        "20200104-000000-00000004",
+    ]
+    # Verwaiste Blobs der gelöschten Einträge werden mit aufgeräumt.
+    assert sorted(p.name for p in blobs.iterdir()) == ["hash2", "hash3", "hash4"]
+
+
+def test_active_session_entries_are_never_pruned(tmp_path):
+    # Deckel 1, aber drei Vorgänge ohne Undo -> alle noch aktiv -> bleiben.
+    store = {}
+    history = _manager(tmp_path, store, max_entries=1)
+    for i in range(3):
+        key = _real_file(tmp_path, f"{i}.flac")
+        store[key] = ({"title": str(i)}, None)
+        history.commit(history.begin("op", [key]))
+
+    root = tmp_path / ".musictagstudio" / "history"
+    dirs = [p for p in root.iterdir() if p.is_dir() and p.name != "blobs"]
+    assert len(dirs) == 3  # aktive Einträge werden trotz Deckel geschützt

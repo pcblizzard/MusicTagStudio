@@ -6,7 +6,13 @@ from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
 import json
+import shutil
 import uuid
+
+
+# Es werden nur die letzten N Vorgänge behalten; ältere räumt der Verlauf
+# automatisch auf, damit der Ordner nicht unbegrenzt wächst.
+DEFAULT_MAX_ENTRIES = 50
 
 
 # Nur die Tag-Felder – Pfad und Cover werden separat behandelt.
@@ -59,14 +65,18 @@ class HistoryManager:
         *,
         read_state: ReadState | None = None,
         write_state: WriteState | None = None,
+        max_entries: int = DEFAULT_MAX_ENTRIES,
     ) -> None:
         self.root = Path(project_root) / ".musictagstudio" / "history"
         self.root.mkdir(parents=True, exist_ok=True)
         self._blobs = self.root / "blobs"
         self._read_state = read_state or _default_read_state
         self._write_state = write_state or _default_write_state
+        self.max_entries = max(1, int(max_entries))
         self.undo_stack: list[HistoryEntry] = []
         self.redo_stack: list[HistoryEntry] = []
+        # Beim Start alte Vorgänge früherer Sitzungen aufräumen.
+        self._prune()
 
     @property
     def can_undo(self) -> bool:
@@ -114,6 +124,7 @@ class HistoryManager:
         self.undo_stack.append(committed)
         self.redo_stack.clear()
         self._write_manifest(committed)
+        self._prune()
 
         return committed
 
@@ -183,6 +194,64 @@ class HistoryManager:
             cover_hash = item.get("cover")
             cover = self._load_blob(cover_hash) if cover_hash else None
             self._write_state(item["path"], item.get("tags", {}), cover)
+
+    def _prune(self) -> None:
+        """Behält die neuesten ``max_entries`` Vorgänge, löscht ältere.
+
+        In der aktuellen Sitzung noch benötigte Einträge (im Undo-/Redo-Stack)
+        werden nie entfernt; anschließend werden nicht mehr referenzierte
+        Cover-Blobs aufgeräumt.
+        """
+        if not self.root.is_dir():
+            return
+
+        active = {entry.entry_id for entry in self.undo_stack}
+        active |= {entry.entry_id for entry in self.redo_stack}
+
+        entry_dirs = sorted(
+            (
+                path
+                for path in self.root.iterdir()
+                if path.is_dir() and path.name != "blobs"
+            ),
+            key=lambda path: path.name,  # Zeitstempel-Präfix -> chronologisch
+        )
+        keep = {path.name for path in entry_dirs[-self.max_entries:]}
+
+        for path in entry_dirs:
+            if path.name in keep or path.name in active:
+                continue
+            shutil.rmtree(path, ignore_errors=True)
+
+        self._collect_blobs()
+
+    def _collect_blobs(self) -> None:
+        if not self._blobs.is_dir():
+            return
+
+        referenced: set[str] = set()
+
+        for path in self.root.iterdir():
+            if not path.is_dir() or path.name == "blobs":
+                continue
+            for name in ("before.json", "after.json"):
+                snapshot_path = path / name
+                if not snapshot_path.is_file():
+                    continue
+                try:
+                    snapshot = json.loads(
+                        snapshot_path.read_text(encoding="utf-8")
+                    )
+                except (OSError, json.JSONDecodeError):
+                    continue
+                for item in snapshot:
+                    digest = item.get("cover")
+                    if digest:
+                        referenced.add(digest)
+
+        for blob in self._blobs.iterdir():
+            if blob.is_file() and blob.name not in referenced:
+                blob.unlink(missing_ok=True)
 
     def _store_blob(self, data: bytes) -> str:
         digest = sha256(data).hexdigest()
