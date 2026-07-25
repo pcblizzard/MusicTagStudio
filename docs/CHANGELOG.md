@@ -58,6 +58,16 @@
   Fundstücke werden zusätzlich verworfen. Angezeigt wird nun die saubere
   Album-Beschreibung.
 
+## Fehlerbehebung: vertauschte Beschriftungen der Tagger-Knöpfe
+
+- Nach Aufnahme des Knopfes „Nach Klang identifizieren" waren die
+  Beschriftungen der Tagger-Werkzeugleiste verrutscht (u. a. „BBCode-Text
+  erstellen" doppelt, „Mehr vom Künstler" fehlte, falsche Tooltips). Ursache
+  war eine positionsbasierte Umbenennung der Knöpfe im Layout.
+- Jeder Knopf trägt seinen Text und Tooltip jetzt fest von der Erstellung; das
+  Layout ordnet nur noch an. Dadurch bleiben Beschriftung, Tooltip und Aktion
+  immer am selben Knopf – auch wenn später weitere Knöpfe hinzukommen.
+
 ## Nach Klang identifizieren (akustischer Fingerabdruck / AcoustID)
 
 - Neuer Knopf **„Nach Klang identifizieren"** im Tagger: Er berechnet den

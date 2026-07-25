@@ -229,9 +229,9 @@ class MainWindow(QMainWindow):
         self.provider_buttons_layout = QGridLayout()
 
         self.proposal_button = QPushButton(
-            "Vorschlag für ausgewählten Titel"
+            "Metadaten für Titel suchen"
         )
-        self.proposal_button.setToolTip("Vorschlag für ausgewählten Titel")
+        self.proposal_button.setToolTip("Metadaten für Titel suchen")
         self.proposal_button.clicked.connect(
             self.create_single_proposal
         )
@@ -250,9 +250,9 @@ class MainWindow(QMainWindow):
         self.identify_button.setEnabled(False)
 
         self.batch_button = QPushButton(
-            "Vorschläge für markierte Titel"
+            "Metadaten für Auswahl suchen"
         )
-        self.batch_button.setToolTip("Vorschläge für markierte Titel")
+        self.batch_button.setToolTip("Metadaten für Auswahl suchen")
         self.batch_button.clicked.connect(
             self.create_batch_proposals
         )
@@ -307,6 +307,9 @@ class MainWindow(QMainWindow):
 
         self.more_artist_button = QPushButton(
             "Mehr vom Künstler"
+        )
+        self.more_artist_button.setToolTip(
+            "Diskografie des Künstlers in der Medienbibliothek öffnen"
         )
         self.more_artist_button.clicked.connect(
             self.show_more_from_artist
@@ -1006,25 +1009,11 @@ class MainWindow(QMainWindow):
             if item.widget() is not None:
                 item.widget().setParent(self.provider_buttons_layout.parentWidget())
 
-        labels = (
-            "Metadaten für Titel suchen",
-            "Metadaten für Auswahl suchen",
-            "Cover für Auswahl verwalten",
-            "Lyrics anzeigen",
-            "Titel abspielen",
-            "BBCode-Text erstellen",
-            "Mehr vom Künstler",
-            "Song über Text finden",
-        )
+        # Jeder Knopf trägt seinen Text/Tooltip bereits von der Erstellung –
+        # hier wird nur noch angeordnet (keine positionsbasierte Umbenennung,
+        # die beim Hinzufügen eines Knopfes alles verschieben würde).
         columns = 4
-        for index, (button, label) in enumerate(
-            zip(
-                self.provider_action_buttons,
-                labels,
-            )
-        ):
-            button.setText(label)
-            button.setToolTip(label)
+        for index, button in enumerate(self.provider_action_buttons):
             self.provider_buttons_layout.addWidget(
                 button,
                 index // columns,
