@@ -1,5 +1,6 @@
 [appearance]
 theme = "automatic"
+style = "standard"
 language = "automatic"
 
 [providers]
@@ -33,6 +34,21 @@ parallel_jobs = 0
 
 [media_library]
 discogs_token = ""
+tidal_client_id = ""
+spotify_client_id = ""
+# Akustischer Fingerabdruck (AcoustID). Leer = mitgelieferter App-Key.
+acoustid_api_key = ""
+# Optionaler Pfad zur fpcalc-Binärdatei (sonst Bundle/PATH).
+fpcalc_path = ""
+
+[network]
+apple_request_interval_seconds = 1.5
+genius_request_interval_seconds = 1.0
+# Öffentliche Apple-Music-Websuche als Fallback für Alben, die die
+# iTunes-Such-API nicht indexiert (nur Metadaten, kein Login).
+apple_web_search_enabled = true
+# Quelle für die 30-Sekunden-Track-Vorschau: "deezer" oder "apple_music".
+preview_source = "deezer"
 
 [library]
 load_sources_on_startup = true

@@ -12,12 +12,14 @@ from threading import Event
 
 from PySide6.QtCore import (
     QObject,
+    QRunnable,
     QThread,
+    QThreadPool,
     Signal,
     Slot,
     Qt,
 )
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -31,6 +33,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QProgressDialog,
     QPushButton,
+    QScrollArea,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -58,6 +61,10 @@ from ..audio_analysis.models import (
 )
 from ..audio_analysis.replaygain import (
     write_replaygain_tags,
+)
+from ..audio_analysis.spectrogram import (
+    SpectrogramError,
+    render_spectrogram,
 )
 from ..models.song import Song
 from ..settings import load_settings
@@ -403,6 +410,48 @@ class AnalysisWorker(QObject):
         self.cancel_event.set()
 
 
+class _SpectrogramSignals(QObject):
+    finished = Signal(str, str)
+    failed = Signal(str, str)
+
+
+class _SpectrogramTask(QRunnable):
+    def __init__(
+        self,
+        source_path: str,
+        installation: FFmpegInstallation,
+        width: int,
+        height: int,
+    ):
+        super().__init__()
+        self.signals = _SpectrogramSignals()
+        self._source_path = source_path
+        self._installation = installation
+        self._width = width
+        self._height = height
+
+    @Slot()
+    def run(self):
+        try:
+            image_path = render_spectrogram(
+                self._source_path,
+                self._installation,
+                width=self._width,
+                height=self._height,
+            )
+        except SpectrogramError as error:
+            self.signals.failed.emit(
+                self._source_path,
+                str(error),
+            )
+            return
+
+        self.signals.finished.emit(
+            self._source_path,
+            str(image_path),
+        )
+
+
 class AudioAnalysisDialog(QDialog):
     def __init__(
         self,
@@ -424,6 +473,13 @@ class AudioAnalysisDialog(QDialog):
         ] = {}
         self.thread: QThread | None = None
         self.worker: AnalysisWorker | None = None
+
+        self._ordered_result_paths: list[str] = []
+        self._spectrogram_source: str | None = None
+        self._spectrogram_shown_source: str | None = None
+        self._spectrogram_pixmap: QPixmap | None = None
+        self._spectrogram_pool = QThreadPool(self)
+        self._spectrogram_pool.setMaxThreadCount(1)
 
         self.installation = find_ffmpeg()
         settings = load_settings()
@@ -576,6 +632,7 @@ class AudioAnalysisDialog(QDialog):
         )
         self.log_output = QPlainTextEdit()
         self.log_output.setReadOnly(True)
+        self.spectrogram_tab = self._create_spectrogram_tab()
 
         self.tabs.addTab(
             self.track_table,
@@ -586,11 +643,22 @@ class AudioAnalysisDialog(QDialog):
             "Albumvergleich",
         )
         self.tabs.addTab(
+            self.spectrogram_tab,
+            "Spektrogramm",
+        )
+        self.tabs.addTab(
             self.log_output,
             "Verlauf",
         )
         layout.addWidget(
             self.tabs
+        )
+
+        self.track_table.itemSelectionChanged.connect(
+            self._on_track_selection_changed
+        )
+        self.tabs.currentChanged.connect(
+            self._on_tab_changed
         )
 
         self.write_button = QPushButton(
@@ -661,6 +729,26 @@ class AudioAnalysisDialog(QDialog):
                 "Quelle",
             ]
         )
+        true_peak_header = table.horizontalHeaderItem(9)
+        if true_peak_header is not None:
+            true_peak_header.setToolTip(
+                "True Peak berücksichtigt auch Spitzen zwischen den "
+                "digitalen Abtastwerten. Deshalb kann der Sample Peak "
+                "unauffällig sein, während der True Peak eine mögliche "
+                "Übersteuerung anzeigt."
+            )
+        peak_status_header = table.horizontalHeaderItem(10)
+        if peak_status_header is not None:
+            peak_status_header.setToolTip(
+                "Einordnung des True Peak: bis +1 dBTP unauffällig, "
+                "über +1 bis +2 dBTP erhöht und über +2 dBTP kritisch."
+            )
+        track_peak_header = table.horizontalHeaderItem(12)
+        if track_peak_header is not None:
+            track_peak_header.setToolTip(
+                "Linearer ReplayGain-Spitzenwert, der aus dem gemessenen "
+                "True Peak berechnet wird."
+            )
         table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
@@ -725,6 +813,149 @@ class AudioAnalysisDialog(QDialog):
             )
 
         return table
+
+    def _create_spectrogram_tab(self) -> QWidget:
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.spectrogram_status = QLabel(
+            "Einen analysierten Titel markieren, um das "
+            "Spektrogramm anzuzeigen."
+        )
+        self.spectrogram_status.setWordWrap(True)
+        container_layout.addWidget(
+            self.spectrogram_status
+        )
+
+        self.spectrogram_view = QLabel()
+        self.spectrogram_view.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        self.spectrogram_view.setStyleSheet(
+            "background: #000000;"
+        )
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(
+            self.spectrogram_view
+        )
+        container_layout.addWidget(
+            scroll_area
+        )
+
+        return container
+
+    def _on_tab_changed(self, _index: int) -> None:
+        if (
+            self.tabs.currentWidget()
+            is self.spectrogram_tab
+        ):
+            self._request_spectrogram_for_selection()
+
+    def _on_track_selection_changed(self) -> None:
+        if (
+            self.tabs.currentWidget()
+            is self.spectrogram_tab
+        ):
+            self._request_spectrogram_for_selection()
+
+    def _selected_result_path(self) -> str | None:
+        rows = self.track_table.selectionModel()
+
+        if rows is None or not rows.hasSelection():
+            return None
+
+        row = self.track_table.currentRow()
+
+        if 0 <= row < len(self._ordered_result_paths):
+            return self._ordered_result_paths[row]
+
+        return None
+
+    def _request_spectrogram_for_selection(self) -> None:
+        path = self._selected_result_path()
+
+        if path is None:
+            self._spectrogram_source = None
+            self._spectrogram_shown_source = None
+            self.spectrogram_view.clear()
+            self.spectrogram_status.setText(
+                "Einen analysierten Titel markieren, um das "
+                "Spektrogramm anzuzeigen."
+            )
+            return
+
+        if not self.installation.available:
+            self.spectrogram_status.setText(
+                "FFmpeg ist nicht verfügbar. Das Spektrogramm "
+                "kann nicht erzeugt werden."
+            )
+            return
+
+        if path == self._spectrogram_shown_source:
+            return
+
+        self._spectrogram_source = path
+        self.spectrogram_status.setText(
+            f"Spektrogramm wird erstellt: {Path(path).name} …"
+        )
+
+        task = _SpectrogramTask(
+            path,
+            self.installation,
+            960,
+            480,
+        )
+        task.signals.finished.connect(
+            self._on_spectrogram_ready
+        )
+        task.signals.failed.connect(
+            self._on_spectrogram_failed
+        )
+        self._spectrogram_pool.start(task)
+
+    @Slot(str, str)
+    def _on_spectrogram_ready(
+        self,
+        source_path: str,
+        image_path: str,
+    ) -> None:
+        if source_path != self._spectrogram_source:
+            return
+
+        pixmap = QPixmap(image_path)
+
+        if pixmap.isNull():
+            self.spectrogram_status.setText(
+                "Das erzeugte Spektrogramm konnte nicht "
+                "geladen werden."
+            )
+            return
+
+        self._spectrogram_pixmap = pixmap
+        self._spectrogram_shown_source = source_path
+        self.spectrogram_view.setPixmap(pixmap)
+        self.spectrogram_view.setMinimumSize(
+            pixmap.size()
+        )
+        self.spectrogram_status.setText(
+            f"Spektrogramm: {Path(source_path).name}"
+        )
+
+    @Slot(str, str)
+    def _on_spectrogram_failed(
+        self,
+        source_path: str,
+        message: str,
+    ) -> None:
+        if source_path != self._spectrogram_source:
+            return
+
+        self.spectrogram_view.clear()
+        self.spectrogram_status.setText(
+            f"Spektrogramm fehlgeschlagen: {message}"
+        )
 
     def set_songs(
         self,
@@ -1010,6 +1241,10 @@ class AudioAnalysisDialog(QDialog):
             self.results[song.path]
             for song in self.current_songs
             if song.path in self.results
+        ]
+        self._ordered_result_paths = [
+            result.path
+            for result in ordered_results
         ]
         self.track_table.setRowCount(
             len(ordered_results)

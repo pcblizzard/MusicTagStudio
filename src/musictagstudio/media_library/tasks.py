@@ -7,6 +7,7 @@ import re
 import urllib.error
 import urllib.request
 
+from .. import __version__
 from .discogs import (
     DiscogsCatalogHit,
     DiscogsCatalogSnapshot,
@@ -216,7 +217,7 @@ def _fetch_url_cover(
         url,
         headers={
             "User-Agent": (
-                "MusicTagStudio/0.7.3.0 "
+                f"MusicTagStudio/{__version__} "
                 "(https://github.com/pcblizzard/MusicTagStudio)"
             )
         },
@@ -268,7 +269,7 @@ def _fetch_release_cover(
         ),
         headers={
             "User-Agent": (
-                "MusicTagStudio/0.7.2.1 "
+                f"MusicTagStudio/{__version__} "
                 "(https://github.com/pcblizzard/MusicTagStudio)"
             )
         },

@@ -7,6 +7,20 @@ from musictagstudio.media_library.streaming import (
 )
 
 
+def test_negative_streaming_result_uses_short_cache_lifetime():
+    result = StreamingAvailability.checked(
+        provider="tidal",
+        release_key="clueso|dejavu12|2026",
+        status=AvailabilityStatus.NOT_FOUND,
+        country="DE",
+    )
+
+    checked_at = datetime.fromisoformat(result.checked_at)
+    expires_at = datetime.fromisoformat(result.expires_at)
+
+    assert expires_at - checked_at == timedelta(minutes=30)
+
+
 def availability(provider="apple_music", country="DE"):
     return StreamingAvailability.available(
         provider=provider,

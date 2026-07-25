@@ -2,12 +2,11 @@
 
 **English** | [Deutsch](README.de.md)
 
-MusicTagStudio is a safety-focused, preview-first metadata editor, music
-catalogue and local audio player for Windows. It connects local audio files
-with MusicBrainz, Discogs, Apple Music, Deezer, TheAudioDB, Cover Art Archive
-and LRCLIB without silently overwriting metadata.
+MusicTagStudio is a metadata editor, music catalogue and local audio player
+for Windows. It connects local audio files with MusicBrainz, Discogs,
+Apple Music, Deezer, TheAudioDB, Cover Art Archive and LRCLIB.
 
-Current development version: **v0.8.6-alpha2.3**
+Current development version: **v0.8.6-alpha20**
 
 ## Features
 
@@ -37,13 +36,21 @@ Current development version: **v0.8.6-alpha2.3**
 - Artist artwork from Apple Music with a Discogs fallback
 - Discography, table, cover-list and cover-grid views
 - Persistent view mode, cover size and splitter positions
+- Apple Music, TIDAL and Spotify album-availability checks
 - Cached streaming availability across views and application restarts
+- TIDAL browser login with OAuth 2.0, PKCE and automatic token refresh
+- TIDAL and Spotify credentials stored in the operating-system credential vault
 
 ### Lyrics
 
 - Read embedded lyrics and local LRC files
 - Support synchronised and unsynchronised lyrics
 - Search LRCLIB and cache results locally
+- Find a song from a remembered lyric fragment, searching local cached/LRC
+  lyrics first and Genius as an optional online extension
+- Store the optional Genius Client Access Token in the operating-system
+  credential vault; Genius results link to the original page and are not
+  scraped for full lyrics
 - Save selected lyrics as an atomic UTF-8 LRC sidecar
 - Preview changes before embedding lyrics into an audio file
 - Require confirmation before replacing embedded lyrics
@@ -80,6 +87,7 @@ Current development version: **v0.8.6-alpha2.3**
 ### Interface
 
 - Light, dark or automatic appearance
+- Standard or Apple Music-inspired visual preset
 - German or English editorial information based on app or system language
 - Separate workspaces for dashboard, tagger, media library, audio analysis and
   library audit
@@ -93,14 +101,16 @@ Current development version: **v0.8.6-alpha2.3**
 | MusicBrainz | Artists, releases, editions and relationships |
 | Discogs | Discographies, editions, labels, formats, covers and artist images |
 | Apple Music | Album matching, track lists, covers, availability and editorial text |
+| TIDAL | Authenticated album-availability checks and catalogue links |
+| Spotify | Authenticated album-availability checks and catalogue links |
 | Deezer | Additional live artist suggestions |
 | TheAudioDB | Localised artist biographies and album descriptions |
 | Cover Art Archive | Additional cover candidates |
 | LRCLIB | Synchronised and unsynchronised lyrics |
 
-Online sources are used only for the purposes listed above. TIDAL, Qobuz,
-Spotify, Amazon Music and YouTube Music are not currently integrated as full
-catalogue or streaming providers.
+Online sources are used only for the purposes listed above. Qobuz, Amazon
+Music and YouTube Music are not currently integrated as catalogue or
+streaming providers.
 
 ## Supported audio formats
 
@@ -180,6 +190,8 @@ Keep a separate, verified backup of every important music library.
 ```powershell
 py -3.13 -m pip install -e ".[dev]"
 py -3.13 -m pytest
+py -3.13 -m ruff check src tests
+py -3.13 -m mypy
 py -3.13 scripts/release_check.py
 ```
 
@@ -205,12 +217,30 @@ See the [architecture documentation](docs/ARCHITECTURE.md), the
 
 ## Version overview
 
-### v0.8.6-alpha2.3
+### v0.8.6-alpha12
 
 - Dedicated queue window with drag-and-drop and multi-selection
 - Append local albums to an existing queue
 - Global media keys and Windows system media display
 - Karaoke display for synchronised lyrics
+- Safer concurrent Discogs and SQLite cache access
+- Consistent provider errors and local filename matching
+- Ruff checks and CI coverage for Python 3.12 and 3.13
+- Application-wide Apple/iTunes request pacing and bounded 429 retries
+- Full Ruff `F` checks and removal of confirmed unused imports
+- Separate appearance mode and visual preset
+- Apple Music-inspired light and graphite-dark palettes
+- Neutral table selections and calmer headers in the light preset
+- Consistent graphite borders, inputs and surfaces in the dark preset
+- Settings page clears unrelated sidebar selections and keeps its status state
+- Slightly clearer card boundaries in the light Apple-inspired preset
+- Live title and artist preview for all featured-artist handling modes
+- Gradual mypy checks for 26 domain, cache, provider, lyrics and player modules
+- Targeted type checking in CI on Python 3.12 and 3.13
+- Defensive handling of unexpected numeric values in MusicBrainz responses
+- Last streaming-availability check shown immediately and after cache reloads
+- Authenticated TIDAL and Spotify album checks with direct catalogue links
+- Secrets stored in the operating-system credential vault instead of config files
 
 ### v0.8.5
 
@@ -240,4 +270,8 @@ lyrics display and Windows media integration. See the
 
 ## License
 
-See [LICENSE](LICENSE).
+MusicTagStudio is licensed under the
+[GNU General Public License v3.0 or later](LICENSE)
+(`GPL-3.0-or-later`).
+
+Copyright © 2026 Michael ([pcblizzard](https://github.com/pcblizzard)).

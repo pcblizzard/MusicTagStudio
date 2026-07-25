@@ -50,6 +50,28 @@ class StreamingAvailability:
             expires_at=(checked + timedelta(days=ttl_days)).isoformat(timespec="seconds"),
         )
 
+    @classmethod
+    def checked(
+        cls,
+        *,
+        provider: str,
+        release_key: str,
+        status: AvailabilityStatus,
+        country: str,
+        ttl_minutes: int = 30,
+    ) -> "StreamingAvailability":
+        checked = datetime.now().astimezone()
+        return cls(
+            provider=provider,
+            release_key=release_key,
+            status=status,
+            country=country.upper(),
+            checked_at=checked.isoformat(timespec="seconds"),
+            expires_at=(checked + timedelta(minutes=ttl_minutes)).isoformat(
+                timespec="seconds"
+            ),
+        )
+
     def is_expired(self, now: datetime | None = None) -> bool:
         if not self.expires_at:
             return True

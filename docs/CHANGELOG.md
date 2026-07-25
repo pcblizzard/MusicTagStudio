@@ -1,3 +1,494 @@
+# MusicTagStudio 0.8.6-alpha25
+
+## Apple-Album per Link direkt im Batch-Vergleich laden
+
+- Erkennt Apple Music ein Album nicht (die iTunes-Suche indexiert manche
+  Alben nicht), bietet der Batch-Vergleich jetzt ein Eingabefeld für den
+  Apple-Music-Link beziehungsweise die Album-ID.
+- Nach dem Einfügen wird die offizielle Trackliste über die Lookup-API
+  geladen, den lokalen Titeln positionsrichtig zugeordnet und die
+  Apple-Music-Spalte ohne erneuten Durchlauf aktualisiert.
+- Der Abruf läuft außerhalb der Oberfläche; ein Statustext meldet Erfolg,
+  Fehler und die Zahl der zugeordneten Titel.
+- Die Änderungsvorschau nennt jetzt eindeutig die Zahl der Feldänderungen
+  und der betroffenen Titel (etwa „56 Änderungen an 9 Titeln werden
+  geschrieben“) statt nur einer Gesamtzahl.
+- Enthält der Batch-Vergleich keine tatsächlichen Änderungen (das Album ist
+  bereits vollständig getaggt), erklärt „Ausgewählte Werte speichern“ dies
+  jetzt, statt ohne Rückmeldung nichts zu tun.
+- Ein Feld gilt nur noch als „Ergänzt“, wenn der vorgeschlagene Wert
+  tatsächlich vom vorhandenen abweicht. Entspricht eine Zusatzquelle bereits
+  dem lokalen Wert, bleibt die Auswahl auf „Lokal“ und zeigt keinen
+  irreführenden Änderungshinweis mehr an.
+
+## Fehlerbehebung: „Über dieses Album" zeigte rohes JSON
+
+- Bei manchen Apple-Music-Alben wurde in „Über dieses Album" das rohe
+  JSON-LD statt der Beschreibung angezeigt. Ursache: Apple bettet den
+  JSON-LD-Block innerhalb der Editorial-Marker ein, und der Textparser hatte
+  den Script-Inhalt als Text eingesammelt.
+- Der Parser überspringt jetzt `<script>`/`<style>`-Inhalte, und JSON-artige
+  Fundstücke werden zusätzlich verworfen. Angezeigt wird nun die saubere
+  Album-Beschreibung.
+
+## Nach Klang identifizieren (akustischer Fingerabdruck / AcoustID)
+
+- Neuer Knopf **„Nach Klang identifizieren"** im Tagger: Er berechnet den
+  akustischen Fingerabdruck des ausgewählten Titels (Chromaprint/`fpcalc`),
+  fragt AcoustID ab und lädt die passenden MusicBrainz-Metadaten. Die Treffer
+  erscheinen im gewohnten Vergleichsdialog zum Prüfen und Übernehmen — ideal
+  für falsch oder gar nicht getaggte Dateien.
+- `fpcalc` wird bevorzugt aus `providers/vendor/` genutzt, sonst aus dem
+  System-PATH; ein eigener Pfad ist in den Einstellungen hinterlegbar.
+- Der AcoustID-Key wird als App-Key mitgeliefert und ist pro Nutzer in den
+  Einstellungen überschreibbar (`acoustid_api_key`).
+- Neuer MusicBrainz-Recording-Lookup per MBID (`lookup_recording_by_id`)
+  wandelt einen AcoustID-Treffer in einen vollständigen Metadaten-Vorschlag.
+- Fehlen `fpcalc` oder Key – oder lehnt AcoustID den Key ab –, erscheint eine
+  verständliche Meldung (inkl. der AcoustID-Fehlerursache) statt eines
+  Absturzes.
+
+## Wiedergabe-Knopf spielt lokale Titel in voller Länge
+
+- Der Knopf in der Trackliste ist jetzt kontextabhängig: Liegt der Titel lokal
+  vor, spielt ein Klick den **vollen Song** über die normale Wiedergabe-Leiste
+  (wie ein Doppelklick). Nur bei nicht vorhandenen Titeln wird die
+  30-Sekunden-Vorschau abgespielt.
+- Die Spalte heißt jetzt „Wiedergabe"; der Tooltip erklärt je Zeile, ob voller
+  Titel oder Vorschau abgespielt wird.
+- Liegt ein Album vollständig lokal vor, entfällt die Vorschau-Auflösung
+  komplett.
+
+## 30-Sekunden-Track-Vorschau für nicht-lokale Alben
+
+- Jeder Albumtrack lässt sich jetzt vorab anhören, ohne die Datei zu besitzen:
+  ein ▶-Knopf pro Track spielt die offizielle 30-Sekunden-Vorschau ab
+  (Apple `previewUrl` bzw. Deezer `preview` – keine Anmeldung, kein Scraping).
+- Verfügbar an zwei Stellen:
+  - **Direkt-Album-Dialog** (Album per Link/ID laden): spielt die Vorschau des
+    jeweils zugeordneten Album-Tracks.
+  - **Medienbibliothek-Trackliste**: die Vorschauen werden im Hintergrund über
+    Deezer aufgelöst und den Titeln positionsrichtig zugeordnet.
+- Ein eigener, schlanker Vorschau-Player sorgt dafür, dass die normale
+  Wiedergabe-Queue der lokalen Bibliothek unberührt bleibt; es läuft immer nur
+  eine Vorschau, eine neue stoppt die vorherige.
+- Der ▶-Knopf ist nur aktiv, wenn tatsächlich eine Vorschau vorliegt
+  (MusicBrainz/Discogs liefern keine).
+- Während eine Vorschau läuft, zeigt die Medienbibliothek „▶ Vorschau läuft:
+  <Titel>" im Status an.
+- Die untere Wiedergabe-Leiste spiegelt die laufende Vorschau: Titel, Position
+  und die ~30-Sekunden-Dauer werden angezeigt, Wiedergabe/Pause und die
+  Suchleiste steuern die Vorschau. Die lokale Wiedergabe wird dafür nur
+  pausiert und nach der Vorschau unverändert wiederhergestellt; die
+  Warteschlange bleibt erhalten (Queue-/Titelsprung-Knöpfe sind während der
+  Vorschau deaktiviert).
+- Neue Einstellung „Vorschau-Quelle" (Deezer oder Apple Music) bestimmt, über
+  welchen Anbieter die Vorschauen in der Medienbibliothek aufgelöst werden.
+- Der veraltete Hinweis „Qobuz und Deezer folgen in späteren Ausbaustufen" in
+  der Streaming-Prüfung wurde entfernt.
+- Fehlerbehebung: Bei Alben mit mehreren Discs (sich wiederholenden
+  Tracknummern) wurde die ⏸-Markierung fälschlich auf mehreren Zeilen
+  gleichzeitig angezeigt. Die spielende Zeile wird jetzt zeilengenau
+  hervorgehoben, unabhängig von gleichen Vorschau-URLs.
+- Fehlerbehebung: Die Vorschau-CDNs (Apple/Deezer) wiesen den Standard-
+  User-Agent des Qt-/ffmpeg-Backends mit HTTP 403 ab, sodass keine Vorschau
+  abspielte. Die Vorschau wird nun mit einem Browser-User-Agent in eine
+  temporäre Datei geladen und lokal abgespielt. Während des Ladens erscheint
+  ein Hinweis, bei Fehlern eine verständliche Meldung.
+
+## Deezer als vollwertige Metadatenquelle
+
+- Deezer ist jetzt als eigene Quelle auswählbar und erscheint mit eigener
+  Spalte im Vergleich. Genutzt wird die offizielle, öffentliche Deezer-API
+  (`api.deezer.com`) ohne Anmeldung – eine saubere, dokumentierte Quelle.
+- Deezer liefert vollständige Album-Tracklisten inklusive **ISRC**, Label,
+  Jahr, Genre sowie Track- und Disc-Positionen. Besonders wertvoll: ISRC,
+  das die Apple-Lookup-Schnittstelle nicht bereitstellt.
+- Der Batch-Vergleich lädt das Deezer-Album album-zentriert (wie Apple und
+  MusicBrainz) und ordnet die Titel positionsrichtig zu; als Rückfall dient
+  eine titelweise Deezer-Suche.
+- Die Vergleichsdialoge leiten ihre Spalten jetzt aus einer zentralen
+  Quell-Liste ab. Neue Quellen lassen sich dadurch an einer Stelle ergänzen,
+  ohne feste Spaltenindizes anzupassen.
+- Qobuz und Amazon Music wurden geprüft, sind aber ohne Nutzer-Anmeldung
+  nicht sauber anzubinden (Qobuz sperrt seine Metadaten-API hinter Login,
+  Amazon Music liefert ohne Login keine Katalogdaten) und bleiben daher
+  vorerst außen vor.
+
+## Apple-Music-Websuche findet nicht indexierte Alben automatisch
+
+- Die iTunes-Such-API indexiert nicht jedes Album (z. B. „Das ist alles von
+  der Kunstfreiheit gedeckt" von Danger Dan). Findet sie kein sicheres
+  Ergebnis, durchsucht MusicTagStudio jetzt zusätzlich die öffentliche
+  Apple-Music-Weboberfläche (`music.apple.com`), deren eingebettetes JSON den
+  vollen Katalog abdeckt. Die gefundene Collection-ID speist die bestehende,
+  verlässliche Lookup-Trackliste.
+- Es werden ausschließlich öffentlich ausgelieferte Metadaten gelesen – kein
+  Login, kein Token, keine Musikdaten. Die Web-Anfrage nutzt denselben
+  Anfrageabstand und Antwort-Cache wie die übrigen Apple-Abfragen.
+- Neuer Schalter „Apple-Music-Websuche als Fallback nutzen" in den
+  Einstellungen (Standard: an) und `apple_web_search_enabled` in der
+  `[network]`-Konfiguration.
+- Der Batch-Albumvergleich nutzt die Websuche als eigene Fallback-Stufe:
+  Findet die iTunes-Suche das Album nicht, wird die Collection-ID über die
+  Websuche ermittelt, bevor die MusicBrainz-Brücke greift. Damit füllt sich
+  die Apple-Music-Spalte auch für nicht indexierte Alben automatisch.
+- Das manuelle Einfügen eines Apple-Links bleibt als Rückfallweg bestehen, ist
+  für solche Alben aber meist nicht mehr nötig.
+
+## Schnelleres Schreiben von Tags und Covern
+
+- Das Speichern der Tags eines Albums läuft jetzt parallel statt Datei für
+  Datei nacheinander. Da Datei-I/O den GIL freigibt, sinkt die Wartezeit für
+  ein ganzes Album spürbar; die Oberfläche wird erst nach Abschluss aller
+  Schreibvorgänge auf dem Hauptthread aktualisiert.
+- Auch das Einbetten eines neuen Albumcovers erfolgt für alle Titel parallel
+  – gerade bei FLAC-Dateien (die beim Speichern komplett neu geschrieben
+  werden) ist das deutlich schneller.
+- Beim Schreiben von MP3-Tags entfällt ein überflüssiger vollständiger
+  Datei-Parse (`MP3(path)`), dessen Ergebnis nie verwendet wurde.
+- Ein Fehler bei einer einzelnen Datei bricht den Album-Durchlauf nicht mehr
+  ab; die übrigen Dateien werden trotzdem gespeichert und der Fehler pro
+  Titel gemeldet.
+
+# MusicTagStudio 0.8.6-alpha24
+
+## Parallele Albumabfragen und Cache-Steuerung
+
+- Der Apple-Music- und der MusicBrainz-Albumpfad laufen beim Batch-Taggen
+  jetzt gleichzeitig. Da beide getrennte Rate-Limit-Sperren nutzen, sinkt die
+  Wartezeit spürbar, ohne die Reihenfolge oder Auswahl der Vorschläge zu
+  verändern.
+- Die Einstellungen bieten unter „Online-Kataloge“ einen Knopf
+  „Provider-Cache leeren“. Er verwirft die zwischengespeicherten Apple- und
+  MusicBrainz-Antworten, sodass Alben bei Bedarf neu abgefragt werden.
+
+# MusicTagStudio 0.8.6-alpha23
+
+## TIDAL-Verbindung bleibt gültig
+
+- Die Auffrischung des TIDAL-Zugriffstokens sendet jetzt die erforderliche
+  `client_id`. Bisher meldete TIDAL nach Ablauf des Tokens „HTTP 400:
+  invalid_request, Missing parameters: client_id“, und die
+  Verfügbarkeitsprüfung schlug fehl.
+- Der Antwort-Cache der Anbieter wird in Tests in ein temporäres Verzeichnis
+  umgeleitet und verschmutzt das Projekt-Cache-Verzeichnis nicht mehr.
+
+# MusicTagStudio 0.8.6-alpha22
+
+## Deutlich schnelleres Taggen
+
+- Antworten von Apple/iTunes und MusicBrainz werden lokal zwischengespeichert.
+  Wird dasselbe Album erneut getaggt, stammen Such- und Lookup-Ergebnisse aus
+  dem Cache und erscheinen nahezu sofort.
+- Findet die Apple-Albumsuche ein Album nicht, entfällt die aufwendige
+  Einzeltitel-Suche über alle Titel. Sie fände ohnehin nur fremde Ausgaben.
+- Der US-Store wird bei der Einzeltitelsuche nur noch als Rückfallebene
+  abgefragt, wenn der bevorzugte Store nichts liefert.
+- Die MusicBrainz-Brücke zur Apple-collectionId prüft nur noch die beste
+  Release-Übereinstimmung und stellt damit höchstens eine Zusatzanfrage.
+- Der Standardabstand zwischen Apple-Anfragen wurde von 1,5 auf 1,0 Sekunden
+  gesenkt; er bleibt in den Einstellungen zwischen 0,5 und 10 Sekunden
+  wählbar.
+
+# MusicTagStudio 0.8.6-alpha21
+
+## Spektrogramm und zuverlässigere Apple-Albumzuordnung
+
+- Die Audio-Analyse zeigt in einem eigenen Reiter „Spektrogramm“ den Zeit-
+  und Frequenzverlauf des markierten Titels. Das Bild wird per FFmpeg
+  außerhalb der Oberfläche erzeugt und je Datei zwischengespeichert.
+- Einzeltitel-Treffer aus fremden Alben, etwa aus einer Compilation, dürfen
+  keine abweichende Track- oder Discnummer mehr in einen Vorschlag einsetzen,
+  solange der Albumname nicht übereinstimmt.
+- Findet die iTunes-Suche ein Album nicht, ermittelt MusicBrainz über seine
+  Apple-Music-Verweise die collectionId. Damit lädt der vorhandene
+  Lookup-Pfad die korrekte, positionsrichtige Trackliste.
+- Der Batch-Vergleich weist ausdrücklich darauf hin, ein unsicher erkanntes
+  Apple-Album über den Direkt-Album-Dialog per Apple-Music-Link zu laden.
+
+# MusicTagStudio 0.8.6-alpha20
+
+## Provider-Diagnose und steuerbare Anfrageabstände
+
+- Discogs, TIDAL, Spotify und Genius können in den Einstellungen gemeinsam
+  und ohne Offenlegung ihrer Zugangsdaten geprüft werden.
+- Die Oberfläche unterscheidet nicht eingerichtete, gültige und
+  fehlgeschlagene Zugänge und merkt sich den Zeitpunkt der letzten
+  erfolgreichen Prüfung.
+- Die Anfrageabstände für Apple/iTunes und Genius sind zwischen 0,5 und
+  10 Sekunden einstellbar; die bisherigen Standardwerte bleiben 1,5 bzw.
+  1,0 Sekunden.
+- Genius ergänzt Albumdetails nur noch für die ersten fünf Treffer. Dadurch
+  werden Textsuchen schneller und erzeugen deutlich weniger API-Anfragen.
+- Die Debug-Info zeigt sichere Provider-Zustände, den gewährten TIDAL-Scope,
+  die Anfrageabstände und die Größe des Streaming-Caches, niemals jedoch
+  Tokens oder Client Secrets.
+
+# MusicTagStudio 0.8.6-alpha19
+
+## Stabilere Online-Anbieter und reproduzierbare Tests
+
+- Genius-Anfragen besitzen jetzt ein gemeinsames Request-Pacing und beachten
+  bei HTTP 429 die vom Anbieter angegebene Wartezeit.
+- Das Ergebnislimit der kombinierten lokalen und Genius-Lyrics-Suche wird
+  zuverlässig eingehalten.
+- Parallele TIDAL-Abfragen teilen sich einen einzigen Token-Refresh. Eindeutig
+  abgelehnte Refresh-Tokens werden aus dem sicheren Speicher entfernt.
+- Der lokale TIDAL-Callback wartet bis zum tatsächlichen OAuth-Rückruf und
+  wird nicht mehr durch Browser-Prefetches oder eine Favicon-Anfrage beendet.
+- Ein unerwarteter Fehler eines Streaming-Anbieters verwirft nicht länger die
+  bereits ermittelten Ergebnisse der übrigen Anbieter.
+- Player-Tests verwenden keinen persönlichen, in Windows gespeicherten
+  Zufallswiedergabemodus mehr.
+- Redundante zweite Zwischenspeicher für lokale Titellängen wurden entfernt.
+
+# MusicTagStudio 0.8.6-alpha18
+
+## Info-, Mitwirkenden- und Debug-Dialog
+
+- Das neue Menü „Info“ öffnet einen Dialog mit den Reitern „Über“,
+  „Mitwirkende“ und „Debug-Info“.
+- Der Über-Reiter nennt Version, Projektseite, Lizenzstatus und verwendete
+  externe Programmschnittstellen.
+- Der Mitwirkenden-Reiter nennt den Projektbetreuer `pcblizzard` und
+  verlinkt die GitHub-Mitwirkenden.
+- Die Debug-Info ermittelt Revision, Python-, PySide6- und Qt-Version,
+  Betriebssystem, Architektur, Kernel und OpenSSL-Version dynamisch und kann
+  vollständig in die Zwischenablage kopiert werden.
+- Das Projekt steht nun ausdrücklich unter GPL-3.0-or-later. Lizenzhinweis,
+  Copyright, Paketmetadaten, README und Info-Dialog wurden entsprechend
+  vereinheitlicht.
+
+# MusicTagStudio 0.8.6-alpha17
+
+## Songs über erinnerte Textstellen finden
+
+- Der Tagger besitzt den neuen Dialog „Song über Text finden“.
+- Bereits zwischengespeicherte Lyrics und lokale LRC-Dateien werden zuerst
+  durchsucht; lokale Treffer lassen sich direkt abspielen.
+- Genius kann die Suche optional um Online-Treffer ergänzen. Dafür wird ein
+  Client Access Token in der Anmeldeinformationsverwaltung des
+  Betriebssystems statt in `config.toml` gespeichert.
+- Genius-Ergebnisse zeigen Titel und Künstler und öffnen die jeweilige
+  Originalseite. MusicTagStudio lädt oder kopiert darüber keine vollständigen
+  Liedtexte.
+- Der Suchdialog erklärt bei reinen Genius-Treffern, dass eine lokale
+  Audiodatei nicht automatisch lokal gespeicherte Lyrics enthält. Die Spalte
+  „Gefundene Textstelle“ besitzt zusätzlich einen erklärenden Tooltip.
+
+# MusicTagStudio 0.8.6-alpha16
+
+## Verständlichere Peak-Werte
+
+- Die Spalten „True Peak“, „Peak-Hinweis“ und „Track Peak“ erklären ihre
+  unterschiedlichen Messwerte jetzt direkt per Tooltip.
+- Der True-Peak-Hinweis macht ausdrücklich darauf aufmerksam, dass ein
+  unauffälliger Sample Peak mögliche Zwischenabtastspitzen nicht ausschließt.
+
+# MusicTagStudio 0.8.6-alpha15
+
+## Verlässliche TIDAL-Neuprüfung
+
+- Erfolgreiche Streaming-Funde bleiben weiterhin sieben Tage im Cache.
+- Negative Ergebnisse wie „nicht gefunden“ laufen bereits nach 30 Minuten
+  ab, damit temporäre API-Antworten und Korrekturen nicht eine Woche lang
+  verborgen bleiben.
+- Die Streaming-Diagnose protokolliert Suchparameter, Kandidaten und die
+  Anbieterentscheidung ohne Zugangsdaten in `logs/streaming.log`.
+
+# MusicTagStudio 0.8.6-alpha14
+
+## Aussagekräftige TIDAL-Diagnose
+
+- TIDAL-Anfragen verwenden den in der aktuellen THIRD_PARTY-Referenz
+  ausgewiesenen JSON:API-Medientyp `application/vnd.api+json`. Der veraltete
+  TIDAL-v1-Medientyp führte am aktuellen Gateway irreführend zu HTTP 404.
+- Schrägstriche in Suchbegriffen werden für den TIDAL-Ressourcenpfad als
+  Leerzeichen übertragen und bis zu 20 Kandidaten ausgewertet. Dadurch wird
+  unter anderem „Deja Vu 1/2“ eindeutig gefunden.
+- Ein HTTP-404 nach erfolgreicher OAuth-Anmeldung wird nicht mehr als
+  allgemeiner Suchfehler dargestellt.
+- Die Medienbibliothek unterscheidet nun ausdrücklich zwischen einer gültigen
+  TIDAL-Anmeldung und einem nicht verfügbaren öffentlichen Katalog-Endpunkt.
+- Die Diagnose ist durch einen Regressionstest abgesichert.
+
+# MusicTagStudio 0.8.6-alpha13
+
+## TIDAL-Browseranmeldung
+
+- TIDAL kann in den Einstellungen über den Browser mit MusicTagStudio
+  verbunden und wieder getrennt werden.
+- Die Anmeldung verwendet Authorization Code mit PKCE, den freigegebenen
+  Scope `search.read` und die lokale Rückrufadresse
+  `http://127.0.0.1:8765/tidal/callback`.
+- Ein zufälliger `state`-Wert schützt die Rückgabe; der lokale Empfänger
+  lauscht ausschließlich auf `127.0.0.1` und protokolliert keine Anfrage.
+- Access- und Refresh-Token werden im Anmeldedatenspeicher des
+  Betriebssystems abgelegt und Access-Token bei Bedarf automatisch erneuert.
+- Die Katalogprüfung bevorzugt den verbundenen Benutzerzugang und verwendet
+  den bisherigen Client-Credentials-Ablauf nur noch als Rückfalloption.
+- PKCE, Tokenaustausch und die Auswahl des Benutzer-Tokens sind durch
+  Regressionstests abgesichert.
+
+# MusicTagStudio 0.8.6-alpha12
+
+## TIDAL- und Spotify-Kataloge
+
+- Die Medienbibliothek prüft ein Album parallel bei Apple Music, TIDAL und
+  Spotify, sofern die jeweiligen Zugangsdaten eingerichtet sind.
+- Treffer werden mit Künstler, Albumtitel, Jahr und Titelanzahl bewertet und
+  nur oberhalb derselben konservativen Mindestübereinstimmung akzeptiert.
+- Direkte TIDAL- und Spotify-Schaltflächen werden nur bei einem bestätigten
+  Treffer aktiviert.
+- Ergebnisse aller Anbieter verwenden den vorhandenen Sieben-Tage-Cache und
+  zeigen den letzten Prüfzeitpunkt auch bei einem Apple-Nichttreffer.
+- Client-IDs werden in den Einstellungen gespeichert; Client-Secrets liegen
+  über `keyring` im Anmeldedatenspeicher des Betriebssystems und nicht im
+  Klartext in der Konfigurationsdatei.
+- Provider-, Cache- und Geheimnisablage sind durch neue Regressionstests sowie
+  die erweiterte mypy-Prüfung abgesichert.
+- Die TIDAL-Suche folgt dem von TIDAL beschriebenen zweistufigen JSON:API-
+  Ablauf: zunächst Album-IDs suchen, anschließend Album- und Künstlerdaten
+  gemeinsam laden. Nicht unterstützte verschachtelte `include`-Parameter
+  werden nicht mehr verwendet.
+- Providerfehler zeigen einen bereinigten HTTP-Status und die vom Anbieter
+  gelieferte Fehlerbeschreibung, ohne Zugangsdaten offenzulegen.
+- Der case-sensitive TIDAL-Suchpfad verwendet korrekt `/v2/searchResults`;
+  Fehler nennen zusätzlich die betroffene Stufe Anmeldung, Suche oder
+  Albumdetails.
+
+# MusicTagStudio 0.8.6-alpha11
+
+## Sichtbarer Streaming-Prüfzeitpunkt
+
+- Nach jeder erfolgreichen Streaming-Prüfung wird sofort Datum und Uhrzeit der
+  Prüfung angezeigt.
+- Nach einem Ansichts- oder Programmneustart bleibt derselbe gespeicherte
+  Prüfzeitpunkt sichtbar.
+- Gespeicherte Ergebnisse werden weiterhin ausdrücklich als solche markiert.
+- Der Apple-Mindestabstand bleibt unverändert bei 1,5 Sekunden.
+
+# MusicTagStudio 0.8.6-alpha10
+
+## Erweiterte statische Typprüfung
+
+- Der mypy-Prüfumfang wächst von acht auf 20 klar abgegrenzte Module.
+- Zusätzlich geprüft werden Apple-, MusicBrainz-, Deezer- und TheAudioDB-
+  Provider, direkte Referenzen sowie weitere Lyrics-Bausteine.
+- Unerwartete Zahlentypen in MusicBrainz-Antworten werden defensiv behandelt,
+  anstatt ungeprüft an `int()` übergeben zu werden.
+- Ein Regressionstest deckt gültige und unerwartete MusicBrainz-Zahlenwerte ab.
+- Das Netzwerkverhalten und die verwendeten HTTPS-Endpunkte bleiben
+  unverändert.
+
+# MusicTagStudio 0.8.6-alpha9
+
+## Schrittweises Type-Checking
+
+- `mypy` ist Teil der Entwicklungsabhängigkeiten und kann über
+  `python -m mypy` gestartet werden.
+- Acht klar abgegrenzte Domain-, Cache-, Provider- und Player-Module werden
+  zunächst statisch geprüft.
+- Die gezielte Typprüfung läuft in der CI unter Python 3.12 und 3.13.
+- Die Behandlung von `HTTPError.headers` im gemeinsamen Apple-HTTP-Modul ist
+  für die unterschiedlichen Laufzeit- und Typisierungsvarianten abgesichert.
+- Der Prüfumfang wird bewusst schrittweise erweitert, damit Qt- und
+  Bibliotheks-Typisierungen nicht als unübersichtliches Gesamtpaket einfließen.
+
+# MusicTagStudio 0.8.6-alpha8
+
+## Feature-Künstler-Vorschau und Einstellungsnavigation
+
+- „Einstellungen“ wurde auf Wunsch wieder aus der linken Hauptnavigation
+  entfernt und bleibt über das Dateimenü sowie die Startseite erreichbar.
+- Während die Einstellungsseite sichtbar ist, wird kein anderer
+  Navigationspunkt fälschlich als aktiv dargestellt.
+- Die Feature-Künstler-Auswahl zeigt live ein Beispiel für resultierenden
+  Titel und resultierendes Künstlerfeld.
+- Die Vorschau verwendet dieselbe Normalisierungslogik wie die tatsächliche
+  Metadatenverarbeitung.
+- Alle drei Modi – nur Künstlerfeld, Titel und Künstlerfeld sowie
+  Quellschreibweise – sind durch UI-Regressionstests abgesichert.
+
+# MusicTagStudio 0.8.6-alpha7
+
+## Synchronisierte Einstellungsnavigation
+
+- Einstellungen besitzen nun einen eigenen Eintrag in der linken Navigation.
+- Beim Öffnen der Einstellungen werden sichtbarer Arbeitsbereich,
+  Navigationsmarkierung und Statuszeile gemeinsam aktualisiert.
+- Auch der initiale Startseitenzustand verwendet dieselbe zentrale
+  Umschaltlogik und kann deshalb nicht mehr von der Sidebar abweichen.
+- Die Kartenrahmen im hellen Apple-Preset wurden geringfügig verstärkt, ohne
+  die ruhige helle Oberfläche aufzugeben.
+- Regressionstests sichern den Start- und Einstellungszustand der Navigation.
+
+# MusicTagStudio 0.8.6-alpha6
+
+## Theme-Polishing
+
+- Tabellenmarkierungen im hellen Apple-Preset sind neutraler und konkurrieren
+  nicht mehr mit der roten Navigations- und Player-Akzentfarbe.
+- Tabellenköpfe, Rasterlinien und Eingabefeldrahmen verwenden ruhigere,
+  konsistente Grautöne.
+- Das dunkle Preset ersetzt verbliebene bläuliche Rahmen durch neutrale
+  Graphitfarben.
+- Karten, Listen, Tabellen, Eingaben und Schaltflächen verwenden
+  vereinheitlichte Rundungen.
+- Scrollbars und Statusflächen wurden an die jeweilige Preset-Palette
+  angeglichen.
+
+# MusicTagStudio 0.8.6-alpha5
+
+## Theme-Presets
+
+- Der Helligkeitsmodus Automatisch/Hell/Dunkel und das visuelle Design sind
+  jetzt getrennte Einstellungen.
+- Das bisherige MusicTagStudio-Design bleibt unverändert als Standard erhalten.
+- Ein zusätzliches Apple-Music-inspiriertes Preset bietet eine helle,
+  zurückhaltende Oberfläche sowie ein graphitdunkles Design mit rotem Akzent.
+- Auswahl, Speicherung und sofortige Anwendung erfolgen über den bestehenden
+  Einstellungsbereich.
+- Ungültige oder ältere Konfigurationen fallen sicher auf das Standarddesign
+  zurück.
+- Änderungsmarkierungen verwenden Palettenfarben und passen sich dadurch an
+  beide Presets an.
+
+# MusicTagStudio 0.8.6-alpha4
+
+## Apple-Pacing und statische Prüfung
+
+- Apple-/iTunes-JSON-Anfragen verwenden eine gemeinsame app-weite
+  Mindestpause und verhindern damit ungebremste Request-Spitzen bei
+  Varianten- und Track-Fallback-Suchen.
+- HTTP 429 wird einmal anhand von `Retry-After` wiederholt; die Wartezeit ist
+  auf 30 Sekunden begrenzt.
+- Der Pacing-Lock wird vor dem Netzwerkzugriff freigegeben und blockiert keine
+  parallel laufende Antwort.
+- Direkte Apple-Song-/Album-ID-Abfragen verwenden denselben Mechanismus.
+- Ruff prüft nun die vollständige `F`-Fehlerfamilie. Bestätigte ungenutzte
+  Imports wurden entfernt; bewusst gehaltene Qt-Testreferenzen sind eng auf
+  Tests begrenzt ausgenommen.
+
+# MusicTagStudio 0.8.6-alpha3
+
+## Stabilität und Entwicklungsqualität
+
+- Discogs hält den globalen Pacing-Lock nicht mehr während Netzwerkzugriffen
+  oder `Retry-After`-Wartezeiten.
+- Gemeinsame Helfer liefern in direkter Albumsuche und Vorschlagsdienst
+  dieselben Dateinamen-Titel und lokalen Tracklängen.
+- Apple Editorial und TheAudioDB übersetzen Netzwerk- und Antwortfehler in
+  einen einheitlichen `EditorialProviderError`.
+- SQLite-basierte Lyrics-, Streaming- und Discogs-Caches warten begrenzt auf
+  konkurrierende Schreibzugriffe.
+- Apple-/iTunes-Anfragen verwenden die aktuelle Paketversion im User-Agent.
+- Eine konservative Ruff-Prüfung erkennt kritische Syntax- und Namensfehler.
+- Die CI testet Python 3.12 und 3.13.
+- Zwei zuvor fehlende Helfer der direkten Apple-Song-ID-Abfrage wurden
+  ergänzt und durch Regressionstests abgesichert.
+
 # MusicTagStudio 0.8.6-alpha2.3
 
 ## Windows-Systemmedienanzeige

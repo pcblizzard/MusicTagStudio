@@ -1,20 +1,24 @@
 from __future__ import annotations
 
-import json
 import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 from ..diagnostics import get_diagnostic_logger
 
 from ..models.metadata import MetadataCandidate
+from .apple_http import (
+    APPLE_USER_AGENT,
+    AppleRequestError,
+    request_json,
+)
 
 
 SEARCH_ENDPOINT = "https://itunes.apple.com/search"
+USER_AGENT = APPLE_USER_AGENT
 DEFAULT_COUNTRY = "DE"
 DEFAULT_LIMIT = 50
 REQUEST_TIMEOUT_SECONDS = 15
@@ -112,33 +116,12 @@ def search_album(
     request = Request(
         f"{SEARCH_ENDPOINT}?{urlencode(params)}",
         headers={
-            "User-Agent": "MusicTagStudio/0.6.8.7",
+            "User-Agent": USER_AGENT,
             "Accept": "application/json",
         },
     )
 
-    try:
-        with urlopen(
-            request,
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        ) as response:
-            payload = json.load(response)
-    except HTTPError as error:
-        raise AppleMusicProviderError(
-            f"Apple antwortete mit HTTP-Fehler {error.code}."
-        ) from error
-    except URLError as error:
-        raise AppleMusicProviderError(
-            "Keine Verbindung zur Apple-Suche: "
-            f"{error.reason}"
-        ) from error
-    except (
-        TimeoutError,
-        json.JSONDecodeError,
-    ) as error:
-        raise AppleMusicProviderError(
-            "Die Apple-Antwort konnte nicht verarbeitet werden."
-        ) from error
+    payload = _request_payload(request)
 
     raw_results = payload.get(
         "results",
@@ -322,6 +305,24 @@ def search_album_variants(
     )
     if any(candidate.confidence >= MINIMUM_ALBUM_CONFIDENCE for candidate in ordered):
         return ordered
+
+    # Findet die iTunes-Such-API nichts Sicheres, deckt die öffentliche
+    # Apple-Music-Websuche auch nicht indexierte Alben ab (nur eine Anfrage).
+    _augment_with_web_search(
+        by_id,
+        album=album,
+        artist=artist,
+        expected_track_count=expected_track_count,
+        wanted_year=wanted_year,
+        country=country,
+    )
+    ordered = sorted(
+        by_id.values(),
+        key=lambda candidate: (-candidate.confidence, candidate.album.casefold()),
+    )
+    if any(candidate.confidence >= MINIMUM_ALBUM_CONFIDENCE for candidate in ordered):
+        return ordered
+
     recovered = _recover_album_from_track_searches(
         album=album,
         artist=artist,
@@ -336,6 +337,98 @@ def search_album_variants(
         by_id.values(),
         key=lambda candidate: (-candidate.confidence, candidate.album.casefold()),
     )
+
+
+def search_albums_via_web(
+    album: str,
+    artist: str = "",
+    *,
+    expected_track_count: int | None = None,
+    wanted_year: str = "",
+    country: str = DEFAULT_COUNTRY,
+) -> list[AppleAlbumCandidate]:
+    """Sucht Alben ausschließlich über die öffentliche Apple-Music-Websuche.
+
+    Anders als search_album_variants wird nicht zuerst die iTunes-Such-API
+    befragt. Der Batch-Weg nutzt diese Funktion gezielt, wenn seine eigene
+    API-Suche kein Album gefunden hat.
+    """
+    by_id: dict[str, AppleAlbumCandidate] = {}
+    _augment_with_web_search(
+        by_id,
+        album=album,
+        artist=artist,
+        expected_track_count=expected_track_count,
+        wanted_year=wanted_year,
+        country=country,
+    )
+    return sorted(
+        by_id.values(),
+        key=lambda candidate: (
+            -candidate.confidence,
+            candidate.album.casefold(),
+        ),
+    )
+
+
+def _augment_with_web_search(
+    by_id: dict[str, AppleAlbumCandidate],
+    *,
+    album: str,
+    artist: str,
+    expected_track_count: int | None,
+    wanted_year: str,
+    country: str,
+) -> None:
+    """Ergänzt Kandidaten aus der Apple-Music-Websuche.
+
+    Die Websuche liefert nur ID, Titel, Künstler und Trackzahl. Bewertet
+    wird sie mit derselben Album-Wertung wie die API-Treffer, sodass sich
+    beide Quellen konsistent einordnen. Fehler beim Scraping dürfen den
+    Haupt-Suchweg niemals unterbrechen.
+    """
+    from . import apple_music_web
+
+    if not apple_music_web.WEB_SEARCH_ENABLED:
+        return
+
+    try:
+        web_albums = apple_music_web.search_albums_web(
+            album,
+            artist,
+            country=country,
+        )
+    except Exception:  # noqa: BLE001 - Scraping darf den Ablauf nie stoppen
+        get_diagnostic_logger("apple_music").exception(
+            "Apple-Web-Suche unerwartet fehlgeschlagen | Album=%r",
+            album,
+        )
+        return
+
+    for web in web_albums:
+        confidence = _album_match_score(
+            wanted_album=album,
+            wanted_artist=artist,
+            expected_track_count=expected_track_count,
+            wanted_year=wanted_year,
+            album=web.album,
+            artist=web.artist,
+            track_count=web.track_count,
+            year="",
+        )
+        candidate = AppleAlbumCandidate(
+            collection_id=web.collection_id,
+            album=web.album,
+            artist=web.artist,
+            track_count=web.track_count,
+            year="",
+            country=country.upper(),
+            confidence=confidence,
+        )
+        current = by_id.get(web.collection_id)
+
+        if current is None or candidate.confidence > current.confidence:
+            by_id[web.collection_id] = candidate
 
 
 def _recover_album_from_track_searches(
@@ -491,33 +584,12 @@ def search_song(
     request = Request(
         f"{SEARCH_ENDPOINT}?{urlencode(params)}",
         headers={
-            "User-Agent": "MusicTagStudio/0.6.8.7",
+            "User-Agent": USER_AGENT,
             "Accept": "application/json",
         },
     )
 
-    try:
-        with urlopen(
-            request,
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        ) as response:
-            payload = json.load(response)
-    except HTTPError as error:
-        raise AppleMusicProviderError(
-            f"Apple antwortete mit HTTP-Fehler {error.code}."
-        ) from error
-    except URLError as error:
-        raise AppleMusicProviderError(
-            "Keine Verbindung zur Apple-Suche: "
-            f"{error.reason}"
-        ) from error
-    except (
-        TimeoutError,
-        json.JSONDecodeError,
-    ) as error:
-        raise AppleMusicProviderError(
-            "Die Apple-Antwort konnte nicht verarbeitet werden."
-        ) from error
+    payload = _request_payload(request)
 
     results: list[MetadataCandidate] = []
 
@@ -817,33 +889,22 @@ def _search_payload(
     request = Request(
         f"{SEARCH_ENDPOINT}?{urlencode(params)}",
         headers={
-            "User-Agent": "MusicTagStudio/0.6.8.7",
+            "User-Agent": USER_AGENT,
             "Accept": "application/json",
         },
     )
 
+    return _request_payload(request)
+
+
+def _request_payload(request: Request) -> dict:
     try:
-        with urlopen(
+        return request_json(
             request,
             timeout=REQUEST_TIMEOUT_SECONDS,
-        ) as response:
-            return json.load(response)
-    except HTTPError as error:
-        raise AppleMusicProviderError(
-            f"Apple antwortete mit HTTP-Fehler {error.code}."
-        ) from error
-    except URLError as error:
-        raise AppleMusicProviderError(
-            "Keine Verbindung zur Apple-Suche: "
-            f"{error.reason}"
-        ) from error
-    except (
-        TimeoutError,
-        json.JSONDecodeError,
-    ) as error:
-        raise AppleMusicProviderError(
-            "Die Apple-Antwort konnte nicht verarbeitet werden."
-        ) from error
+        )
+    except AppleRequestError as error:
+        raise AppleMusicProviderError(str(error)) from error
 
 
 def _unique_countries(

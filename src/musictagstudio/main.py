@@ -13,15 +13,13 @@ from .diagnostics import (
     log_application_start,
     log_application_stop,
 )
-from .settings import load_settings
+from .settings import apply_request_intervals, load_settings
 from .theme import apply_theme
 from .ui.main_window import MainWindow
 
 
 def _install_qt_logging() -> None:
-    logger = get_diagnostic_logger(
-        "qt"
-    )
+    logger = get_diagnostic_logger("qt")
 
     def qt_message_handler(
         message_type,
@@ -49,9 +47,7 @@ def _install_qt_logging() -> None:
             message,
         )
 
-    qInstallMessageHandler(
-        qt_message_handler
-    )
+    qInstallMessageHandler(qt_message_handler)
 
 
 def main():
@@ -60,43 +56,32 @@ def main():
         version=__version__,
     )
     _install_qt_logging()
-    logger = get_diagnostic_logger(
-        "application"
-    )
+    logger = get_diagnostic_logger("application")
 
     try:
-        logger.info(
-            "QApplication wird erstellt"
-        )
+        logger.info("QApplication wird erstellt")
         QApplication.setHighDpiScaleFactorRoundingPolicy(
             Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
         )
-        app = QApplication(
-            sys.argv
-        )
+        app = QApplication(sys.argv)
 
         def refresh_automatic_theme():
-            settings = (
-                load_settings()
-            )
+            settings = load_settings()
             logger.info(
                 "Automatisches Theme aktualisiert | Theme=%s",
                 settings.theme,
             )
 
-            if (
-                settings.theme
-                == "automatic"
-            ):
+            if settings.theme == "automatic":
                 apply_theme(
                     app,
                     settings.theme,
+                    settings.theme_style,
                 )
 
-        logger.info(
-            "Einstellungen werden geladen"
-        )
+        logger.info("Einstellungen werden geladen")
         settings = load_settings()
+        apply_request_intervals(settings)
         logger.info(
             "Einstellungen geladen | Theme=%s | "
             "Metadatenquelle=%s | Apple-Store=%s | "
@@ -109,18 +94,13 @@ def main():
         apply_theme(
             app,
             settings.theme,
+            settings.theme_style,
         )
-        logger.info(
-            "Theme angewendet"
-        )
+        logger.info("Theme angewendet")
 
-        app.styleHints().colorSchemeChanged.connect(
-            refresh_automatic_theme
-        )
+        app.styleHints().colorSchemeChanged.connect(refresh_automatic_theme)
 
-        logger.info(
-            "Hauptfenster wird erstellt"
-        )
+        logger.info("Hauptfenster wird erstellt")
         window = MainWindow()
         window.show()
         logger.info(
@@ -130,19 +110,13 @@ def main():
         )
 
         exit_code = app.exec()
-        log_application_stop(
-            exit_code
-        )
+        log_application_stop(exit_code)
 
         return exit_code
     except Exception:
-        logger.exception(
-            "Programmstart oder Hauptschleife fehlgeschlagen"
-        )
+        logger.exception("Programmstart oder Hauptschleife fehlgeschlagen")
         raise
 
 
 if __name__ == "__main__":
-    sys.exit(
-        main()
-    )
+    sys.exit(main())

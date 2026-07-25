@@ -1,4 +1,8 @@
-from musictagstudio.providers.musicbrainz import _candidate_from_recording
+from musictagstudio.providers.musicbrainz import (
+    _best_tag,
+    _candidate_from_recording,
+    _optional_int,
+)
 
 
 def test_musicbrainz_recording_parser():
@@ -35,3 +39,15 @@ def test_musicbrainz_recording_parser():
     assert result.track == "2"
     assert result.total_tracks == "10"
     assert result.year == "1997"
+
+
+def test_musicbrainz_numeric_json_values_are_parsed_defensively():
+    assert _optional_int("12") == 12
+    assert _optional_int(7) == 7
+    assert _optional_int({"unexpected": "value"}) is None
+    assert _best_tag(
+        [
+            {"name": "invalid", "count": {"unexpected": "value"}},
+            {"name": "pop", "count": "4"},
+        ]
+    ) == "pop"

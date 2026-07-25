@@ -6,17 +6,17 @@ import re
 import sqlite3
 import threading
 import time
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 import urllib.error
 import urllib.request
 
 from .. import __version__
+from ..database import connect_database
 from ..diagnostics import project_root
 
 BASE_URL = "https://api.discogs.com"
 USER_AGENT = (
-    f"MusicTagStudio/{__version__} "
-    "(https://github.com/pcblizzard/MusicTagStudio)"
+    f"MusicTagStudio/{__version__} (https://github.com/pcblizzard/MusicTagStudio)"
 )
 REQUEST_INTERVAL_SECONDS = 1.05
 _request_lock = threading.Lock()
@@ -89,7 +89,7 @@ def load_catalog_snapshot(query: str) -> DiscogsCatalogSnapshot | None:
     if not cache_path.is_file():
         return None
     try:
-        with sqlite3.connect(cache_path) as connection:
+        with connect_database(cache_path) as connection:
             row = connection.execute(
                 "SELECT releases_json, fetched_at FROM discogs_catalog WHERE query_key = ?",
                 (_key(query),),
@@ -118,7 +118,7 @@ def save_catalog_snapshot(
         [asdict(release) for release in releases],
         ensure_ascii=False,
     )
-    with sqlite3.connect(cache_path) as connection:
+    with connect_database(cache_path) as connection:
         connection.execute(
             "CREATE TABLE IF NOT EXISTS discogs_catalog ("
             "query_key TEXT PRIMARY KEY, releases_json TEXT NOT NULL, fetched_at REAL NOT NULL)"
@@ -141,9 +141,7 @@ def _catalog_cache_path():
 
 
 def _release_from_cache(item: dict) -> DiscogsRelease:
-    tuple_fields = {
-        "labels", "formats", "format_descriptions", "artists", "badges"
-    }
+    tuple_fields = {"labels", "formats", "format_descriptions", "artists", "badges"}
     values = {
         key: tuple(value) if key in tuple_fields else value
         for key, value in item.items()
@@ -180,11 +178,7 @@ def search_artists(
         "results",
         [],
     ):
-        artist_id = _safe_int(
-            item.get(
-                "id"
-            )
-        )
+        artist_id = _safe_int(item.get("id"))
 
         if not artist_id:
             continue
@@ -253,11 +247,7 @@ def search_catalog(
             "results",
             [],
         ):
-            entity_id = _safe_int(
-                item.get(
-                    "id"
-                )
-            )
+            entity_id = _safe_int(item.get("id"))
 
             if not entity_id:
                 continue
@@ -295,42 +285,26 @@ def search_catalog(
                         "",
                     )
                 ).strip(),
-                ", ".join(
-                    labels[:2]
-                ),
-                ", ".join(
-                    formats[:3]
-                ),
+                ", ".join(labels[:2]),
+                ", ".join(formats[:3]),
             ]
             external_url = ""
 
             if kind == "artist":
-                external_url = (
-                    f"https://www.discogs.com/artist/{entity_id}"
-                )
+                external_url = f"https://www.discogs.com/artist/{entity_id}"
             elif kind == "label":
-                external_url = (
-                    f"https://www.discogs.com/label/{entity_id}"
-                )
+                external_url = f"https://www.discogs.com/label/{entity_id}"
             elif kind == "master":
-                external_url = (
-                    f"https://www.discogs.com/master/{entity_id}"
-                )
+                external_url = f"https://www.discogs.com/master/{entity_id}"
             else:
-                external_url = (
-                    f"https://www.discogs.com/release/{entity_id}"
-                )
+                external_url = f"https://www.discogs.com/release/{entity_id}"
 
             hits.append(
                 DiscogsCatalogHit(
                     kind=kind,
                     entity_id=entity_id,
                     title=title,
-                    subtitle=" · ".join(
-                        value
-                        for value in subtitle_parts
-                        if value
-                    ),
+                    subtitle=" · ".join(value for value in subtitle_parts if value),
                     resource_url=str(
                         item.get(
                             "resource_url",
@@ -391,19 +365,13 @@ def fetch_artist_image(
         limit_per_kind=15,
     )
     exact = [
-        hit
-        for hit in hits
-        if _key(re.sub(r"\s+\(\d+\)$", "", hit.title)) == wanted
+        hit for hit in hits if _key(re.sub(r"\s+\(\d+\)$", "", hit.title)) == wanted
     ]
     if not exact:
         return None
     hit = exact[0]
     detail = _get_json(f"/artists/{hit.entity_id}", token)
-    images = [
-        image
-        for image in detail.get("images", [])
-        if isinstance(image, dict)
-    ]
+    images = [image for image in detail.get("images", []) if isinstance(image, dict)]
     images.sort(key=lambda image: 0 if image.get("type") == "primary" else 1)
     for image in images:
         url = str(image.get("uri") or image.get("resource_url") or "").strip()
@@ -420,25 +388,17 @@ def fetch_catalog_release(
     token: str,
 ) -> DiscogsRelease:
     _require_token(token)
-    kind = str(
-        kind or ""
-    ).casefold()
+    kind = str(kind or "").casefold()
 
     if kind == "master":
         master = _get_json(
             f"/masters/{entity_id}",
             token,
         )
-        main_release = _safe_int(
-            master.get(
-                "main_release"
-            )
-        )
+        main_release = _safe_int(master.get("main_release"))
 
         if not main_release:
-            raise DiscogsProviderError(
-                "Der Discogs-Master besitzt keine Hauptausgabe."
-            )
+            raise DiscogsProviderError("Der Discogs-Master besitzt keine Hauptausgabe.")
 
         detail = _get_json(
             f"/releases/{main_release}",
@@ -519,25 +479,10 @@ def fetch_label_releases(
                 [],
             )
         )
-        summaries.extend(
-            items
-        )
-        pages = _safe_int(
-            (
-                payload.get(
-                    "pagination"
-                )
-                or {}
-            ).get(
-                "pages"
-            )
-        )
+        summaries.extend(items)
+        pages = _safe_int((payload.get("pagination") or {}).get("pages"))
 
-        if (
-            not items
-            or page >= pages
-            or len(summaries) >= maximum
-        ):
+        if not items or page >= pages or len(summaries) >= maximum:
             break
 
         page += 1
@@ -548,9 +493,7 @@ def fetch_label_releases(
         if _safe_int(item.get("id"))
     ]
 
-    return _deduplicate_releases(
-        releases
-    )
+    return _deduplicate_releases(releases)
 
 
 def _release_from_label_summary(
@@ -560,9 +503,7 @@ def _release_from_label_summary(
     release_id = _safe_int(item.get("id"))
     title = str(item.get("title", "")).strip()
     formats = tuple(
-        part.strip()
-        for part in str(item.get("format", "")).split(",")
-        if part.strip()
+        part.strip() for part in str(item.get("format", "")).split(",") if part.strip()
     )
     artist = _clean_artist_name(str(item.get("artist", "")).strip())
     category = classify_release(
@@ -624,25 +565,10 @@ def fetch_artist_releases(
                 [],
             )
         )
-        summaries.extend(
-            page_items
-        )
-        pages = _safe_int(
-            (
-                payload.get(
-                    "pagination"
-                )
-                or {}
-            ).get(
-                "pages"
-            )
-        )
+        summaries.extend(page_items)
+        pages = _safe_int((payload.get("pagination") or {}).get("pages"))
 
-        if (
-            not page_items
-            or page >= pages
-            or len(summaries) >= maximum
-        ):
+        if not page_items or page >= pages or len(summaries) >= maximum:
             break
 
         page += 1
@@ -674,9 +600,7 @@ def fetch_artist_releases(
             )
         )
 
-    return _deduplicate_releases(
-        releases
-    )
+    return _deduplicate_releases(releases)
 
 
 def fetch_release_tracks(
@@ -742,9 +666,7 @@ def fetch_release_tracks(
                         "",
                     )
                 ),
-                artist=", ".join(
-                    artists
-                ),
+                artist=", ".join(artists),
                 duration=str(
                     item.get(
                         "duration",
@@ -755,9 +677,7 @@ def fetch_release_tracks(
         )
 
     return (
-        tuple(
-            tracks
-        ),
+        tuple(tracks),
         payload,
     )
 
@@ -772,22 +692,11 @@ def _fetch_summary_detail(
             "",
         )
     ).casefold()
-    main_release = _safe_int(
-        summary.get(
-            "main_release"
-        )
-    )
-    summary_id = _safe_int(
-        summary.get(
-            "id"
-        )
-    )
+    main_release = _safe_int(summary.get("main_release"))
+    summary_id = _safe_int(summary.get("id"))
 
     try:
-        if (
-            release_type == "master"
-            and main_release
-        ):
+        if release_type == "master" and main_release:
             return _get_json(
                 f"/releases/{main_release}",
                 token,
@@ -814,21 +723,11 @@ def _release_from_payload(
             "",
         )
     )
-    summary_id = _safe_int(
-        summary.get(
-            "id"
-        )
-    )
-    main_release_id = _safe_int(
-        summary.get(
-            "main_release"
-        )
-    )
+    summary_id = _safe_int(summary.get("id"))
+    main_release_id = _safe_int(summary.get("main_release"))
     release_id = (
         main_release_id
-        if release_type.casefold()
-        == "master"
-        and main_release_id
+        if release_type.casefold() == "master" and main_release_id
         else summary_id
     )
     title = str(
@@ -841,15 +740,7 @@ def _release_from_payload(
             "",
         )
     )
-    year_value = (
-        summary.get(
-            "year"
-        )
-        or detail.get(
-            "year"
-        )
-        or ""
-    )
+    year_value = summary.get("year") or detail.get("year") or ""
     labels = tuple(
         dict.fromkeys(
             str(
@@ -914,12 +805,7 @@ def _release_from_payload(
 
         if name:
             formats.append(
-                (
-                    f"{quantity}×{name}"
-                    if quantity
-                    and quantity != "1"
-                    else name
-                )
+                (f"{quantity}×{name}" if quantity and quantity != "1" else name)
             )
 
         descriptions.extend(
@@ -928,9 +814,7 @@ def _release_from_payload(
                 "descriptions",
                 [],
             )
-            if str(
-                value
-            ).strip()
+            if str(value).strip()
         )
 
     category = classify_release(
@@ -941,18 +825,10 @@ def _release_from_payload(
                 "",
             )
         ),
-        formats=tuple(
-            formats
-        ),
-        descriptions=tuple(
-            descriptions
-        ),
-        artist_count=len(
-            artists
-        ),
-        label_count=len(
-            labels
-        ),
+        formats=tuple(formats),
+        descriptions=tuple(descriptions),
+        artist_count=len(artists),
+        label_count=len(labels),
         role=str(
             summary.get(
                 "role",
@@ -961,12 +837,8 @@ def _release_from_payload(
         ),
     )
     badges = release_badges(
-        formats=tuple(
-            formats
-        ),
-        descriptions=tuple(
-            descriptions
-        ),
+        formats=tuple(formats),
+        descriptions=tuple(descriptions),
         category=category,
     )
     images = detail.get(
@@ -976,12 +848,15 @@ def _release_from_payload(
     cover_url = ""
 
     for image in images:
-        if str(
-            image.get(
-                "type",
-                "",
-            )
-        ).casefold() == "primary":
+        if (
+            str(
+                image.get(
+                    "type",
+                    "",
+                )
+            ).casefold()
+            == "primary"
+        ):
             cover_url = str(
                 image.get(
                     "uri150",
@@ -1007,13 +882,9 @@ def _release_from_payload(
         )
 
     return DiscogsRelease(
-        source_id=(
-            f"discogs:{release_id or summary_id}"
-        ),
+        source_id=(f"discogs:{release_id or summary_id}"),
         title=title,
-        year=str(
-            year_value
-        ),
+        year=str(year_value),
         role=str(
             summary.get(
                 "role",
@@ -1022,17 +893,10 @@ def _release_from_payload(
         ),
         release_type=release_type,
         main_release_id=main_release_id,
-        master_id=(
-            summary_id
-            if release_type.casefold()
-            == "master"
-            else 0
-        ),
+        master_id=(summary_id if release_type.casefold() == "master" else 0),
         release_id=release_id,
         external_url=(
-            f"https://www.discogs.com/release/{release_id}"
-            if release_id
-            else ""
+            f"https://www.discogs.com/release/{release_id}" if release_id else ""
         ),
         resource_url=str(
             summary.get(
@@ -1042,16 +906,8 @@ def _release_from_payload(
         ),
         cover_url=cover_url,
         labels=labels,
-        formats=tuple(
-            dict.fromkeys(
-                formats
-            )
-        ),
-        format_descriptions=tuple(
-            dict.fromkeys(
-                descriptions
-            )
-        ),
+        formats=tuple(dict.fromkeys(formats)),
+        format_descriptions=tuple(dict.fromkeys(descriptions)),
         artists=artists,
         track_count=len(
             detail.get(
@@ -1107,10 +963,7 @@ def classify_release(
     if "soundtrack" in text or "score" in text:
         return "Soundtracks"
 
-    if (
-        "box set" in text
-        or "boxset" in compact
-    ):
+    if "box set" in text or "boxset" in compact:
         return "Boxsets"
 
     if "live" in text:
@@ -1155,9 +1008,7 @@ def release_badges(
     badges: list[str] = []
 
     for value in values:
-        clean = str(
-            value
-        ).strip()
+        clean = str(value).strip()
 
         if not clean:
             continue
@@ -1173,9 +1024,7 @@ def release_badges(
             continue
 
         if clean not in badges:
-            badges.append(
-                clean
-            )
+            badges.append(clean)
 
     if category in {
         "Mixtapes",
@@ -1188,14 +1037,10 @@ def release_badges(
     }:
         badges.insert(
             0,
-            category.rstrip(
-                "s"
-            ),
+            category.rstrip("s"),
         )
 
-    return tuple(
-        badges[:8]
-    )
+    return tuple(badges[:8])
 
 
 def _deduplicate_releases(
@@ -1208,33 +1053,20 @@ def _deduplicate_releases(
 
     for release in releases:
         key = (
-            _key(
-                release.title
-            ),
+            _key(release.title),
             release.year,
             release.category,
         )
-        current = unique.get(
-            key
-        )
+        current = unique.get(key)
 
-        if (
-            current is None
-            or (
-                not current.cover_url
-                and release.cover_url
-            )
-        ):
+        if current is None or (not current.cover_url and release.cover_url):
             unique[key] = release
 
     return sorted(
         unique.values(),
         key=lambda release: (
-            _category_order(
-                release.category
-            ),
-            release.year
-            or "9999",
+            _category_order(release.category),
+            release.year or "9999",
             release.title.casefold(),
         ),
     )
@@ -1244,12 +1076,8 @@ def _search_rank(
     query: str,
     title: str,
 ) -> tuple[int, int]:
-    wanted = _key(
-        query
-    )
-    actual = _key(
-        title
-    )
+    wanted = _key(query)
+    actual = _key(title)
 
     if actual == wanted:
         return (
@@ -1257,29 +1085,21 @@ def _search_rank(
             0,
         )
 
-    if actual.startswith(
-        wanted
-    ):
+    if actual.startswith(wanted):
         return (
             1,
-            len(
-                actual
-            ),
+            len(actual),
         )
 
     if wanted in actual:
         return (
             2,
-            len(
-                actual
-            ),
+            len(actual),
         )
 
     return (
         3,
-        len(
-            actual
-        ),
+        len(actual),
     )
 
 
@@ -1288,93 +1108,73 @@ def _get_json(
     token: str,
     params: dict | None = None,
 ) -> dict:
-    query = dict(
-        params
-        or {}
-    )
-    url = (
-        BASE_URL
-        + endpoint
-        + "?"
-        + urlencode(
-            query
-        )
-    )
+    query = dict(params or {})
+    url = BASE_URL + endpoint + "?" + urlencode(query)
     request = urllib.request.Request(
         url,
         headers={
             "User-Agent": USER_AGENT,
             "Authorization": f"Discogs token={token}",
-            "Accept": (
-                "application/vnd.discogs.v2.discogs+json"
-            ),
+            "Accept": ("application/vnd.discogs.v2.discogs+json"),
         },
     )
 
     for attempt in range(2):
         global _last_request_at
         with _request_lock:
-            delay = REQUEST_INTERVAL_SECONDS - (
-                time.monotonic() - _last_request_at
-            )
+            delay = REQUEST_INTERVAL_SECONDS - (time.monotonic() - _last_request_at)
             if delay > 0:
                 time.sleep(delay)
-            try:
-                with urllib.request.urlopen(
-                    request,
-                    timeout=20,
-                ) as response:
-                    return json.loads(
-                        response.read().decode(
-                            "utf-8"
-                        )
-                    )
-            except urllib.error.HTTPError as error:
-                if error.code == 429 and attempt == 0:
-                    retry_after = float(
-                        (error.headers or {}).get("Retry-After", "2")
-                    )
-                    time.sleep(max(1.0, min(retry_after, 30.0)))
-                    continue
-                if error.code in {
-                    401,
-                    403,
-                }:
-                    raise DiscogsProviderError(
-                        "Discogs hat den Zugriff abgelehnt. "
-                        "Bitte den persönlichen Discogs-Token in "
-                        "den Einstellungen prüfen."
-                    ) from error
-                if error.code == 429:
-                    raise DiscogsProviderError(
-                        "Das Discogs-Anfragelimit ist erreicht. "
-                        "Bitte die Suche in Kürze erneut versuchen."
-                    ) from error
+            _last_request_at = time.monotonic()
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=20,
+            ) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            if error.code == 429 and attempt == 0:
+                retry_after = float((error.headers or {}).get("Retry-After", "2"))
+                time.sleep(max(1.0, min(retry_after, 30.0)))
+                continue
+            if error.code in {
+                401,
+                403,
+            }:
                 raise DiscogsProviderError(
-                    f"Discogs-Fehler HTTP {error.code}."
+                    "Discogs hat den Zugriff abgelehnt. "
+                    "Bitte den persönlichen Discogs-Token in "
+                    "den Einstellungen prüfen."
                 ) from error
-            except (
-                urllib.error.URLError,
-                TimeoutError,
-                json.JSONDecodeError,
-            ) as error:
+            if error.code == 429:
                 raise DiscogsProviderError(
-                    "Discogs konnte nicht erreicht oder die Antwort "
-                    "nicht verarbeitet werden."
+                    "Das Discogs-Anfragelimit ist erreicht. "
+                    "Bitte die Suche in Kürze erneut versuchen."
                 ) from error
-            finally:
-                _last_request_at = time.monotonic()
+            raise DiscogsProviderError(f"Discogs-Fehler HTTP {error.code}.") from error
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            json.JSONDecodeError,
+        ) as error:
+            raise DiscogsProviderError(
+                "Discogs konnte nicht erreicht oder die Antwort "
+                "nicht verarbeitet werden."
+            ) from error
+
+
+def validate_token(token: str) -> None:
+    if not token.strip():
+        raise DiscogsProviderError("Das Discogs-Token fehlt.")
+    _get_json("/oauth/identity", token.strip())
 
 
 def _require_token(
     token: str,
 ) -> None:
-    if not str(
-        token or ""
-    ).strip():
+    if not str(token or "").strip():
         raise DiscogsProviderError(
-            "Für die Discogs-Ergänzung ist ein persönlicher "
-            "Discogs-Token erforderlich."
+            "Für die Discogs-Ergänzung ist ein persönlicher Discogs-Token erforderlich."
         )
 
 
@@ -1394,9 +1194,7 @@ def _key(
     return re.sub(
         r"[^a-z0-9]+",
         "",
-        str(
-            value or ""
-        ).casefold(),
+        str(value or "").casefold(),
     )
 
 
@@ -1404,9 +1202,7 @@ def _safe_int(
     value,
 ) -> int:
     try:
-        return int(
-            value
-        )
+        return int(value)
     except (
         TypeError,
         ValueError,

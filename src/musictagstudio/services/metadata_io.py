@@ -1080,8 +1080,9 @@ def _write_mp3(
     path: Path,
     song: Song,
 ) -> None:
-    MP3(path)
-
+    # Hinweis: Kein separates MP3(path) mehr – der frühere Aufruf hat die
+    # komplette Datei nur geparst, das Ergebnis aber verworfen. ID3(path)
+    # liest die Tags direkt; das spart einen vollständigen Datei-Parse.
     try:
         tags = ID3(path)
     except ID3NoHeaderError:

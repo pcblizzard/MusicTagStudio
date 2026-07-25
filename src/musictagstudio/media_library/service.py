@@ -8,7 +8,6 @@ from .discogs import classify_release, release_badges
 
 from ..providers.musicbrainz import (
     BASE_URL,
-    MusicBrainzProviderError,
     _artist_credit,
     _request_json,
 )

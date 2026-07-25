@@ -9,8 +9,8 @@ INPUT_NORMAL = ""
 
 INPUT_CHANGED = """
 QLineEdit {
-    background: #eaf3ff;
-    border: 1px solid #2f80ed;
+    background: palette(alternate-base);
+    border: 1px solid palette(highlight);
     border-radius: 6px;
 }
 """
@@ -22,26 +22,49 @@ BUTTON_CHANGED = "Änderungen speichern *"
 def apply_theme(
     app: QApplication,
     mode: str,
+    style: str = "standard",
 ) -> None:
     resolved_mode = _resolve_theme_mode(
         app,
         mode,
     )
+    resolved_style = (
+        style
+        if style in {"standard", "apple"}
+        else "standard"
+    )
     app.setStyle("Fusion")
+    app.setProperty("themeStyle", resolved_style)
 
     if resolved_mode == "dark":
         app.setPalette(
-            _dark_palette()
+            (
+                _apple_dark_palette()
+                if resolved_style == "apple"
+                else _dark_palette()
+            )
         )
         app.setStyleSheet(
-            _dark_stylesheet()
+            (
+                _apple_dark_stylesheet()
+                if resolved_style == "apple"
+                else _dark_stylesheet()
+            )
         )
     else:
         app.setPalette(
-            _light_palette()
+            (
+                _apple_light_palette()
+                if resolved_style == "apple"
+                else _light_palette()
+            )
         )
         app.setStyleSheet(
-            _light_stylesheet()
+            (
+                _apple_light_stylesheet()
+                if resolved_style == "apple"
+                else _light_stylesheet()
+            )
         )
 
 
@@ -144,6 +167,174 @@ def _dark_palette() -> QPalette:
     )
 
     return palette
+
+
+def _apple_light_palette() -> QPalette:
+    palette = _light_palette()
+    colors = {
+        QPalette.ColorRole.Window: "#f5f5f7",
+        QPalette.ColorRole.WindowText: "#1d1d1f",
+        QPalette.ColorRole.Base: "#ffffff",
+        QPalette.ColorRole.AlternateBase: "#f2f2f4",
+        QPalette.ColorRole.Text: "#1d1d1f",
+        QPalette.ColorRole.Button: "#ffffff",
+        QPalette.ColorRole.ButtonText: "#1d1d1f",
+        QPalette.ColorRole.BrightText: "#d70015",
+        QPalette.ColorRole.Highlight: "#fa2d48",
+        QPalette.ColorRole.HighlightedText: "#ffffff",
+        QPalette.ColorRole.PlaceholderText: "#747478",
+        QPalette.ColorRole.Mid: "#d2d2d7",
+        QPalette.ColorRole.Dark: "#a1a1a6",
+    }
+    for role, color in colors.items():
+        palette.setColor(role, QColor(color))
+    return palette
+
+
+def _apple_dark_palette() -> QPalette:
+    palette = _dark_palette()
+    colors = {
+        QPalette.ColorRole.Window: "#1c1c1e",
+        QPalette.ColorRole.WindowText: "#f5f5f7",
+        QPalette.ColorRole.Base: "#121214",
+        QPalette.ColorRole.AlternateBase: "#242426",
+        QPalette.ColorRole.ToolTipBase: "#2c2c2e",
+        QPalette.ColorRole.ToolTipText: "#f5f5f7",
+        QPalette.ColorRole.Text: "#f5f5f7",
+        QPalette.ColorRole.Button: "#2c2c2e",
+        QPalette.ColorRole.ButtonText: "#f5f5f7",
+        QPalette.ColorRole.BrightText: "#ff6961",
+        QPalette.ColorRole.Highlight: "#fa2d55",
+        QPalette.ColorRole.HighlightedText: "#ffffff",
+        QPalette.ColorRole.PlaceholderText: "#98989d",
+        QPalette.ColorRole.Mid: "#48484a",
+        QPalette.ColorRole.Dark: "#0b0b0c",
+        QPalette.ColorRole.Light: "#3a3a3c",
+    }
+    for role, color in colors.items():
+        palette.setColor(role, QColor(color))
+    return palette
+
+
+def _replace_colors(stylesheet: str, replacements: dict[str, str]) -> str:
+    for source, target in replacements.items():
+        stylesheet = stylesheet.replace(source, target)
+    return stylesheet
+
+
+def _apple_light_stylesheet() -> str:
+    stylesheet = _replace_colors(
+        _light_stylesheet(),
+        {
+            "#f7f9fc": "#f5f5f7",
+            "#1f2937": "#1d1d1f",
+            "#f5f7fa": "#f2f2f4",
+            "#2f80ed": "#fa2d48",
+            "#dbeafe": "#ffe3e8",
+            "#174ea6": "#a6112a",
+            "#edf5ff": "#fff0f2",
+            "#d6e6fb": "#ffd0d8",
+            "#b8d4fa": "#ffb8c4",
+            "#7ab0f5": "#ff6b7f",
+            "#bcd8ff": "#ffd1d8",
+            "#e4efff": "#ffe8ec",
+            "#c8dcf8": "#ffc8d1",
+        },
+    )
+    return stylesheet + """
+    QGroupBox {
+        border: 1px solid #cfcfd4;
+        border-radius: 12px;
+        background: #ffffff;
+    }
+    QTableWidget, QTreeWidget, QListWidget, QListView {
+        border: 1px solid #d7d7dc;
+        border-radius: 10px;
+        gridline-color: #e8e8eb;
+        selection-background-color: #eeeef1;
+        selection-color: #1d1d1f;
+    }
+    QHeaderView::section {
+        background: #f2f2f4;
+        color: #3a3a3c;
+        border-right: 1px solid #dedee2;
+        border-bottom: 1px solid #d2d2d7;
+    }
+    QLineEdit, QComboBox, QSpinBox {
+        border-color: #d2d2d7;
+        border-radius: 8px;
+    }
+    QPushButton {
+        border-color: #d2d2d7;
+        border-radius: 9px;
+    }
+    QStatusBar {
+        border-top-color: #dedee2;
+    }
+    """
+
+
+def _apple_dark_stylesheet() -> str:
+    stylesheet = _replace_colors(
+        _dark_stylesheet(),
+        {
+            "#15191d": "#1c1c1e",
+            "#edf2f6": "#f5f5f7",
+            "#101418": "#121214",
+            "#1b2127": "#242426",
+            "#222930": "#2c2c2e",
+            "#232a31": "#2c2c2e",
+            "#1b2025": "#242426",
+            "#20c7df": "#fa2d55",
+            "#062129": "#ffffff",
+            "#061b20": "#ffffff",
+            "#245f6a": "#6e2432",
+            "#285c66": "#5a2530",
+            "#28bfd3": "#ff667d",
+            "#2a6873": "#8a3040",
+            "#293840": "#3a292e",
+            "#28343b": "#352a2e",
+        },
+    )
+    return stylesheet + """
+    QGroupBox {
+        border: 1px solid #3a3a3c;
+        border-radius: 12px;
+        background: #242426;
+    }
+    QTableWidget, QTreeWidget, QListWidget, QListView {
+        border: 1px solid #3a3a3c;
+        border-radius: 10px;
+        gridline-color: #323234;
+        selection-background-color: #463137;
+        selection-color: #ffffff;
+    }
+    QHeaderView::section {
+        background: #2c2c2e;
+        color: #f2f2f7;
+        border-right: 1px solid #3a3a3c;
+        border-bottom: 1px solid #48484a;
+    }
+    QLineEdit, QComboBox, QSpinBox {
+        background: #161618;
+        border-color: #48484a;
+        border-radius: 8px;
+    }
+    QPushButton {
+        background: #2c2c2e;
+        border-color: #48484a;
+        border-radius: 9px;
+    }
+    QToolBar, QStatusBar {
+        border-color: #3a3a3c;
+    }
+    QScrollBar:vertical {
+        background: #1c1c1e;
+    }
+    QScrollBar::handle:vertical {
+        background: #48484a;
+    }
+    """
 
 
 def _light_stylesheet() -> str:

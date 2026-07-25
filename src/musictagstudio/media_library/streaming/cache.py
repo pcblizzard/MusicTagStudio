@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
-import sqlite3
 
+from ...database import connect_database
 from ...diagnostics import project_root
 from .models import AvailabilityStatus, StreamingAvailability
 
@@ -18,7 +18,7 @@ class StreamingAvailabilityCache:
             / "streaming_availability.sqlite3"
         )
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.path) as connection:
+        with connect_database(self.path) as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS streaming_availability (
@@ -43,7 +43,7 @@ class StreamingAvailabilityCache:
     def get(
         self, provider: str, release_key: str, country: str
     ) -> StreamingAvailability | None:
-        with sqlite3.connect(self.path) as connection:
+        with connect_database(self.path) as connection:
             row = connection.execute(
                 """SELECT status, external_id, external_url, album, artist,
                           year, track_count, confidence, checked_at, expires_at
@@ -78,7 +78,7 @@ class StreamingAvailabilityCache:
     def put(self, result: StreamingAvailability) -> None:
         values = asdict(result)
         values["status"] = result.status.value
-        with sqlite3.connect(self.path) as connection:
+        with connect_database(self.path) as connection:
             connection.execute(
                 """INSERT INTO streaming_availability
                    (provider, release_key, country, status, external_id,

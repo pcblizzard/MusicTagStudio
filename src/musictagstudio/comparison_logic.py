@@ -14,7 +14,19 @@ SOURCE_ORDER = (
     "local",
     "apple_music",
     "musicbrainz",
+    "deezer",
 )
+
+# Menschlich lesbare Namen der Quellen. Zentrale Definition, aus der die
+# Vergleichsdialoge ihre Spaltenüberschriften und Auswahlfelder ableiten.
+# Eine neue Quelle wird ausschließlich hier und in SOURCE_ORDER ergänzt.
+SOURCE_LABELS: dict[str, str] = {
+    "local": "Lokal",
+    "apple_music": "Apple Music",
+    "musicbrainz": "MusicBrainz",
+    "deezer": "Deezer",
+    "qobuz": "Qobuz",
+}
 
 
 @dataclass(frozen=True)
@@ -95,12 +107,15 @@ def build_field_comparisons(
             len(distinct_provider_values) > 1
         )
 
-        is_supplemented = (
+        default_value = values.get(default_source, "")
+        is_supplemented = bool(
             default_source not in {
                 "local",
                 primary_source,
             }
             and not values.get(primary_source, "")
+            and default_value
+            and default_value != values.get("local", "")
         )
 
         comparisons.append(
@@ -129,8 +144,15 @@ def choose_default_source(
     if primary_value:
         return primary_source
 
+    local_value = values.get("local", "").strip()
+
     for source_name in SOURCE_ORDER[1:]:
-        if values.get(source_name, "").strip():
+        value = values.get(source_name, "").strip()
+
+        # Eine Zusatzquelle wird nur vorgeschlagen, wenn sie den lokalen
+        # Wert tatsächlich ändern würde. Andernfalls bleibt es beim
+        # lokalen Wert, damit die Auswahl keine Scheinänderung anzeigt.
+        if value and value != local_value:
             return source_name
 
     return "local"

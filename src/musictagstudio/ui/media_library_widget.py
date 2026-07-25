@@ -59,7 +59,6 @@ from ..media_library import (
     Edition,
     ReleaseGroup,
     Track,
-    fetch_artist_release_groups,
     fetch_release_group_editions,
     fetch_release_tracklist,
     ArtistRelationsResponse,
@@ -79,12 +78,10 @@ from ..settings import load_settings
 from ..i18n import tr
 from ..library_sources import IndexedAlbum
 from ..models.song import Song
+from ..player.preview import PreviewPlayer
 from ..services.cover import load_cover
 from ..providers.apple_music import (
     AppleAlbumCandidate,
-    AppleMusicProviderError,
-    MINIMUM_ALBUM_CONFIDENCE,
-    search_album_variants as search_apple_album,
 )
 from ..providers.apple_artist import (
     ArtistArtwork,
@@ -107,13 +104,11 @@ from ..media_library.tasks import (
 from ..media_library.presentation import (
     artist_text as _artist_text,
     category as _category,
-    category_order as _category_order,
     discogs_position as _discogs_position,
     duration as _duration,
     duration_ms as _duration_ms,
     label_artist_statistics as _label_artist_statistics,
     local_status_display as _local_status_display,
-    medium_count as _medium_count,
     merge_release_groups as _merge_release_groups,
     normalized as _normalized,
     release_source_details as _release_source_details,
@@ -125,7 +120,14 @@ from ..media_library.streaming import (
     AvailabilityStatus,
     StreamingAvailability,
     StreamingAvailabilityCache,
+    StreamingCheckReport,
+    check_streaming_providers,
     streaming_release_key,
+)
+from ..secret_store import (
+    SPOTIFY_CLIENT_SECRET,
+    TIDAL_CLIENT_SECRET,
+    get_secret,
 )
 
 
@@ -163,6 +165,108 @@ class Worker(QRunnable):
         self.signals.finished.emit(
             result
         )
+
+
+def _resolve_deezer_previews(
+    album: str,
+    artist: str,
+    expected_track_count: int,
+) -> dict[tuple[int, int], str]:
+    """Löst 30-Sekunden-Vorschauen über Deezer auf und ordnet sie nach
+    (Disc, Track) zu. Läuft im Worker-Thread; Fehler ergeben leere Zuordnung,
+    damit die Trackliste nie blockiert wird."""
+    from ..providers import deezer
+
+    try:
+        candidates = deezer.search_albums(
+            album,
+            artist,
+            expected_track_count=expected_track_count,
+        )
+        best = next(
+            (
+                candidate
+                for candidate in candidates
+                if candidate.confidence >= deezer.MINIMUM_ALBUM_CONFIDENCE
+            ),
+            None,
+        )
+
+        if best is None:
+            return {}
+
+        result = deezer.lookup_album(best.album_id)
+    except deezer.DeezerProviderError:
+        return {}
+
+    return _preview_map_from_tracks(result.tracks)
+
+
+def _resolve_apple_previews(
+    album: str,
+    artist: str,
+    expected_track_count: int,
+    country: str,
+) -> dict[tuple[int, int], str]:
+    """Löst Vorschauen über Apple Music auf (Album finden → Lookup-Trackliste)."""
+    from ..direct_album_lookup import (
+        DirectAlbumLookupError,
+        lookup_apple_album_by_id,
+    )
+    from ..providers.apple_music import (
+        MINIMUM_ALBUM_CONFIDENCE,
+        AppleMusicProviderError,
+        search_album_variants,
+    )
+
+    try:
+        candidates = search_album_variants(
+            album,
+            artist,
+            expected_track_count=expected_track_count,
+            country=country,
+        )
+    except AppleMusicProviderError:
+        return {}
+
+    best = next(
+        (
+            candidate
+            for candidate in candidates
+            if candidate.confidence >= MINIMUM_ALBUM_CONFIDENCE
+        ),
+        None,
+    )
+
+    if best is None:
+        return {}
+
+    try:
+        result = lookup_apple_album_by_id(
+            best.collection_id,
+            country=best.country,
+        )
+    except DirectAlbumLookupError:
+        return {}
+
+    return _preview_map_from_tracks(result.tracks)
+
+
+def _preview_map_from_tracks(tracks) -> dict[tuple[int, int], str]:
+    mapping: dict[tuple[int, int], str] = {}
+
+    for track in tracks:
+        if not track.preview_url:
+            continue
+
+        try:
+            key = (int(track.disc or 1), int(track.track))
+        except (TypeError, ValueError):
+            continue
+
+        mapping[key] = track.preview_url
+
+    return mapping
 
 
 class MediaLibraryWidget(QWidget):
@@ -218,6 +322,25 @@ class MediaLibraryWidget(QWidget):
             | None
         ) = None
         self.current_tracks: list[Track] = []
+        # 30-Sekunden-Track-Vorschau (Deezer). Eigener Player, damit die
+        # lokale Wiedergabe-Queue unberührt bleibt.
+        self.preview_player = PreviewPlayer(self)
+        self.preview_player.state_changed.connect(
+            self._on_preview_state
+        )
+        self.preview_player.error_occurred.connect(
+            self._on_preview_error
+        )
+        self.track_preview_buttons: list[QPushButton] = []
+        self.track_preview_urls: list[str] = []
+        # Pro Zeile: liegt der Track lokal vor? Dann spielt der Knopf den
+        # vollen Titel statt einer 30-Sekunden-Vorschau.
+        self._row_is_local: list[bool] = []
+        self._preview_token = 0
+        # Zeilenindex der aktuell spielenden Vorschau (-1 = keine). Die
+        # Hervorhebung erfolgt zeilen- statt urlbasiert, weil bei Mehrfach-
+        # Discs dieselbe Vorschau-URL mehreren Zeilen zugeordnet sein kann.
+        self._playing_preview_row = -1
         self._local_songs: list[Song] = []
         self.local_albums: dict[
             str,
@@ -246,6 +369,10 @@ class MediaLibraryWidget(QWidget):
         self._category_icons = self._load_category_icons()
         self.ui_settings = QSettings("MusicTagStudio", "MusicTagStudio")
         self._streaming_results: dict[str, AppleAlbumCandidate | None] = {}
+        self._provider_streaming_results: dict[
+            str, dict[str, StreamingAvailability]
+        ] = {}
+        self._provider_streaming_errors: dict[str, dict[str, str]] = {}
         self._streaming_checked_at: dict[str, datetime] = {}
         self._editorial_request_key = ""
         self._editorial_heading = ""
@@ -585,6 +712,16 @@ class MediaLibraryWidget(QWidget):
         self.apple_button.clicked.connect(
             self.open_apple
         )
+        self.tidal_button = QPushButton("TIDAL")
+        self.tidal_button.setEnabled(False)
+        self.tidal_button.clicked.connect(
+            lambda: self._open_streaming_provider(self.tidal_button)
+        )
+        self.spotify_button = QPushButton("Spotify")
+        self.spotify_button.setEnabled(False)
+        self.spotify_button.clicked.connect(
+            lambda: self._open_streaming_provider(self.spotify_button)
+        )
         service_row.addWidget(
             self.streaming_button
         )
@@ -597,6 +734,11 @@ class MediaLibraryWidget(QWidget):
         detail_layout.addLayout(
             service_row
         )
+        provider_row = QHBoxLayout()
+        provider_row.addStretch()
+        provider_row.addWidget(self.tidal_button)
+        provider_row.addWidget(self.spotify_button)
+        detail_layout.addLayout(provider_row)
 
         self.streaming_status = QLabel(
             "Streaming und Qualität wurden nicht abgefragt."
@@ -690,7 +832,7 @@ class MediaLibraryWidget(QWidget):
         track_layout.addWidget(QLabel("Trackliste"))
         self.track_table = QTableWidget(
             0,
-            4,
+            5,
         )
         self.track_table.setHorizontalHeaderLabels(
             [
@@ -698,6 +840,7 @@ class MediaLibraryWidget(QWidget):
                 "Track",
                 "Titel",
                 "Dauer",
+                "Wiedergabe",
             ]
         )
         self.track_table.setEditTriggers(
@@ -848,22 +991,8 @@ class MediaLibraryWidget(QWidget):
         }
         self._refresh_local_markers()
 
-    def _play_local_track(self, row: int, _column: int) -> None:
-        if not (0 <= row < len(self.current_tracks)):
-            return
-        group = self.current_group
-        if group is None:
-            return
-
-        songs = self._current_local_album_songs()
-        if not songs:
-            self._set_status(
-                "Die lokalen Albumdateien sind noch nicht eingelesen. "
-                "Bitte zuerst die Bibliotheksdaten aktualisieren."
-            )
-            return
-
-        track = self.current_tracks[row]
+    def _match_local_index(self, track, songs: list[Song]) -> int:
+        """Findet den Index der lokalen Datei zu einem Albumtrack (oder -1)."""
         start_index = next(
             (
                 index
@@ -875,6 +1004,7 @@ class MediaLibraryWidget(QWidget):
             ),
             -1,
         )
+
         if start_index < 0:
             wanted_title = _normalized(track.title)
             start_index = next(
@@ -885,6 +1015,36 @@ class MediaLibraryWidget(QWidget):
                 ),
                 -1,
             )
+
+        return start_index
+
+    def _local_playback_for_row(self, row: int) -> tuple[list[Song], int]:
+        """Liefert (Albumsongs, Startindex) oder ([], -1), wenn nicht lokal."""
+        if not (0 <= row < len(self.current_tracks)) or self.current_group is None:
+            return [], -1
+
+        songs = self._current_local_album_songs()
+
+        if not songs:
+            return [], -1
+
+        return songs, self._match_local_index(self.current_tracks[row], songs)
+
+    def _play_local_track(self, row: int, _column: int) -> None:
+        if not (0 <= row < len(self.current_tracks)):
+            return
+        if self.current_group is None:
+            return
+
+        songs, start_index = self._local_playback_for_row(row)
+
+        if not songs:
+            self._set_status(
+                "Die lokalen Albumdateien sind noch nicht eingelesen. "
+                "Bitte zuerst die Bibliotheksdaten aktualisieren."
+            )
+            return
+
         if start_index < 0:
             self._set_status(
                 "Der ausgewählte Titel konnte keiner lokalen Datei "
@@ -1955,6 +2115,7 @@ class MediaLibraryWidget(QWidget):
     def _load_group(self, group: ReleaseGroup) -> None:
         self.track_panel.show()
         self.current_group=group; self.current_tracks=[]; self.editions=[]; self.edition_combo.clear(); self.track_table.setRowCount(0)
+        self.preview_player.stop(); self._preview_token += 1; self._playing_preview_row = -1; self.track_preview_buttons = []; self.track_preview_urls = []; self._row_is_local = []
         self._cover_generation += 1; self._show_cover(None); self.group_title.setText(group.title)
         key=_normalized(group.title); local_path=self.local_albums.get(key); status=self.local_album_status.get(key,"Nicht vorhanden"); local_online=status == "Lokal verfügbar"
         self._push_breadcrumb(
@@ -1977,7 +2138,11 @@ class MediaLibraryWidget(QWidget):
             if local_online
             else "Das Album ist indiziert, die Musikquelle ist momentan nicht erreichbar."
         )
-        self.streaming_button.setEnabled(True); self.quality_button.setEnabled(True); self.apple_button.setEnabled(False)
+        self.streaming_button.setEnabled(True)
+        self.quality_button.setEnabled(True)
+        self.apple_button.setEnabled(False)
+        self.tidal_button.setEnabled(False)
+        self.spotify_button.setEnabled(False)
         cached_streaming = self._streaming_results.get(group.release_group_id)
         if group.release_group_id not in self._streaming_results:
             cached_streaming = self._load_saved_streaming_result(group)
@@ -2368,6 +2533,21 @@ class MediaLibraryWidget(QWidget):
             tracks
         )
         self.current_tracks = tracks
+        self.preview_player.stop()
+        self._playing_preview_row = -1
+        self.track_preview_buttons = []
+        self.track_preview_urls = [""] * len(tracks)
+
+        # Lokale Verfügbarkeit pro Zeile bestimmen (für vollen Song statt
+        # Vorschau). Ist nichts lokal, bleiben alle Werte False.
+        local_songs = self._current_local_album_songs()
+        self._row_is_local = [
+            bool(
+                local_songs
+                and self._match_local_index(track, local_songs) >= 0
+            )
+            for track in tracks
+        ]
         self.track_table.setRowCount(
             len(tracks)
         )
@@ -2399,10 +2579,24 @@ class MediaLibraryWidget(QWidget):
                     ),
                 )
 
+            preview_button = QPushButton("▶")
+            preview_button.setEnabled(False)
+            preview_button.clicked.connect(
+                lambda _checked=False, index=row: self._play_track(index)
+            )
+            self.track_preview_buttons.append(preview_button)
+            self.track_table.setCellWidget(
+                row,
+                4,
+                preview_button,
+            )
+
         self.track_table.resizeColumnsToContents()
         self._set_status(
             f"{len(tracks)} Titel geladen."
         )
+        self._refresh_track_preview_buttons()
+        self._start_preview_resolution(tracks)
 
     def _discogs_tracks_loaded(
         self,
@@ -2425,6 +2619,154 @@ class MediaLibraryWidget(QWidget):
                 )
             )
         self._tracks_loaded(tracks)
+
+    def _start_preview_resolution(self, tracks: list) -> None:
+        group = self.current_group
+
+        if group is None or not tracks:
+            return
+
+        # Liegt das gesamte Album lokal vor, wird keine Vorschau benötigt.
+        if self._row_is_local and all(self._row_is_local):
+            return
+
+        # Token schützt vor veralteten Ergebnissen, wenn schnell ein anderes
+        # Album gewählt wird.
+        self._preview_token += 1
+        token = self._preview_token
+
+        settings = load_settings()
+
+        if settings.preview_source == "apple_music":
+            self._run(
+                _resolve_apple_previews,
+                group.title,
+                group.artist,
+                len(tracks),
+                settings.apple_country,
+                finished=lambda mapping, resolved_token=token: (
+                    self._previews_resolved(resolved_token, mapping)
+                ),
+                failed=lambda _error: None,
+            )
+        else:
+            self._run(
+                _resolve_deezer_previews,
+                group.title,
+                group.artist,
+                len(tracks),
+                finished=lambda mapping, resolved_token=token: (
+                    self._previews_resolved(resolved_token, mapping)
+                ),
+                failed=lambda _error: None,
+            )
+
+    def _previews_resolved(
+        self,
+        token: int,
+        mapping: dict,
+    ) -> None:
+        if token != self._preview_token:
+            return
+
+        for row, track in enumerate(self.current_tracks):
+            if row >= len(self.track_preview_urls):
+                break
+
+            key = (track.disc_number, track.track_number)
+            self.track_preview_urls[row] = mapping.get(key, "")
+
+        self._refresh_track_preview_buttons()
+
+    def _play_track(self, row: int) -> None:
+        """Ein-Klick-Wiedergabe: voller lokaler Titel, sonst 30-Sek-Vorschau."""
+        songs, start_index = self._local_playback_for_row(row)
+
+        if songs and start_index >= 0:
+            # Lokal vorhanden -> vollen Titel über die normale Leiste spielen.
+            self.preview_player.stop()
+            self._playing_preview_row = -1
+            self._refresh_track_preview_buttons()
+            self.play_local_tracks.emit(songs, start_index)
+            return
+
+        self._toggle_track_preview(row)
+
+    def _toggle_track_preview(self, row: int) -> None:
+        if not (0 <= row < len(self.track_preview_urls)):
+            return
+
+        url = self.track_preview_urls[row]
+
+        if not url:
+            return
+
+        # Läuft genau diese Zeile bereits, wird gestoppt – andernfalls startet
+        # die neue Vorschau. Der Zeilenindex wird synchron gemerkt, damit die
+        # Hervorhebung unabhängig von URL-Kollisionen korrekt bleibt.
+        if row == self._playing_preview_row and self.preview_player.is_playing():
+            self._playing_preview_row = -1
+            self.preview_player.stop()
+            return
+
+        self._playing_preview_row = row
+        title = (
+            _track_title(self.current_tracks[row])
+            if 0 <= row < len(self.current_tracks)
+            else ""
+        )
+        self.preview_player.play(url, title)
+
+        if title:
+            self._set_status(f"Vorschau wird geladen: {title} …")
+
+    def _on_preview_error(self, message: str) -> None:
+        self._playing_preview_row = -1
+        self._refresh_track_preview_buttons()
+        self._set_status(message)
+
+    def _refresh_track_preview_buttons(self) -> None:
+        playing = self.preview_player.is_playing()
+
+        for row, button in enumerate(self.track_preview_buttons):
+            # Lokale Tracks: der Knopf spielt den vollen Titel (über die
+            # normale Wiedergabe-Leiste), keine Vorschau-Markierung.
+            if row < len(self._row_is_local) and self._row_is_local[row]:
+                button.setEnabled(True)
+                button.setText("▶")
+                button.setToolTip(
+                    "Vollen Titel abspielen (lokal vorhanden)"
+                )
+                continue
+
+            url = (
+                self.track_preview_urls[row]
+                if row < len(self.track_preview_urls)
+                else ""
+            )
+            button.setEnabled(bool(url))
+            is_active = playing and row == self._playing_preview_row
+            button.setText("⏸" if is_active else "▶")
+            button.setToolTip("30-Sekunden-Vorschau abspielen")
+
+    def _on_preview_state(self, _url: str, playing: bool) -> None:
+        self._refresh_track_preview_buttons()
+
+        # Der Vorschau-Player ist bewusst getrennt von der unteren
+        # Wiedergabe-Leiste (die spielt lokale Dateien). Damit klar ist, dass
+        # gerade eine Vorschau läuft, wird der Status entsprechend gesetzt.
+        if (
+            playing
+            and 0 <= self._playing_preview_row < len(self.current_tracks)
+        ):
+            title = _track_title(
+                self.current_tracks[self._playing_preview_row]
+            )
+            self._set_status(f"▶ Vorschau läuft: {title}")
+        elif not playing and self.current_tracks:
+            self._set_status(
+                f"{len(self.current_tracks)} Titel geladen."
+            )
 
     def _load_category_icons(
         self,
@@ -2705,14 +3047,15 @@ class MediaLibraryWidget(QWidget):
             False
         )
         self.streaming_status.setText(
-            "Apple Music wird auf ausdrücklichen Wunsch geprüft …"
+            "Apple Music, TIDAL und Spotify werden geprüft …"
         )
         expected_track_count = None
         edition_index = self.edition_combo.currentIndex()
         if 0 <= edition_index < len(self.editions):
             expected_track_count = self.editions[edition_index].track_count or None
+        settings = load_settings()
         self._run(
-            search_apple_album,
+            check_streaming_providers,
             group.title,
             _streaming_artist(group.artist, self.current_artist_name),
             expected_track_count=expected_track_count,
@@ -2723,11 +3066,14 @@ class MediaLibraryWidget(QWidget):
                 ]
             ),
             country="DE",
-            limit=10,
+            tidal_client_id=settings.tidal_client_id,
+            tidal_client_secret=get_secret(TIDAL_CLIENT_SECRET),
+            spotify_client_id=settings.spotify_client_id,
+            spotify_client_secret=get_secret(SPOTIFY_CLIENT_SECRET),
             finished=self._streaming_loaded,
-            transform=lambda candidates, group_id=group.release_group_id: (
+            transform=lambda report, group_id=group.release_group_id: (
                 group_id,
-                candidates,
+                report,
             ),
         )
 
@@ -2735,32 +3081,45 @@ class MediaLibraryWidget(QWidget):
         self,
         result,
     ) -> None:
-        group_id, candidates = result
+        group_id, report = result
         if (
             self.current_group is None
             or self.current_group.release_group_id != group_id
         ):
             return
+        if not isinstance(report, StreamingCheckReport):
+            return
         self.streaming_button.setEnabled(
             True
         )
-        candidates = [
-            candidate
-            for candidate in candidates
-            if candidate.confidence >= MINIMUM_ALBUM_CONFIDENCE
-        ]
+        self._provider_streaming_results[group_id] = dict(report.results)
+        self._provider_streaming_errors[group_id] = dict(report.errors)
+        for availability in report.results.values():
+            self.streaming_cache.put(availability)
+        self._apply_provider_buttons(report.results)
 
-        if not candidates:
+        apple_result = report.results.get("apple_music")
+        if (
+            apple_result is None
+            or apple_result.status is not AvailabilityStatus.AVAILABLE
+        ):
             self._streaming_results[group_id] = None
             self._show_no_streaming_result(self.current_group)
             return
 
-        best = candidates[
-            0
-        ]
+        best = AppleAlbumCandidate(
+            collection_id=apple_result.external_id,
+            album=apple_result.album,
+            artist=apple_result.artist,
+            track_count=apple_result.track_count,
+            year=apple_result.year,
+            country=apple_result.country,
+            confidence=apple_result.confidence,
+        )
         self._streaming_results[group_id] = best
-        self._streaming_checked_at[group_id] = datetime.now().astimezone()
-        self._save_streaming_result(self.current_group, best)
+        self._streaming_checked_at[group_id] = datetime.fromisoformat(
+            apple_result.checked_at
+        )
         self._show_streaming_result(self.current_group, best)
         self._request_editorial(
             f"album:{self.current_group.release_group_id}",
@@ -2782,6 +3141,16 @@ class MediaLibraryWidget(QWidget):
         *,
         saved: bool = False,
     ) -> None:
+        checked_at = self._streaming_checked_at.get(
+            group.release_group_id,
+            datetime.now().astimezone(),
+        )
+        checked_hint = (
+            ("Gespeichertes Ergebnis · " if saved else "")
+            + "Zuletzt geprüft: "
+            + checked_at.astimezone().strftime("%d.%m.%Y, %H:%M")
+            + ". "
+        )
         url = (
             "https://music.apple.com/de/album/"
             f"id{best.collection_id}"
@@ -2797,17 +3166,8 @@ class MediaLibraryWidget(QWidget):
             "Apple Music: gefunden · "
             f"{best.track_count} Titel · "
             f"Übereinstimmung {best.confidence} %. "
-            + (
-                "Gespeichertes Ergebnis · zuletzt geprüft: "
-                + self._streaming_checked_at.get(
-                    group.release_group_id,
-                    datetime.now().astimezone(),
-                ).astimezone().strftime("%d.%m.%Y, %H:%M")
-                + ". "
-                if saved
-                else ""
-            )
-            + "Qobuz, TIDAL und Deezer folgen in späteren Ausbaustufen."
+            + checked_hint
+            + self._additional_streaming_summary(group.release_group_id)
         )
         status = self.local_album_status.get(_normalized(group.title), "Nicht vorhanden")
         self._render_source_details(group, status, apple_music_status="found")
@@ -2815,11 +3175,67 @@ class MediaLibraryWidget(QWidget):
     def _show_no_streaming_result(self, group: ReleaseGroup) -> None:
         self.apple_button.setEnabled(False)
         self.streaming_status.setText(
-            "Bei Apple Music wurde keine eindeutige Ausgabe gefunden. "
-            "Weitere Dienste wurden noch nicht abgefragt."
+            "Apple Music: keine eindeutige Ausgabe gefunden. "
+            + self._streaming_checked_hint(group.release_group_id)
+            + self._additional_streaming_summary(group.release_group_id)
         )
         status = self.local_album_status.get(_normalized(group.title), "Nicht vorhanden")
         self._render_source_details(group, status, apple_music_status="not_found")
+
+    def _streaming_checked_hint(self, group_id: str) -> str:
+        checked_values = [
+            result.checked_at
+            for result in self._provider_streaming_results.get(group_id, {}).values()
+            if result.checked_at
+        ]
+        if not checked_values:
+            return ""
+        try:
+            checked_at = max(datetime.fromisoformat(value) for value in checked_values)
+        except ValueError:
+            return ""
+        return (
+            "Zuletzt geprüft: "
+            + checked_at.astimezone().strftime("%d.%m.%Y, %H:%M")
+            + ". "
+        )
+
+    def _additional_streaming_summary(self, group_id: str) -> str:
+        results = self._provider_streaming_results.get(group_id, {})
+        errors = self._provider_streaming_errors.get(group_id, {})
+        parts: list[str] = []
+        for provider, label in (("tidal", "TIDAL"), ("spotify", "Spotify")):
+            result = results.get(provider)
+            if result is not None:
+                if result.status is AvailabilityStatus.AVAILABLE:
+                    parts.append(
+                        f"{label}: gefunden ({result.confidence} %)"
+                    )
+                else:
+                    parts.append(f"{label}: nicht gefunden")
+            elif provider in errors:
+                parts.append(f"{label}: Fehler ({errors[provider]})")
+            else:
+                parts.append(f"{label}: nicht eingerichtet")
+        return " · ".join(parts) + "."
+
+    def _apply_provider_buttons(
+        self,
+        results: dict[str, StreamingAvailability],
+    ) -> None:
+        for provider, button in (
+            ("tidal", self.tidal_button),
+            ("spotify", self.spotify_button),
+        ):
+            result = results.get(provider)
+            url = (
+                result.external_url
+                if result is not None
+                and result.status is AvailabilityStatus.AVAILABLE
+                else ""
+            )
+            button.setProperty("url", url)
+            button.setEnabled(bool(url))
 
     def _streaming_release_key(self, group: ReleaseGroup) -> str:
         return streaming_release_key(
@@ -2855,12 +3271,24 @@ class MediaLibraryWidget(QWidget):
     def _load_saved_streaming_result(
         self, group: ReleaseGroup
     ) -> AppleAlbumCandidate | None:
-        cached = self.streaming_cache.get(
-            "apple_music",
-            self._streaming_release_key(group),
-            "DE",
-        )
+        release_key = self._streaming_release_key(group)
+        provider_results = {
+            provider: cached
+            for provider in ("apple_music", "tidal", "spotify")
+            if (
+                cached := self.streaming_cache.get(provider, release_key, "DE")
+            )
+            is not None
+        }
+        if provider_results:
+            self._provider_streaming_results[group.release_group_id] = (
+                provider_results
+            )
+            self._apply_provider_buttons(provider_results)
+        cached = provider_results.get("apple_music")
         if cached is None or cached.status is not AvailabilityStatus.AVAILABLE:
+            if provider_results:
+                self._streaming_results[group.release_group_id] = None
             return None
         checked_at = datetime.fromisoformat(cached.checked_at)
         self._streaming_checked_at[group.release_group_id] = checked_at
@@ -2934,6 +3362,12 @@ class MediaLibraryWidget(QWidget):
             webbrowser.open(
                 url
             )
+
+    @staticmethod
+    def _open_streaming_provider(button: QPushButton) -> None:
+        url = str(button.property("url") or "")
+        if url:
+            webbrowser.open(url)
 
     def _open_local(
         self,

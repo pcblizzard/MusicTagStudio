@@ -10,6 +10,26 @@ from PySide6.QtWidgets import (
 )
 
 
+def _summary_text(
+    changes: list[tuple[str, str, str, str]],
+    file_count: int | None,
+) -> str:
+    """Beschreibt Feldänderungen und die Zahl betroffener Titel eindeutig."""
+    change_count = len(changes)
+
+    if file_count is None:
+        file_count = len({subject for subject, _f, _b, _a in changes})
+
+    changes_word = "Änderung" if change_count == 1 else "Änderungen"
+    titles_word = "Titel" if file_count == 1 else "Titeln"
+    verb = "wird" if change_count == 1 else "werden"
+
+    return (
+        f"{change_count} {changes_word} an {file_count} "
+        f"{titles_word} {verb} geschrieben."
+    )
+
+
 class ChangePreviewDialog(QDialog):
     def __init__(
         self,
@@ -17,6 +37,8 @@ class ChangePreviewDialog(QDialog):
             tuple[str, str, str, str]
         ],
         parent=None,
+        *,
+        file_count: int | None = None,
     ) -> None:
         super().__init__(
             parent
@@ -34,7 +56,7 @@ class ChangePreviewDialog(QDialog):
         )
         layout.addWidget(
             QLabel(
-                f"{len(changes)} Änderung(en) werden geschrieben."
+                _summary_text(changes, file_count)
             )
         )
 

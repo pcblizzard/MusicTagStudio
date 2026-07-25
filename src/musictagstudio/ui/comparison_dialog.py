@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -16,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..comparison_logic import (
+    SOURCE_LABELS,
     SOURCE_ORDER,
     FieldComparison,
     build_field_comparisons,
@@ -27,11 +27,20 @@ from ..models.metadata import (
 from ..models.song import Song
 
 
-SOURCE_LABELS = {
-    "local": "Lokal",
-    "apple_music": "Apple Music",
-    "musicbrainz": "MusicBrainz",
-}
+# Spaltenlayout wird vollständig aus SOURCE_ORDER abgeleitet:
+# 0 = Feld, danach je eine Wertspalte pro Quelle, dann Auswahl und Hinweis.
+_SELECTOR_COLUMN = len(SOURCE_ORDER) + 1
+_STATUS_COLUMN = len(SOURCE_ORDER) + 2
+_COLUMN_COUNT = len(SOURCE_ORDER) + 3
+
+
+def _header_labels() -> list[str]:
+    return (
+        ["Feld"]
+        + [SOURCE_LABELS[source] for source in SOURCE_ORDER]
+        + ["Auswahl", "Hinweis"]
+    )
+
 
 PREFERRED_BACKGROUND = QColor(42, 78, 58)
 SUPPLEMENT_BACKGROUND = QColor(50, 66, 86)
@@ -106,17 +115,10 @@ class ComparisonDialog(QDialog):
 
         self.table = QTableWidget(
             len(self.comparisons),
-            6,
+            _COLUMN_COUNT,
         )
         self.table.setHorizontalHeaderLabels(
-            [
-                "Feld",
-                "Lokal",
-                "Apple Music",
-                "MusicBrainz",
-                "Auswahl",
-                "Hinweis",
-            ]
+            _header_labels()
         )
         self.table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
@@ -142,20 +144,17 @@ class ComparisonDialog(QDialog):
             QHeaderView.ResizeMode.ResizeToContents,
         )
 
-        for column in (1, 2, 3):
+        for column in range(1, len(SOURCE_ORDER) + 1):
             header.setSectionResizeMode(
                 column,
                 QHeaderView.ResizeMode.Stretch,
             )
 
-        header.setSectionResizeMode(
-            4,
-            QHeaderView.ResizeMode.ResizeToContents,
-        )
-        header.setSectionResizeMode(
-            5,
-            QHeaderView.ResizeMode.ResizeToContents,
-        )
+        for column in (_SELECTOR_COLUMN, _STATUS_COLUMN):
+            header.setSectionResizeMode(
+                column,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
 
         layout.addWidget(self.table)
 
@@ -261,14 +260,14 @@ class ComparisonDialog(QDialog):
 
         self.table.setCellWidget(
             row,
-            4,
+            _SELECTOR_COLUMN,
             selector,
         )
 
         status_item = QTableWidgetItem()
         self.table.setItem(
             row,
-            5,
+            _STATUS_COLUMN,
             status_item,
         )
 
@@ -314,7 +313,7 @@ class ComparisonDialog(QDialog):
 
         status_item = self.table.item(
             row,
-            5,
+            _STATUS_COLUMN,
         )
         status_item.setText(
             ", ".join(messages)
@@ -331,9 +330,8 @@ class ComparisonDialog(QDialog):
 
     def _highlight_preferred_column(self):
         source_to_column = {
-            "local": 1,
-            "apple_music": 2,
-            "musicbrainz": 3,
+            source: index + 1
+            for index, source in enumerate(SOURCE_ORDER)
         }
         column = source_to_column.get(
             self.primary_source

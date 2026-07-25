@@ -2,7 +2,9 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 
-SourceName = Literal["local", "apple_music", "musicbrainz"]
+SourceName = Literal[
+    "local", "apple_music", "musicbrainz", "deezer", "qobuz"
+]
 
 EDITABLE_FIELDS: tuple[str, ...] = (
     "title",

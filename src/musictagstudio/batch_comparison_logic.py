@@ -4,6 +4,7 @@ from collections import Counter
 from dataclasses import dataclass
 
 from .comparison_logic import (
+    SOURCE_ORDER,
     FieldComparison,
     build_field_comparisons,
 )
@@ -94,11 +95,7 @@ def build_common_field_comparisons(
         values: dict[str, str] = {}
         display_values: dict[str, str] = {}
 
-        for source_name in (
-            "local",
-            "apple_music",
-            "musicbrainz",
-        ):
+        for source_name in SOURCE_ORDER:
             source_values = [
                 (
                     comparison.values.get(
@@ -169,14 +166,15 @@ def build_common_field_comparisons(
             or any(
                 values.get(source_name)
                 == "<verschiedene Werte>"
-                for source_name in (
-                    "apple_music",
-                    "musicbrainz",
-                )
+                for source_name in SOURCE_ORDER[1:]
             )
         )
 
-        is_supplemented = (
+        default_value = values.get(
+            default_source,
+            "",
+        )
+        is_supplemented = bool(
             default_source not in {
                 "local",
                 primary_source,
@@ -187,6 +185,9 @@ def build_common_field_comparisons(
                     "",
                 )
             )
+            and _usable(default_value)
+            and default_value
+            != values.get("local", "")
         )
 
         result.append(
@@ -294,16 +295,18 @@ def _choose_batch_default_source(
     ):
         return primary_source
 
-    for source_name in (
-        "apple_music",
-        "musicbrainz",
-    ):
-        if _usable(
-            values.get(
-                source_name,
-                "",
-            )
-        ):
+    local_value = values.get("local", "")
+
+    for source_name in SOURCE_ORDER[1:]:
+        value = values.get(
+            source_name,
+            "",
+        )
+
+        # Eine Zusatzquelle wird nur als Standard gewählt, wenn sie den
+        # gemeinsamen lokalen Wert wirklich ändert. Entspricht sie ihm
+        # bereits, bleibt „Lokal“ vorausgewählt.
+        if _usable(value) and value != local_value:
             return source_name
 
     return "local"

@@ -25,10 +25,16 @@ ThemeMode = Literal[
     "dark",
 ]
 
+ThemeStyle = Literal[
+    "standard",
+    "apple",
+]
+
 
 @dataclass(frozen=True)
 class AppSettings:
     theme: ThemeMode = "automatic"
+    theme_style: ThemeStyle = "standard"
     language: str = "automatic"
     selected_provider: str = "apple_music"
     enrich_missing_fields: bool = True
@@ -54,6 +60,17 @@ class AppSettings:
     scan_sources_on_startup: bool = False
 
     discogs_token: str = ""
+    tidal_client_id: str = ""
+    spotify_client_id: str = ""
+    # Akustischer Fingerabdruck (AcoustID). Leer = mitgelieferter App-Key.
+    acoustid_api_key: str = ""
+    # Optionaler Pfad zur fpcalc-Binärdatei (sonst Bundle/PATH).
+    fpcalc_path: str = ""
+    apple_request_interval_seconds: float = 1.0
+    genius_request_interval_seconds: float = 1.0
+    apple_web_search_enabled: bool = True
+    # Quelle für die 30-Sekunden-Track-Vorschau: "deezer" oder "apple_music".
+    preview_source: str = "deezer"
 
 
 def load_settings(
@@ -113,6 +130,7 @@ def load_settings(
         "media_library",
         {},
     )
+    network = data.get("network", {})
 
     theme = str(
         appearance.get(
@@ -126,8 +144,21 @@ def load_settings(
             "automatic",
         )
     )
+    theme_style = str(
+        appearance.get(
+            "style",
+            "standard",
+        )
+    )
     if language not in {
-        "automatic", "de", "en", "es", "fr", "it", "pt_PT", "pt_BR",
+        "automatic",
+        "de",
+        "en",
+        "es",
+        "fr",
+        "it",
+        "pt_PT",
+        "pt_BR",
     }:
         language = "automatic"
 
@@ -137,6 +168,11 @@ def load_settings(
         "dark",
     }:
         theme = "automatic"
+    if theme_style not in {
+        "standard",
+        "apple",
+    }:
+        theme_style = "standard"
 
     selected_provider = str(
         providers.get(
@@ -144,14 +180,9 @@ def load_settings(
             "apple_music",
         )
     )
-    provider = PROVIDERS_BY_ID.get(
-        selected_provider
-    )
+    provider = PROVIDERS_BY_ID.get(selected_provider)
 
-    if (
-        provider is None
-        or provider.status != "supported"
-    ):
+    if provider is None or provider.status != "supported":
         selected_provider = "apple_music"
 
     selected_cover = str(
@@ -160,17 +191,9 @@ def load_settings(
             "apple_music",
         )
     )
-    cover_provider = (
-        COVER_SOURCES_BY_ID.get(
-            selected_cover
-        )
-    )
+    cover_provider = COVER_SOURCES_BY_ID.get(selected_cover)
 
-    if (
-        cover_provider is None
-        or cover_provider.status
-        != "supported"
-    ):
+    if cover_provider is None or cover_provider.status != "supported":
         selected_cover = "apple_music"
 
     feature_handling = str(
@@ -242,9 +265,7 @@ def load_settings(
                             "",
                         )
                     ).strip()
-                    or Path(
-                        path_value
-                    ).name
+                    or Path(path_value).name
                     or path_value,
                     path=path_value,
                     enabled=bool(
@@ -258,6 +279,7 @@ def load_settings(
 
     return AppSettings(
         theme=theme,
+        theme_style=theme_style,
         language=language,
         selected_provider=selected_provider,
         enrich_missing_fields=bool(
@@ -336,9 +358,7 @@ def load_settings(
             default=30,
         ),
         audio_analysis_parallel_jobs=parallel_jobs,
-        music_sources=tuple(
-            music_sources
-        ),
+        music_sources=tuple(music_sources),
         load_sources_on_startup=bool(
             library.get(
                 "load_sources_on_startup",
@@ -357,6 +377,56 @@ def load_settings(
                 "",
             )
         ).strip(),
+        tidal_client_id=str(
+            media_library.get(
+                "tidal_client_id",
+                "",
+            )
+        ).strip(),
+        spotify_client_id=str(
+            media_library.get(
+                "spotify_client_id",
+                "",
+            )
+        ).strip(),
+        acoustid_api_key=str(
+            media_library.get(
+                "acoustid_api_key",
+                "",
+            )
+        ).strip(),
+        fpcalc_path=str(
+            media_library.get(
+                "fpcalc_path",
+                "",
+            )
+        ).strip(),
+        apple_request_interval_seconds=_safe_float(
+            network.get("apple_request_interval_seconds", 1.0),
+            default=1.0,
+            minimum=0.5,
+            maximum=10.0,
+        ),
+        genius_request_interval_seconds=_safe_float(
+            network.get("genius_request_interval_seconds", 1.0),
+            default=1.0,
+            minimum=0.5,
+            maximum=10.0,
+        ),
+        apple_web_search_enabled=bool(
+            network.get(
+                "apple_web_search_enabled",
+                True,
+            )
+        ),
+        preview_source=(
+            "apple_music"
+            if str(
+                network.get("preview_source", "deezer")
+            ).strip().lower()
+            == "apple_music"
+            else "deezer"
+        ),
     )
 
 
@@ -367,36 +437,25 @@ def save_settings(
     lines = [
         "[appearance]",
         f'theme = "{settings.theme}"',
+        f'style = "{settings.theme_style}"',
         f'language = "{settings.language}"',
         "",
         "[providers]",
         f'selected = "{settings.selected_provider}"',
-        (
-            "enrich_missing_fields = "
-            f"{str(settings.enrich_missing_fields).lower()}"
-        ),
+        (f"enrich_missing_fields = {str(settings.enrich_missing_fields).lower()}"),
         f'apple_country = "{settings.apple_country.upper()}"',
         "",
         "[behavior]",
-        (
-            "preview_before_writing = "
-            f"{str(settings.preview_before_writing).lower()}"
-        ),
+        (f"preview_before_writing = {str(settings.preview_before_writing).lower()}"),
         "",
         "[normalization]",
         f'feature_handling = "{settings.feature_handling}"',
         "",
         "[cover_sources]",
         f'selected = "{settings.selected_cover_source}"',
-        (
-            "fallback_enabled = "
-            f"{str(settings.cover_fallback_enabled).lower()}"
-        ),
+        (f"fallback_enabled = {str(settings.cover_fallback_enabled).lower()}"),
         f"minimum_size = {settings.minimum_cover_size}",
-        (
-            "cache_max_age_days = "
-            f"{settings.cover_cache_max_age_days}"
-        ),
+        (f"cache_max_age_days = {settings.cover_cache_max_age_days}"),
         "",
         "[cover_output]",
         'master_pattern = "{album_artist} - {album}.front.{ext}"',
@@ -405,29 +464,36 @@ def save_settings(
         f"folder_size = {settings.folder_cover_size}",
         f"folder_quality = {settings.folder_cover_quality}",
         'folder_pattern = "{album_artist} - {album}_400px.jpg"',
-        (
-            "artist_folder_levels_up = "
-            f"{settings.artist_folder_levels_up}"
-        ),
+        (f"artist_folder_levels_up = {settings.artist_folder_levels_up}"),
         "",
         "[audio_analysis]",
-        (
-            "parallel_jobs = "
-            f"{settings.audio_analysis_parallel_jobs}"
-        ),
+        (f"parallel_jobs = {settings.audio_analysis_parallel_jobs}"),
         "",
         "[media_library]",
         f'discogs_token = "{_toml_string(settings.discogs_token)}"',
+        f'tidal_client_id = "{_toml_string(settings.tidal_client_id)}"',
+        f'spotify_client_id = "{_toml_string(settings.spotify_client_id)}"',
+        f'acoustid_api_key = "{_toml_string(settings.acoustid_api_key)}"',
+        f'fpcalc_path = "{_toml_string(settings.fpcalc_path)}"',
+        "",
+        "[network]",
+        (
+            "apple_request_interval_seconds = "
+            f"{settings.apple_request_interval_seconds:.1f}"
+        ),
+        (
+            "genius_request_interval_seconds = "
+            f"{settings.genius_request_interval_seconds:.1f}"
+        ),
+        (
+            "apple_web_search_enabled = "
+            f"{str(settings.apple_web_search_enabled).lower()}"
+        ),
+        f'preview_source = "{_toml_string(settings.preview_source)}"',
         "",
         "[library]",
-        (
-            "load_sources_on_startup = "
-            f"{str(settings.load_sources_on_startup).lower()}"
-        ),
-        (
-            "scan_sources_on_startup = "
-            f"{str(settings.scan_sources_on_startup).lower()}"
-        ),
+        (f"load_sources_on_startup = {str(settings.load_sources_on_startup).lower()}"),
+        (f"scan_sources_on_startup = {str(settings.scan_sources_on_startup).lower()}"),
         "",
     ]
 
@@ -438,10 +504,7 @@ def save_settings(
                 f'id = "{_toml_string(source.source_id)}"',
                 f'name = "{_toml_string(source.name)}"',
                 f'path = "{_toml_string(source.path)}"',
-                (
-                    "enabled = "
-                    f"{str(source.enabled).lower()}"
-                ),
+                (f"enabled = {str(source.enabled).lower()}"),
                 "",
             ]
         )
@@ -455,12 +518,16 @@ def save_settings(
 def _toml_string(
     value: str,
 ) -> str:
-    return str(value).replace(
-        "\\",
-        "\\\\",
-    ).replace(
-        '"',
-        '\\"',
+    return (
+        str(value)
+        .replace(
+            "\\",
+            "\\\\",
+        )
+        .replace(
+            '"',
+            '\\"',
+        )
     )
 
 
@@ -476,3 +543,25 @@ def _safe_int(
         ValueError,
     ):
         return default
+
+
+def _safe_float(
+    value: object,
+    *,
+    default: float,
+    minimum: float,
+    maximum: float,
+) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(parsed, maximum))
+
+
+def apply_request_intervals(settings: AppSettings) -> None:
+    from .providers import apple_http, apple_music_web, genius
+
+    apple_http.REQUEST_INTERVAL_SECONDS = settings.apple_request_interval_seconds
+    genius.REQUEST_INTERVAL_SECONDS = settings.genius_request_interval_seconds
+    apple_music_web.WEB_SEARCH_ENABLED = settings.apple_web_search_enabled

@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from musictagstudio.library_sources import (
     IndexedAlbum,

@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from musictagstudio.models.song import Song
 from musictagstudio.services import release_text

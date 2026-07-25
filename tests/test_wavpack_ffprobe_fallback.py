@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from musictagstudio.services import metadata_io
 

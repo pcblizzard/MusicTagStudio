@@ -9,6 +9,31 @@ Ohne feste Termine.
 - **alpha2.1 ✅:** globale Windows-Medientasten
 - **alpha2.2 ✅:** statische und mitlaufende Karaoke-Lyrics
 - **alpha2.3 ✅:** Windows-System-Medienanzeige mit Titel, Künstler und Cover
+- **alpha3 ✅:** Provider-/Cache-Härtung, gemeinsame Track-Helfer,
+  Ruff und CI mit Python 3.12/3.13
+- **alpha4 ✅:** Apple-Pacing mit 429-Backoff und vollständige Ruff-F-Prüfung
+- **alpha5 ✅:** getrennte Theme-Modi und Apple-Music-inspiriertes Preset
+- **alpha6 ✅:** Kontrast-, Tabellen- und Graphit-Polishing des neuen Presets
+- **alpha7 ✅:** synchronisierte Einstellungsnavigation und Light-Theme-Rahmen
+- **alpha8 ✅:** Feature-Künstler-Vorschau und neutrale Einstellungsnavigation
+- **alpha9 ✅:** schrittweises mypy-Type-Checking in lokaler Entwicklung und CI
+- **alpha10 ✅:** mypy-Ausbau auf Provider und Lyrics sowie robuste
+  MusicBrainz-Zahlenwerte
+- **alpha11 ✅:** sichtbarer Zeitpunkt der letzten Streaming-Prüfung
+- **alpha15 ✅:** kurzlebiger Negativ-Cache und nachvollziehbare,
+  zugangsdatenfreie Streaming-Diagnose
+- **alpha16 ✅:** verständliche Tooltips für Sample-, True- und
+  ReplayGain-Peakwerte
+- **alpha17 ✅:** umgekehrte Liedtextsuche in lokalen Lyrics und optional
+  über Genius
+- **alpha18 ✅:** Info-Dialog mit Schnittstellen-, Mitwirkenden-, Lizenz- und
+  dynamischen Debug-Informationen
+- **alpha14 ✅:** klare Unterscheidung zwischen erfolgreicher TIDAL-Anmeldung
+  und einem nicht verfügbaren öffentlichen Katalog-Endpunkt.
+- **alpha13 ✅:** TIDAL-Browseranmeldung mit OAuth 2.0/PKCE, sicherer
+  Tokenablage und automatischer Erneuerung.
+- **alpha12 ✅:** offizielle TIDAL- und Spotify-Katalogabfragen mit sicher
+  gespeicherten Zugangsdaten und gemeinsamem Streaming-Cache
 - **beta:** gespeicherte Warteschlangen, Fehlerfälle und UI-Polishing
 
 ## v0.8.5 — Player

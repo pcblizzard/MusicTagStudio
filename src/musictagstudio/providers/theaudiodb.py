@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from hashlib import sha256
 import html
 import json
-from pathlib import Path
 import re
 import time
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -18,6 +18,10 @@ from .. import __version__
 BASE_URL = "https://www.theaudiodb.com/api/v1/json/123"
 USER_AGENT = f"MusicTagStudio/{__version__} (https://github.com/pcblizzard/MusicTagStudio)"
 CACHE_SECONDS = 30 * 24 * 60 * 60
+
+
+class EditorialProviderError(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -115,8 +119,17 @@ def _get_json(endpoint: str, params: dict[str, str]) -> dict:
         except (OSError, json.JSONDecodeError):
             pass
     request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    with urlopen(request, timeout=12) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+    try:
+        with urlopen(request, timeout=12) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        raise EditorialProviderError(
+            f"TheAudioDB returned HTTP {error.code}."
+        ) from error
+    except (URLError, TimeoutError, OSError, json.JSONDecodeError) as error:
+        raise EditorialProviderError(
+            "TheAudioDB could not be reached or returned invalid data."
+        ) from error
     try:
         cache_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     except OSError:

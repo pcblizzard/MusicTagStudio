@@ -345,14 +345,26 @@ class CoverManager:
             self.settings.embedded_cover_size,
             self.settings.embedded_cover_quality,
         )
-        count = 0
+        # Das Einbetten schreibt jede Audiodatei komplett neu (I/O-lastig,
+        # gerade bei FLAC). Da jede Datei ein eigener Pfad ist, lassen sich
+        # die Schreibvorgänge gefahrlos parallel ausführen – Datei-I/O gibt
+        # den GIL frei, das ergibt nahezu lineare Beschleunigung auf SSD.
+        worker_count = min(8, max(1, len(songs)))
 
-        for song in songs:
-            embed_cover(
-                song.path,
-                embedded,
+        with ThreadPoolExecutor(
+            max_workers=worker_count
+        ) as pool:
+            list(
+                pool.map(
+                    lambda song: embed_cover(
+                        song.path,
+                        embedded,
+                    ),
+                    songs,
+                )
             )
-            count += 1
+
+        count = len(songs)
 
         artist_folder = album_dir
 

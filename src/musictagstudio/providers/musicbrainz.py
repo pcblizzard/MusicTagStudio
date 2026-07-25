@@ -14,6 +14,7 @@ from ..musicbrainz_http import (
     MUSICBRAINZ_USER_AGENT,
     wait_for_musicbrainz_slot,
 )
+from . import http_cache
 
 
 BASE_URL = MUSICBRAINZ_BASE_URL
@@ -298,6 +299,27 @@ def search_song(
     return sorted(results, key=lambda item: -item.confidence)
 
 
+def lookup_recording_by_id(recording_id: str) -> MetadataCandidate | None:
+    """Lädt ein Recording per MBID (z. B. aus einem AcoustID-Treffer)."""
+    recording_id = recording_id.strip()
+
+    if not recording_id:
+        return None
+
+    params = {
+        "fmt": "json",
+        "inc": "artists+releases+isrcs+genres+tags+media",
+    }
+    payload = _request_json(
+        f"{BASE_URL}/recording/{recording_id}?{urlencode(params)}"
+    )
+
+    if not payload.get("id"):
+        return None
+
+    return _candidate_from_recording(payload)
+
+
 def _candidate_from_recording(recording: dict) -> MetadataCandidate:
     releases = recording.get("releases") or []
     release = releases[0] if releases else {}
@@ -338,6 +360,10 @@ def _candidate_from_recording(recording: dict) -> MetadataCandidate:
 
 
 def _request_json(url: str) -> dict:
+    cached = http_cache.load(url)
+    if cached is not None:
+        return cached
+
     wait_for_musicbrainz_slot()
     request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     try:
@@ -355,6 +381,7 @@ def _request_json(url: str) -> dict:
         raise MusicBrainzProviderError(
             "Die MusicBrainz-Antwort konnte nicht verarbeitet werden."
         ) from error
+    http_cache.store(url, data)
     return data
 
 
@@ -390,7 +417,11 @@ def _extract_label(release: dict) -> str:
 def _best_tag(tags: list[dict]) -> str:
     if not tags:
         return ""
-    sorted_tags = sorted(tags, key=lambda item: int(item.get("count") or 0), reverse=True)
+    sorted_tags = sorted(
+        tags,
+        key=lambda item: _optional_int(item.get("count")) or 0,
+        reverse=True,
+    )
     return str(sorted_tags[0].get("name") or "")
 
 
@@ -404,6 +435,8 @@ def _escape(value: str) -> str:
 
 
 def _optional_int(value: object) -> int | None:
+    if not isinstance(value, (str, bytes, bytearray, int, float)):
+        return None
     try:
         return int(value)
     except (TypeError, ValueError):

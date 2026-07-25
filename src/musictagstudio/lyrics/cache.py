@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict
 import json
 from pathlib import Path
-import sqlite3
 
+from ..database import connect_database
 from ..diagnostics import project_root
 from .models import LyricsDocument, LyricsLine
 
@@ -15,7 +15,7 @@ class LyricsCache:
             path or project_root() / "cache" / "lyrics" / "lyrics.sqlite3"
         )
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.path) as connection:
+        with connect_database(self.path) as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS lyrics_cache (
@@ -27,7 +27,7 @@ class LyricsCache:
             )
 
     def get(self, cache_key: str) -> LyricsDocument | None:
-        with sqlite3.connect(self.path) as connection:
+        with connect_database(self.path) as connection:
             row = connection.execute(
                 "SELECT document_json FROM lyrics_cache WHERE cache_key = ?",
                 (cache_key,),
@@ -45,7 +45,7 @@ class LyricsCache:
 
     def put(self, cache_key: str, document: LyricsDocument) -> None:
         payload = asdict(document)
-        with sqlite3.connect(self.path) as connection:
+        with connect_database(self.path) as connection:
             connection.execute(
                 """
                 INSERT INTO lyrics_cache(cache_key, document_json, fetched_at)

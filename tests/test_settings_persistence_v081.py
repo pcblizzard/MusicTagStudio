@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from musictagstudio.library_sources import new_source
 from musictagstudio.settings import AppSettings, load_settings, save_settings

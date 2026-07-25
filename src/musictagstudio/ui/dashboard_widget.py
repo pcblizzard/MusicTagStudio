@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
 
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
-    QHBoxLayout,
     QLabel,
     QPushButton,
     QVBoxLayout,
@@ -14,7 +12,6 @@ from PySide6.QtWidgets import (
 )
 
 from ..library_sources import IndexedAlbum, MusicSource
-from ..i18n import tr
 
 
 class DashboardWidget(QWidget):

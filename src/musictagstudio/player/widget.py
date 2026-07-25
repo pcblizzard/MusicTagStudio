@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QPixmap
+from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -35,6 +36,11 @@ class PlayerBar(QWidget):
         if self.engine.queue.shuffle_mode not in {"off", "history", "fresh"}:
             self.engine.queue.shuffle_mode = "off"
         self._seeking = False
+        # Wenn eine 30-Sekunden-Vorschau läuft, übernimmt die Leiste vorüber-
+        # gehend deren Anzeige und Steuerung, ohne die lokale Warteschlange zu
+        # verändern (die lokale Wiedergabe wird nur pausiert).
+        self._preview_mode = False
+        self.preview_player: object | None = None
         self.setObjectName("playerBar")
         self.setStyleSheet(
             "QWidget#playerBar { border-top: 1px solid palette(mid); }"
@@ -116,7 +122,7 @@ class PlayerBar(QWidget):
         layout.addWidget(self.volume_slider)
 
         self.previous_button.clicked.connect(self.engine.previous)
-        self.play_button.clicked.connect(self.engine.toggle)
+        self.play_button.clicked.connect(self._toggle_play)
         self.next_button.clicked.connect(self.engine.next)
         self.shuffle_button.clicked.connect(self.engine.cycle_shuffle)
         self.repeat_button.clicked.connect(self.engine.cycle_repeat)
@@ -146,7 +152,97 @@ class PlayerBar(QWidget):
     def play_songs(self, songs: list[Song], start_index: int = 0) -> bool:
         return self.engine.set_queue(songs, start_index, autoplay=True)
 
+    def bind_preview_player(self, player) -> None:
+        """Verbindet die Leiste mit einem Vorschau-Player.
+
+        Während einer Vorschau zeigt die Leiste Titel, Position und die
+        ~30-Sekunden-Dauer der Vorschau an und steuert Wiedergabe/Pause sowie
+        die Suchleiste für die Vorschau. Die lokale Warteschlange bleibt
+        unangetastet und wird nach der Vorschau unverändert wiederhergestellt.
+        """
+        self.preview_player = player
+        player.session_changed.connect(self._preview_session_changed)
+        player.state_changed.connect(self._preview_state_changed)
+        player.position_changed.connect(self._preview_position_changed)
+        player.duration_changed.connect(self._preview_duration_changed)
+
+    def _preview_session_changed(self, active: bool) -> None:
+        self._preview_mode = active
+
+        if active:
+            # Zwei gleichzeitige Audiostreams vermeiden: lokale Wiedergabe
+            # pausieren (Queue/Position bleiben erhalten).
+            if (
+                self.engine.media_player.playbackState()
+                == QMediaPlayer.PlaybackState.PlayingState
+            ):
+                self.engine.media_player.pause()
+
+            title = (
+                self.preview_player.current_title
+                if self.preview_player is not None
+                else ""
+            ) or "Vorschau"
+            self.title_label.setText(f"{title} (Vorschau)")
+            self.title_label.setToolTip("30-Sekunden-Vorschau")
+            self.album_label.setText("30-Sekunden-Vorschau")
+            self.cover_label.setPixmap(QPixmap())
+            self.cover_label.setText("♪")
+            self.position_slider.setRange(0, 0)
+            self.position_label.setText("0:00")
+            self.duration_label.setText("0:00")
+            self.play_button.setText("Ⅱ")
+            self._set_queue_controls_enabled(False)
+
+            if self.preview_player is not None:
+                self.preview_player.set_volume(self.volume_slider.value())
+        else:
+            self._set_queue_controls_enabled(True)
+            self._restore_engine_display()
+
+    def _set_queue_controls_enabled(self, enabled: bool) -> None:
+        for widget in (
+            self.shuffle_button,
+            self.previous_button,
+            self.next_button,
+            self.repeat_button,
+            self.queue_button,
+        ):
+            widget.setEnabled(enabled)
+
+    def _restore_engine_display(self) -> None:
+        self._song_changed(self.engine.current_song)
+        self._playback_changed(
+            self.engine.media_player.playbackState()
+            == QMediaPlayer.PlaybackState.PlayingState
+        )
+        self._duration_changed(self.engine.media_player.duration())
+        self._position_changed(self.engine.media_player.position())
+
+    def _preview_state_changed(self, _url: str, playing: bool) -> None:
+        if self._preview_mode:
+            self.play_button.setText("Ⅱ" if playing else "▶")
+
+    def _preview_position_changed(self, position: int) -> None:
+        if self._preview_mode:
+            self.position_label.setText(format_milliseconds(position))
+            if not self._seeking:
+                self.position_slider.setValue(position)
+
+    def _preview_duration_changed(self, duration: int) -> None:
+        if self._preview_mode:
+            self.position_slider.setRange(0, max(0, duration))
+            self.duration_label.setText(format_milliseconds(duration))
+
+    def _toggle_play(self) -> None:
+        if self._preview_mode and self.preview_player is not None:
+            self.preview_player.toggle_pause()
+        else:
+            self.engine.toggle()
+
     def _song_changed(self, song: Song | None) -> None:
+        if self._preview_mode:
+            return
         if song is None:
             self.title_label.setText("Kein Titel geladen")
             self.album_label.clear()
@@ -165,14 +261,20 @@ class PlayerBar(QWidget):
         self._show_song_cover(song)
 
     def _playback_changed(self, playing: bool) -> None:
+        if self._preview_mode:
+            return
         self.play_button.setText("Ⅱ" if playing else "▶")
 
     def _position_changed(self, position: int) -> None:
+        if self._preview_mode:
+            return
         self.position_label.setText(format_milliseconds(position))
         if not self._seeking:
             self.position_slider.setValue(position)
 
     def _duration_changed(self, duration: int) -> None:
+        if self._preview_mode:
+            return
         self.position_slider.setRange(0, max(0, duration))
         self.duration_label.setText(format_milliseconds(duration))
 
@@ -256,10 +358,15 @@ class PlayerBar(QWidget):
 
     def _seek_finished(self) -> None:
         self._seeking = False
-        self.engine.seek(self.position_slider.value())
+        if self._preview_mode and self.preview_player is not None:
+            self.preview_player.seek(self.position_slider.value())
+        else:
+            self.engine.seek(self.position_slider.value())
 
     def _volume_changed(self, value: int) -> None:
         self.engine.set_volume(value)
+        if self.preview_player is not None:
+            self.preview_player.set_volume(value)
         self.settings.setValue("player/volume", value)
 
     def _show_error(self, message: str) -> None:

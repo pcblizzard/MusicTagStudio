@@ -8,6 +8,7 @@ def test_supported_providers():
     assert supported_provider_ids() == (
         "apple_music",
         "musicbrainz",
+        "deezer",
     )
 
 

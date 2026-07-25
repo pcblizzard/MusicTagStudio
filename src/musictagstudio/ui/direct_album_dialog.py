@@ -25,7 +25,6 @@ from PySide6.QtWidgets import (
 
 from ..direct_album_lookup import (
     AlbumMatchingResult,
-    DirectAlbumLookupError,
     build_album_matching_result,
     lookup_album,
 )
@@ -34,6 +33,7 @@ from ..direct_references import (
     parse_album_reference,
 )
 from ..models.song import Song
+from ..player.preview import PreviewPlayer
 
 
 class WorkerSignals(QObject):
@@ -88,6 +88,14 @@ class DirectAlbumDialog(QDialog):
         self.track_combos: list[
             QComboBox
         ] = []
+        self.preview_buttons: list[
+            QPushButton
+        ] = []
+        self._playing_preview_row = -1
+        self.preview_player = PreviewPlayer(self)
+        self.preview_player.state_changed.connect(
+            self._on_preview_state
+        )
         self.thread_pool = (
             QThreadPool.globalInstance()
         )
@@ -142,7 +150,7 @@ class DirectAlbumDialog(QDialog):
 
         self.table = QTableWidget(
             len(songs),
-            7,
+            8,
         )
         self.table.setHorizontalHeaderLabels(
             [
@@ -153,6 +161,7 @@ class DirectAlbumDialog(QDialog):
                 "Quelltitel",
                 "Sicherheit",
                 "Begründung",
+                "Vorschau",
             ]
         )
         self.table.setEditTriggers(
@@ -178,6 +187,7 @@ class DirectAlbumDialog(QDialog):
             3,
             5,
             6,
+            7,
         ):
             header.setSectionResizeMode(
                 column,
@@ -297,6 +307,9 @@ class DirectAlbumDialog(QDialog):
         }
 
         self.track_combos.clear()
+        self.preview_player.stop()
+        self._playing_preview_row = -1
+        self.preview_buttons.clear()
 
         for row, song in enumerate(
             self.songs
@@ -337,6 +350,20 @@ class DirectAlbumDialog(QDialog):
                 row,
                 3,
                 combo,
+            )
+
+            preview_button = QPushButton("▶")
+            preview_button.setToolTip(
+                "30-Sekunden-Vorschau des zugeordneten Albumtracks abspielen"
+            )
+            preview_button.clicked.connect(
+                lambda _checked=False, index=row: self._toggle_preview(index)
+            )
+            self.preview_buttons.append(preview_button)
+            self.table.setCellWidget(
+                row,
+                7,
+                preview_button,
             )
 
             if match is None:
@@ -384,6 +411,7 @@ class DirectAlbumDialog(QDialog):
             )
 
         self._rebuild_manual_matches()
+        self._refresh_preview_buttons()
 
         automatic_count = len(
             self.matching_result.matches
@@ -454,6 +482,53 @@ class DirectAlbumDialog(QDialog):
             )
 
         self._rebuild_manual_matches()
+        self._refresh_preview_buttons()
+
+    def _selected_track(self, row: int):
+        if self.result is None or row >= len(self.track_combos):
+            return None
+
+        track_index = self.track_combos[row].currentData()
+
+        if track_index is None or track_index < 0:
+            return None
+
+        return self.result.tracks[track_index]
+
+    def _toggle_preview(self, row: int) -> None:
+        track = self._selected_track(row)
+
+        if track is None or not track.preview_url:
+            return
+
+        # Zeilenbasierte Steuerung: derselbe Album-Track kann mehreren
+        # lokalen Dateien zugeordnet sein und hätte dann dieselbe URL.
+        if row == self._playing_preview_row and self.preview_player.is_playing():
+            self._playing_preview_row = -1
+            self.preview_player.stop()
+            return
+
+        self._playing_preview_row = row
+        self.preview_player.play(track.preview_url, track.title)
+
+    def _refresh_preview_buttons(self) -> None:
+        """Aktiviert den ▶-Knopf nur, wenn der zugeordnete Track eine
+        Vorschau-URL hat (Apple/Deezer – MusicBrainz/Discogs liefern keine)."""
+        playing = self.preview_player.is_playing()
+
+        for row, button in enumerate(self.preview_buttons):
+            track = self._selected_track(row)
+            has_preview = bool(track and track.preview_url)
+            button.setEnabled(has_preview)
+            is_active = playing and row == self._playing_preview_row
+            button.setText("⏸" if is_active else "▶")
+
+    def _on_preview_state(self, _url: str, _playing: bool) -> None:
+        self._refresh_preview_buttons()
+
+    def done(self, result: int) -> None:
+        self.preview_player.stop()
+        super().done(result)
 
     def _rebuild_manual_matches(self):
         if self.result is None:

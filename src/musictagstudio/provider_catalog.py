@@ -79,12 +79,13 @@ PROVIDERS: tuple[ProviderDefinition, ...] = (
     ProviderDefinition(
         provider_id="deezer",
         name="Deezer",
-        status="unsupported",
-        status_text="Aktuell nicht unterstützt",
+        status="supported",
+        status_text="Unterstützt",
         tooltip=(
-            "In MusicTagStudio derzeit nicht implementiert.\n\n"
-            "MusicTagStudio verwendet ausschließlich offiziell "
-            "dokumentierte Programmierschnittstellen."
+            "In MusicTagStudio unterstützt.\n\n"
+            "Nutzt die offizielle, öffentliche Deezer-API "
+            "(api.deezer.com) ohne Anmeldung. Liefert vollständige "
+            "Album-Tracklisten inklusive ISRC, Label und Positionen."
         ),
     ),
     ProviderDefinition(

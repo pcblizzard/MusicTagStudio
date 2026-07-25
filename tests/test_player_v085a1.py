@@ -177,7 +177,21 @@ def test_missing_first_file_is_skipped_when_queue_has_a_valid_file(tmp_path):
     app.processEvents()
 
 
-def test_player_bar_exposes_basic_controls():
+def test_player_bar_exposes_basic_controls(monkeypatch):
+    class EmptySettings:
+        def __init__(self, *_args):
+            self.values = {}
+
+        def value(self, key, default=None):
+            return self.values.get(key, default)
+
+        def setValue(self, key, value):
+            self.values[key] = value
+
+    monkeypatch.setattr(
+        "musictagstudio.player.widget.QSettings",
+        EmptySettings,
+    )
     app = QApplication.instance() or QApplication([])
     bar = PlayerBar()
 

@@ -1,6 +1,5 @@
 from mutagen.apev2 import APEv2
 
-from musictagstudio.models.song import Song
 from musictagstudio.services import metadata_io
 
 

@@ -22,7 +22,7 @@ def test_metadata_panel_is_not_fixed_width():
     assert "self.workspace_stack.setMinimumWidth" in text
 
 
-def test_settings_is_not_in_sidebar_and_is_in_file_menu():
+def test_settings_is_not_in_sidebar_and_remains_in_file_menu():
     text = source()
 
     workspace_block = text[

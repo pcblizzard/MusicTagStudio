@@ -3,11 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 import re
-from urllib.parse import quote
 
 from .client import (
     MusicBrainzClient,
-    MusicBrainzClientError,
     RequestTrace,
     default_client,
 )

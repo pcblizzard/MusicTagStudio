@@ -8,6 +8,14 @@ SOURCE = (
     / "ui"
     / "media_library_widget.py"
 ).read_text(encoding="utf-8")
+STREAMING_SERVICE_SOURCE = (
+    Path(__file__).parents[1]
+    / "src"
+    / "musictagstudio"
+    / "media_library"
+    / "streaming"
+    / "service.py"
+).read_text(encoding="utf-8")
 
 
 def test_streaming_search_uses_known_release_context() -> None:
@@ -16,7 +24,10 @@ def test_streaming_search_uses_known_release_context() -> None:
 
 
 def test_streaming_result_requires_safe_confidence() -> None:
-    assert "candidate.confidence >= MINIMUM_ALBUM_CONFIDENCE" in SOURCE
+    assert (
+        "candidate.confidence >= MINIMUM_ALBUM_CONFIDENCE"
+        in STREAMING_SERVICE_SOURCE
+    )
 
 
 def test_stale_streaming_result_is_ignored() -> None:
@@ -58,3 +69,9 @@ def test_streaming_result_survives_view_changes_and_restart() -> None:
     assert "StreamingAvailabilityCache" in SOURCE
     assert "ttl_days=7" in SOURCE
     assert 'strftime("%d.%m.%Y, %H:%M")' in SOURCE
+
+
+def test_every_successful_streaming_check_shows_its_timestamp() -> None:
+    assert '"Zuletzt geprüft: "' in SOURCE
+    assert '("Gespeichertes Ergebnis · " if saved else "")' in SOURCE
+    assert "+ checked_hint" in SOURCE

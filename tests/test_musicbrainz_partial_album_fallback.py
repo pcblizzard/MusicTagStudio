@@ -67,6 +67,11 @@ def test_unmatched_release_tracks_receive_single_search(
     )
     monkeypatch.setattr(
         proposal,
+        "search_apple",
+        lambda *args, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        proposal,
         "search_mb_release",
         lambda *args, **kwargs: [
             MusicBrainzReleaseCandidate(

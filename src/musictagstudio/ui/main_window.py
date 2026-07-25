@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
@@ -13,7 +14,6 @@ from PySide6.QtGui import (
     QAction,
     QCloseEvent,
     QKeySequence,
-    QIcon,
     QPixmap,
     QShortcut,
 )
@@ -41,7 +41,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..core.merger import apply_merged_metadata, song_values
+from ..core.merger import song_values
 from ..diagnostics import get_diagnostic_logger, project_root
 from ..history import HistoryManager
 from ..library_sources import (
@@ -50,7 +50,6 @@ from ..library_sources import (
     load_library_index,
     merge_scan_results,
     save_library_index,
-    scan_source,
     index_songs,
     update_source_availability,
 )
@@ -65,6 +64,11 @@ from ..services.proposal import (
     build_batch_proposals,
     build_proposal,
 )
+from ..providers import fingerprint
+from ..providers.musicbrainz import (
+    MusicBrainzProviderError,
+    lookup_recording_by_id,
+)
 from ..services.scanner import scan_folder_detailed
 from ..services.release_text import create_release_text
 from ..settings import load_settings, save_settings
@@ -78,6 +82,7 @@ from ..theme import (
 )
 from ..batch_comparison_logic import BatchSongProposal
 from .batch_dialog import BatchComparisonDialog
+from .about_dialog import AboutDialog
 from .comparison_dialog import ComparisonDialog
 from .settings_dialog import SettingsDialog
 from .cover_dialog import (
@@ -92,6 +97,7 @@ from .change_preview_dialog import ChangePreviewDialog
 from .history_dialog import HistoryDialog
 from .media_library_widget import MediaLibraryWidget
 from .lyrics_dialog import LyricsDialog
+from .lyrics_search_dialog import LyricsSearchDialog
 from .dashboard_widget import DashboardWidget
 from ..player import (
     PlayerBar,
@@ -113,6 +119,46 @@ OPTIONAL_FIELDS = (
     "composer",
     "comment",
 )
+
+
+def _save_songs_in_parallel(
+    items: list[tuple[int, Song]],
+) -> list[tuple[int, Song, Exception | None]]:
+    """Schreibt mehrere Songs gleichzeitig in ihre Dateien.
+
+    Jeder Song hat einen eigenen Pfad, daher sind die Schreibvorgänge
+    unabhängig und lassen sich parallelisieren. Datei-I/O gibt den GIL
+    frei, sodass die Wartezeit für ein Album spürbar sinkt. Es findet
+    kein Qt-Zugriff statt – die UI-Aktualisierung bleibt beim Aufrufer.
+    Ein Fehler pro Datei wird zurückgegeben statt geworfen, damit die
+    übrigen Dateien trotzdem gespeichert werden.
+    """
+    if not items:
+        return []
+
+    def _save_one(
+        pair: tuple[int, Song],
+    ) -> tuple[int, Song, Exception | None]:
+        row, updated = pair
+
+        try:
+            save_song_metadata(
+                updated.path,
+                updated,
+            )
+
+            return row, updated, None
+        except Exception as error:  # noqa: BLE001
+            return row, updated, error
+
+    worker_count = min(8, len(items))
+
+    with ThreadPoolExecutor(
+        max_workers=worker_count
+    ) as pool:
+        return list(
+            pool.map(_save_one, items)
+        )
 
 
 class MainWindow(QMainWindow):
@@ -191,6 +237,18 @@ class MainWindow(QMainWindow):
         )
         self.proposal_button.setEnabled(False)
 
+        self.identify_button = QPushButton(
+            "Nach Klang identifizieren"
+        )
+        self.identify_button.setToolTip(
+            "Erkennt den ausgewählten Titel per akustischem Fingerabdruck "
+            "(AcoustID) und schlägt die passenden MusicBrainz-Metadaten vor."
+        )
+        self.identify_button.clicked.connect(
+            self.identify_by_sound
+        )
+        self.identify_button.setEnabled(False)
+
         self.batch_button = QPushButton(
             "Vorschläge für markierte Titel"
         )
@@ -215,6 +273,12 @@ class MainWindow(QMainWindow):
         )
         self.lyrics_button.clicked.connect(self.show_lyrics)
         self.lyrics_button.setEnabled(False)
+
+        self.lyrics_search_button = QPushButton("Song über Text finden")
+        self.lyrics_search_button.setToolTip(
+            "Lokale Lyrics und Genius nach einer Textstelle durchsuchen"
+        )
+        self.lyrics_search_button.clicked.connect(self.search_song_by_lyrics)
 
         self.player_button = QPushButton("Titel abspielen")
         self.player_button.setToolTip("Ausgewählten lokalen Titel abspielen")
@@ -363,12 +427,14 @@ class MainWindow(QMainWindow):
         left_layout.addLayout(library_actions)
         self.provider_action_buttons = (
             self.proposal_button,
+            self.identify_button,
             self.batch_button,
             self.cover_button,
             self.lyrics_button,
             self.player_button,
             self.release_text_button,
             self.more_artist_button,
+            self.lyrics_search_button,
         )
         left_layout.addLayout(
             self.provider_buttons_layout
@@ -705,6 +771,12 @@ class MainWindow(QMainWindow):
             stretch=1,
         )
         self.player_bar = PlayerBar(self)
+        # Die untere Leiste spiegelt zusätzlich die Track-Vorschau der
+        # Medienbibliothek (Titel, Position, ~30 Sek.), ohne die lokale
+        # Wiedergabe zu verändern.
+        self.player_bar.bind_preview_player(
+            self.media_library.preview_player
+        )
         self.windows_media_keys = WindowsMediaKeyController(
             self.player_bar.engine
         )
@@ -734,16 +806,8 @@ class MainWindow(QMainWindow):
         application_layout.addWidget(shell, stretch=1)
         application_layout.addWidget(self.player_bar)
         self.setCentralWidget(application_shell)
-        self.workspace_buttons.button(
+        self.switch_workspace(
             5
-        ).setChecked(
-            True
-        )
-        self.workspace_stack.setCurrentIndex(
-            5
-        )
-        self.statusBar().showMessage(
-            "Bereit"
         )
 
         self.update_optional_columns()
@@ -809,6 +873,12 @@ class MainWindow(QMainWindow):
             button.setChecked(
                 True
             )
+        else:
+            checked_button = self.workspace_buttons.checkedButton()
+            if checked_button is not None:
+                self.workspace_buttons.setExclusive(False)
+                checked_button.setChecked(False)
+                self.workspace_buttons.setExclusive(True)
 
     def apply_embedded_settings(
         self,
@@ -825,6 +895,7 @@ class MainWindow(QMainWindow):
             apply_theme(
                 app,
                 new_settings.theme,
+                new_settings.theme_style,
             )
 
         self.load_configured_sources()
@@ -943,6 +1014,7 @@ class MainWindow(QMainWindow):
             "Titel abspielen",
             "BBCode-Text erstellen",
             "Mehr vom Künstler",
+            "Song über Text finden",
         )
         columns = 4
         for index, (button, label) in enumerate(
@@ -1100,6 +1172,13 @@ class MainWindow(QMainWindow):
         reset_columns_action.triggered.connect(
             self.reset_table_column_widths
         )
+
+        info_menu = self.menuBar().addMenu("Info")
+        about_action = info_menu.addAction("Über MusicTagStudio …")
+        about_action.triggered.connect(self.show_about_dialog)
+
+    def show_about_dialog(self) -> None:
+        AboutDialog(self).exec()
 
     def _selected_album_artist(
         self,
@@ -1333,6 +1412,14 @@ class MainWindow(QMainWindow):
         )
         dialog.exec()
 
+    def search_song_by_lyrics(self) -> None:
+        dialog = LyricsSearchDialog(
+            tuple(self.songs),
+            self,
+            player_bar=self.player_bar,
+        )
+        dialog.exec()
+
     def create_release_text_file(
         self,
     ):
@@ -1509,6 +1596,7 @@ class MainWindow(QMainWindow):
         changes: list[
             tuple[str, str, str, str]
         ] = []
+        changed_rows: set[int] = set()
 
         for row, updated in items:
             original = self.songs[
@@ -1547,6 +1635,7 @@ class MainWindow(QMainWindow):
                             after,
                         )
                     )
+                    changed_rows.add(row)
 
         if not changes:
             return True
@@ -1555,6 +1644,7 @@ class MainWindow(QMainWindow):
             ChangePreviewDialog(
                 changes,
                 self,
+                file_count=len(changed_rows),
             ).exec()
             == ChangePreviewDialog.DialogCode.Accepted
         )
@@ -1586,13 +1676,12 @@ class MainWindow(QMainWindow):
         failed: list[str] = []
 
         try:
-            for row, updated in items:
-                try:
-                    save_song_metadata(
-                        updated.path,
-                        updated,
-                    )
-                except Exception as error:
+            # Die Dateien werden parallel geschrieben (I/O gibt den GIL frei),
+            # die UI-Aktualisierung bleibt danach auf dem Hauptthread.
+            for row, updated, error in _save_songs_in_parallel(
+                items
+            ):
+                if error is not None:
                     failed.append(
                         f"{updated.title}: {error}"
                     )
@@ -2077,6 +2166,9 @@ class MainWindow(QMainWindow):
         self.proposal_button.setEnabled(
             enabled
         )
+        self.identify_button.setEnabled(
+            enabled
+        )
         self.batch_button.setEnabled(
             enabled
         )
@@ -2511,6 +2603,116 @@ class MainWindow(QMainWindow):
             self.editor_fields[name].setText(
                 value
             )
+
+        self.loading_editor = False
+        self.update_dirty_state()
+
+    def identify_by_sound(self):
+        """Identifiziert den ausgewählten Titel per akustischem Fingerabdruck."""
+        if len(self.active_rows) != 1:
+            QMessageBox.information(
+                self,
+                "Nach Klang identifizieren",
+                "Bitte genau einen Titel auswählen.",
+            )
+            return
+
+        if self.has_unsaved_changes:
+            if not self.confirm_pending_changes():
+                return
+
+        row = self.active_rows[0]
+        song = self.songs[row]
+
+        if not Path(song.path).is_file():
+            QMessageBox.warning(
+                self,
+                "Nach Klang identifizieren",
+                "Die Audiodatei wurde nicht gefunden.",
+            )
+            return
+
+        settings = load_settings()
+        api_key = fingerprint.resolve_api_key(settings.acoustid_api_key)
+
+        if not api_key:
+            QMessageBox.information(
+                self,
+                "Nach Klang identifizieren",
+                "Es ist kein AcoustID-Key hinterlegt. Bitte in den "
+                "Einstellungen einen AcoustID-Application-Key eintragen "
+                "(von acoustid.org/new-application).",
+            )
+            return
+
+        candidates: list = []
+        error_message = ""
+
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            matches = fingerprint.identify_recording(
+                song.path,
+                api_key=api_key,
+                fpcalc_path=settings.fpcalc_path,
+            )
+            seen: set[str] = set()
+
+            for match in matches[:3]:
+                if match.recording_id in seen:
+                    continue
+                seen.add(match.recording_id)
+
+                candidate = lookup_recording_by_id(match.recording_id)
+
+                if candidate is not None:
+                    candidates.append(
+                        replace(
+                            candidate,
+                            confidence=int(round(match.score * 100)),
+                        )
+                    )
+        except fingerprint.FingerprintError as error:
+            error_message = str(error)
+        except MusicBrainzProviderError as error:
+            error_message = str(error)
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if error_message:
+            QMessageBox.warning(
+                self,
+                "Nach Klang identifizieren",
+                error_message,
+            )
+            return
+
+        if not candidates:
+            QMessageBox.information(
+                self,
+                "Nach Klang identifizieren",
+                "Über den akustischen Fingerabdruck wurde kein passender "
+                "MusicBrainz-Eintrag gefunden.",
+            )
+            return
+
+        dialog = ComparisonDialog(
+            song,
+            candidates,
+            primary_source="musicbrainz",
+            feature_handling=settings.feature_handling,
+            parent=self,
+        )
+
+        if (
+            dialog.exec() != dialog.DialogCode.Accepted
+            or not dialog.selected_fields
+        ):
+            return
+
+        self.loading_editor = True
+
+        for name, value in dialog.selected_values.items():
+            self.editor_fields[name].setText(value)
 
         self.loading_editor = False
         self.update_dirty_state()

@@ -5,7 +5,6 @@ import os
 import platform
 import sys
 import threading
-import traceback
 import uuid
 from datetime import datetime
 from pathlib import Path

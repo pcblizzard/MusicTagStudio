@@ -4,13 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "musictagstudio"
-version = "0.8.6-alpha2.post3"
+version = "0.8.6a20"
 description = "A safe, preview-first audio metadata editor"
+license = { text = "GPL-3.0-or-later" }
+authors = [
+    { name = "Michael (pcblizzard)" },
+]
 requires-python = ">=3.12"
 dependencies = [
     "PySide6>=6.8",
     "mutagen>=1.47",
     "Pillow>=10.0",
+    "keyring>=25.6",
     "winrt-runtime>=3.2.1; platform_system == 'Windows'",
     "winrt-Windows.Foundation>=3.2.1; platform_system == 'Windows'",
     "winrt-Windows.Media>=3.2.1; platform_system == 'Windows'",
@@ -19,7 +24,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9"]
+dev = [
+    "mypy>=1.17",
+    "pytest>=9",
+    "ruff>=0.12",
+]
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -27,3 +43,54 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F841"]
+
+[tool.mypy]
+python_version = "3.12"
+files = [
+    "src/musictagstudio/database.py",
+    "src/musictagstudio/direct_references.py",
+    "src/musictagstudio/local_track.py",
+    "src/musictagstudio/musicbrainz_http.py",
+    "src/musictagstudio/providers/apple_artist.py",
+    "src/musictagstudio/providers/apple_editorial.py",
+    "src/musictagstudio/providers/apple_http.py",
+    "src/musictagstudio/providers/apple_music_web.py",
+    "src/musictagstudio/providers/deezer.py",
+    "src/musictagstudio/providers/fingerprint.py",
+    "src/musictagstudio/providers/musicbrainz.py",
+    "src/musictagstudio/providers/oauth_catalog.py",
+    "src/musictagstudio/providers/spotify.py",
+    "src/musictagstudio/providers/streaming_catalog.py",
+    "src/musictagstudio/providers/theaudiodb.py",
+    "src/musictagstudio/providers/tidal.py",
+    "src/musictagstudio/providers/tidal_auth.py",
+    "src/musictagstudio/audio_analysis/spectrogram.py",
+    "src/musictagstudio/player/preview.py",
+    "src/musictagstudio/providers/http_cache.py",
+    "src/musictagstudio/media_library/streaming/models.py",
+    "src/musictagstudio/media_library/streaming/cache.py",
+    "src/musictagstudio/media_library/streaming/service.py",
+    "src/musictagstudio/lyrics/duration.py",
+    "src/musictagstudio/lyrics/lrc.py",
+    "src/musictagstudio/lyrics/lrclib.py",
+    "src/musictagstudio/lyrics/models.py",
+    "src/musictagstudio/lyrics/cache.py",
+    "src/musictagstudio/lyrics/resolver.py",
+    "src/musictagstudio/lyrics/storage.py",
+    "src/musictagstudio/player/model.py",
+    "src/musictagstudio/secret_store.py",
+]
+ignore_missing_imports = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true

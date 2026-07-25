@@ -3,10 +3,8 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
-from functools import lru_cache
 from pathlib import Path
 
-from mutagen import File as MutagenFile
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -16,12 +14,23 @@ from .diagnostics import (
     cache_directory,
     get_diagnostic_logger,
 )
-from .direct_references import DirectAlbumReference
+from .local_track import local_duration_ms, title_from_filename
+from .direct_references import (
+    DirectAlbumReference,
+    DirectAlbumReferenceError,
+    parse_album_reference,
+)
 from .models.metadata import MetadataCandidate
 from .models.song import Song
+from .providers import http_cache
 from .musicbrainz_http import (
     MUSICBRAINZ_USER_AGENT,
     wait_for_musicbrainz_slot,
+)
+from .providers.apple_http import (
+    APPLE_USER_AGENT,
+    AppleRequestError,
+    request_json as request_apple_json,
 )
 
 
@@ -47,6 +56,9 @@ class DirectAlbumTrack:
     composer: str = ""
     duration_ms: int | None = None
     external_id: str = ""
+    # 30-Sekunden-Vorschau-URL (Apple/Deezer). Reine Wiedergabe-Information,
+    # kein Tag-Feld – wird daher nicht in MetadataCandidate übernommen.
+    preview_url: str = ""
 
     def as_candidate(
         self,
@@ -107,13 +119,9 @@ def lookup_album(
         release_id = reference.reference_id
 
         if reference.reference_type == "release-group":
-            release_id = _resolve_release_group(
-                reference.reference_id
-            )
+            release_id = _resolve_release_group(reference.reference_id)
 
-        return _lookup_musicbrainz_release(
-            release_id
-        )
+        return _lookup_musicbrainz_release(release_id)
 
     raise DirectAlbumLookupError(
         "Diese direkte Albumquelle wird derzeit nicht unterstützt."
@@ -141,10 +149,7 @@ class AlbumMatchingResult:
     def mapping(
         self,
     ) -> dict[int, DirectAlbumTrack]:
-        return {
-            match.local_index: match.track
-            for match in self.matches
-        }
+        return {match.local_index: match.track for match in self.matches}
 
     @property
     def complete(self) -> bool:
@@ -197,29 +202,19 @@ def build_album_matching_result(
     if not songs or not album.tracks:
         return AlbumMatchingResult(
             matches=(),
-            unmatched_local_indexes=tuple(
-                range(len(songs))
-            ),
-            unused_track_indexes=tuple(
-                range(len(album.tracks))
-            ),
+            unmatched_local_indexes=tuple(range(len(songs))),
+            unused_track_indexes=tuple(range(len(album.tracks))),
             ambiguous_local_indexes=(),
         )
 
     score_matrix: list[list[int]] = []
-    reason_matrix: list[
-        list[tuple[str, ...]]
-    ] = []
+    reason_matrix: list[list[tuple[str, ...]]] = []
 
     for local_index, song in enumerate(songs):
         score_row: list[int] = []
-        reason_row: list[
-            tuple[str, ...]
-        ] = []
+        reason_row: list[tuple[str, ...]] = []
 
-        for track_index, track in enumerate(
-            album.tracks
-        ):
+        for track_index, track in enumerate(album.tracks):
             score, reasons = _score_pair(
                 song,
                 track,
@@ -227,74 +222,49 @@ def build_album_matching_result(
                 track_index=track_index,
             )
             score_row.append(score)
-            reason_row.append(
-                tuple(reasons)
-            )
+            reason_row.append(tuple(reasons))
 
         score_matrix.append(score_row)
         reason_matrix.append(reason_row)
 
-    assignments = _maximum_weight_assignment(
-        score_matrix
-    )
+    assignments = _maximum_weight_assignment(score_matrix)
 
     matches: list[AlbumTrackMatch] = []
     unmatched_local: list[int] = []
     used_tracks: set[int] = set()
     ambiguous_local: list[int] = []
 
-    for local_index, track_index in enumerate(
-        assignments
-    ):
-        if (
-            track_index is None
-            or track_index >= len(album.tracks)
-        ):
-            unmatched_local.append(
-                local_index
-            )
+    for local_index, track_index in enumerate(assignments):
+        if track_index is None or track_index >= len(album.tracks):
+            unmatched_local.append(local_index)
             continue
 
-        score = score_matrix[
-            local_index
-        ][track_index]
-        reasons = reason_matrix[
-            local_index
-        ][track_index]
+        score = score_matrix[local_index][track_index]
+        reasons = reason_matrix[local_index][track_index]
 
         # Sehr schwache Ergebnisse werden nicht automatisch übernommen.
         if score < 30:
-            unmatched_local.append(
-                local_index
-            )
+            unmatched_local.append(local_index)
             continue
 
         row_scores = sorted(
             score_matrix[local_index],
             reverse=True,
         )
-        gap = (
-            row_scores[0] - row_scores[1]
-            if len(row_scores) > 1
-            else row_scores[0]
-        )
+        gap = row_scores[0] - row_scores[1] if len(row_scores) > 1 else row_scores[0]
         confidence = _confidence_label(
             score,
             gap,
         )
 
         if confidence == "Mehrdeutig":
-            ambiguous_local.append(
-                local_index
-            )
+            ambiguous_local.append(local_index)
 
         matches.append(
             AlbumTrackMatch(
                 local_index=local_index,
                 track_index=track_index,
-                track=album.tracks[
-                    track_index
-                ],
+                track=album.tracks[track_index],
                 score=score,
                 confidence=confidence,
                 reasons=reasons,
@@ -303,24 +273,14 @@ def build_album_matching_result(
         used_tracks.add(track_index)
 
     unused_tracks = [
-        index
-        for index in range(
-            len(album.tracks)
-        )
-        if index not in used_tracks
+        index for index in range(len(album.tracks)) if index not in used_tracks
     ]
 
     return AlbumMatchingResult(
         matches=tuple(matches),
-        unmatched_local_indexes=tuple(
-            unmatched_local
-        ),
-        unused_track_indexes=tuple(
-            unused_tracks
-        ),
-        ambiguous_local_indexes=tuple(
-            ambiguous_local
-        ),
+        unmatched_local_indexes=tuple(unmatched_local),
+        unused_track_indexes=tuple(unused_tracks),
+        ambiguous_local_indexes=tuple(ambiguous_local),
     )
 
 
@@ -334,101 +294,41 @@ def _score_pair(
     score = 0
     reasons: list[str] = []
 
-    local_title = _normalize(
-        song.title
-    )
-    source_title = _normalize(
-        track.title
-    )
-    filename_title = _normalize(
-        _title_from_filename(
-            song.path
-        )
-    )
+    local_title = _normalize(song.title)
+    source_title = _normalize(track.title)
+    filename_title = _normalize(_title_from_filename(song.path))
 
-    if (
-        local_title
-        and local_title == source_title
-    ):
+    if local_title and local_title == source_title:
         score += 95
-        reasons.append(
-            "Titel-Tag stimmt exakt"
-        )
-    elif (
-        local_title
-        and _simplify_title(
-            song.title
-        )
-        == _simplify_title(
-            track.title
-        )
-    ):
+        reasons.append("Titel-Tag stimmt exakt")
+    elif local_title and _simplify_title(song.title) == _simplify_title(track.title):
         score += 70
-        reasons.append(
-            "Titel-Tag stimmt vereinfacht"
-        )
+        reasons.append("Titel-Tag stimmt vereinfacht")
 
-    if (
-        filename_title
-        and filename_title == source_title
-    ):
+    if filename_title and filename_title == source_title:
         score += 120
-        reasons.append(
-            "Titel aus Dateiname stimmt exakt"
-        )
-    elif (
-        filename_title
-        and _simplify_title(
-            _title_from_filename(
-                song.path
-            )
-        )
-        == _simplify_title(
-            track.title
-        )
-    ):
+        reasons.append("Titel aus Dateiname stimmt exakt")
+    elif filename_title and _simplify_title(
+        _title_from_filename(song.path)
+    ) == _simplify_title(track.title):
         score += 90
-        reasons.append(
-            "Titel aus Dateiname stimmt vereinfacht"
-        )
+        reasons.append("Titel aus Dateiname stimmt vereinfacht")
 
-    filename_disc, filename_track = (
-        _numbers_from_filename(
-            song.path
-        )
-    )
-    source_disc = _as_int(
-        track.disc
-    ) or 1
-    source_track = _as_int(
-        track.track
-    )
+    filename_disc, filename_track = _numbers_from_filename(song.path)
+    source_disc = _as_int(track.disc) or 1
+    source_track = _as_int(track.track)
 
-    if (
-        filename_track is not None
-        and source_track is not None
-    ):
-        if (
-            filename_track == source_track
-            and (
-                filename_disc is None
-                or filename_disc
-                == source_disc
-            )
+    if filename_track is not None and source_track is not None:
+        if filename_track == source_track and (
+            filename_disc is None or filename_disc == source_disc
         ):
             score += 130
-            reasons.append(
-                "Tracknummer aus Dateiname stimmt"
-            )
+            reasons.append("Tracknummer aus Dateiname stimmt")
         else:
             score -= 55
 
-    local_track = _as_int(
-        song.track
-    )
-    local_disc = _as_int(
-        song.disc
-    ) or 1
+    local_track = _as_int(song.track)
+    local_disc = _as_int(song.disc) or 1
 
     if (
         local_track is not None
@@ -437,33 +337,19 @@ def _score_pair(
         and local_disc == source_disc
     ):
         score += 25
-        reasons.append(
-            "Lokaler Disc-/Tracktag stimmt"
-        )
+        reasons.append("Lokaler Disc-/Tracktag stimmt")
 
-    local_duration_ms = _local_duration_ms(
-        song.path
-    )
+    local_duration_ms = _local_duration_ms(song.path)
 
-    if (
-        local_duration_ms is not None
-        and track.duration_ms is not None
-    ):
-        difference = abs(
-            local_duration_ms
-            - track.duration_ms
-        )
+    if local_duration_ms is not None and track.duration_ms is not None:
+        difference = abs(local_duration_ms - track.duration_ms)
 
         if difference <= 1500:
             score += 35
-            reasons.append(
-                "Dauer nahezu identisch"
-            )
+            reasons.append("Dauer nahezu identisch")
         elif difference <= 4000:
             score += 22
-            reasons.append(
-                "Dauer ähnlich"
-            )
+            reasons.append("Dauer ähnlich")
         elif difference <= 10000:
             score += 8
         elif difference >= 30000:
@@ -472,13 +358,9 @@ def _score_pair(
     # Reihenfolge ist nur ein leichtes Zusatzsignal.
     if local_index == track_index:
         score += 12
-        reasons.append(
-            "Position stimmt"
-        )
+        reasons.append("Position stimmt")
     else:
-        distance = abs(
-            local_index - track_index
-        )
+        distance = abs(local_index - track_index)
         score -= min(
             12,
             distance,
@@ -487,44 +369,10 @@ def _score_pair(
     return score, reasons
 
 
-
-@lru_cache(maxsize=4096)
 def _local_duration_ms(
     filepath: str,
 ) -> int | None:
-    path = Path(filepath)
-
-    if not path.is_file():
-        return None
-
-    try:
-        audio = MutagenFile(path)
-    except Exception:
-        return None
-
-    info = getattr(
-        audio,
-        "info",
-        None,
-    )
-    length = getattr(
-        info,
-        "length",
-        None,
-    )
-
-    if length is None:
-        return None
-
-    try:
-        return round(
-            float(length) * 1000
-        )
-    except (
-        TypeError,
-        ValueError,
-    ):
-        return None
+    return local_duration_ms(filepath)
 
 
 def _maximum_weight_assignment(
@@ -538,10 +386,7 @@ def _maximum_weight_assignment(
     """
     row_count = len(scores)
     column_count = max(
-        (
-            len(row)
-            for row in scores
-        ),
+        (len(row) for row in scores),
         default=0,
     )
     size = max(
@@ -553,23 +398,16 @@ def _maximum_weight_assignment(
         return []
 
     maximum = max(
-        (
-            value
-            for row in scores
-            for value in row
-        ),
+        (value for row in scores for value in row),
         default=0,
     )
 
     costs = [
         [
-            maximum - (
+            maximum
+            - (
                 scores[row][column]
-                if (
-                    row < row_count
-                    and column
-                    < len(scores[row])
-                )
+                if (row < row_count and column < len(scores[row]))
                 else 0
             )
             for column in range(size)
@@ -586,9 +424,7 @@ def _maximum_weight_assignment(
     for row in range(1, size + 1):
         p[0] = row
         column_0 = 0
-        minimum_values = [
-            float("inf")
-        ] * (size + 1)
+        minimum_values = [float("inf")] * (size + 1)
         used = [False] * (size + 1)
 
         while True:
@@ -605,41 +441,23 @@ def _maximum_weight_assignment(
                     continue
 
                 current = (
-                    costs[
-                        current_row - 1
-                    ][column - 1]
-                    - u[current_row]
-                    - v[column]
+                    costs[current_row - 1][column - 1] - u[current_row] - v[column]
                 )
 
-                if (
-                    current
-                    < minimum_values[column]
-                ):
-                    minimum_values[
-                        column
-                    ] = current
+                if current < minimum_values[column]:
+                    minimum_values[column] = current
                     way[column] = column_0
 
-                if (
-                    minimum_values[column]
-                    < delta
-                ):
-                    delta = (
-                        minimum_values[column]
-                    )
+                if minimum_values[column] < delta:
+                    delta = minimum_values[column]
                     column_1 = column
 
-            for column in range(
-                size + 1
-            ):
+            for column in range(size + 1):
                 if used[column]:
                     u[p[column]] += delta
                     v[column] -= delta
                 else:
-                    minimum_values[
-                        column
-                    ] -= delta
+                    minimum_values[column] -= delta
 
             column_0 = column_1
 
@@ -654,9 +472,7 @@ def _maximum_weight_assignment(
             if column_0 == 0:
                 break
 
-    assignment: list[
-        int | None
-    ] = [None] * row_count
+    assignment: list[int | None] = [None] * row_count
 
     for column in range(
         1,
@@ -664,13 +480,8 @@ def _maximum_weight_assignment(
     ):
         row = p[column]
 
-        if (
-            1 <= row <= row_count
-            and column <= column_count
-        ):
-            assignment[
-                row - 1
-            ] = column - 1
+        if 1 <= row <= row_count and column <= column_count:
+            assignment[row - 1] = column - 1
 
     return assignment
 
@@ -678,33 +489,7 @@ def _maximum_weight_assignment(
 def _title_from_filename(
     filepath: str,
 ) -> str:
-    stem = re.sub(
-        r"\.[^.]+$",
-        "",
-        filepath.rsplit(
-            "/",
-            1,
-        )[-1].rsplit(
-            "\\",
-            1,
-        )[-1],
-    )
-
-    # Nummernpräfix entfernen: 09., 109., 1-09 usw.
-    stem = re.sub(
-        r"^\s*(?:\d{1,2}[-_.])?\d{1,3}\s*[.)_-]\s*",
-        "",
-        stem,
-    )
-
-    # Übliches Schema "Künstler - Titel".
-    if " - " in stem:
-        stem = stem.split(
-            " - ",
-            1,
-        )[1]
-
-    return stem.strip()
+    return title_from_filename(filepath)
 
 
 def _numbers_from_filename(
@@ -775,6 +560,32 @@ def _simplify_title(
     return normalized.strip()
 
 
+def _request_json(
+    endpoint: str,
+    params: dict[str, object],
+) -> dict:
+    request = Request(
+        f"{endpoint}?{urlencode(params)}",
+        headers={
+            "User-Agent": APPLE_USER_AGENT,
+            "Accept": "application/json",
+        },
+    )
+    try:
+        return request_apple_json(
+            request,
+            timeout=TIMEOUT_SECONDS,
+        )
+    except AppleRequestError as error:
+        raise DirectAlbumLookupError(
+            f"Die direkte Apple-Abfrage ist fehlgeschlagen: {error}"
+        ) from error
+
+
+def _year_from_date(value: str) -> str:
+    return _year(value)
+
+
 def _lookup_apple_song(
     song_id: str,
     *,
@@ -795,12 +606,7 @@ def _lookup_apple_song(
                 "results",
                 [],
             )
-            if (
-                result.get("wrapperType")
-                == "track"
-                and result.get("kind")
-                == "song"
-            )
+            if (result.get("wrapperType") == "track" and result.get("kind") == "song")
         ),
         None,
     )
@@ -822,10 +628,8 @@ def _lookup_apple_song(
                     [],
                 )
                 if (
-                    result.get("wrapperType")
-                    == "track"
-                    and result.get("kind")
-                    == "song"
+                    result.get("wrapperType") == "track"
+                    and result.get("kind") == "song"
                 )
             ),
             None,
@@ -851,9 +655,7 @@ def _lookup_apple_song(
             )
         ),
         album_artist=str(
-            item.get(
-                "collectionArtistName"
-            )
+            item.get("collectionArtistName")
             or item.get(
                 "artistName",
                 "",
@@ -903,28 +705,22 @@ def _lookup_apple_song(
                 "",
             )
         ),
-        duration_ms=_optional_int(
-            item.get(
-                "trackTimeMillis"
-            )
-        ),
+        duration_ms=_optional_int(item.get("trackTimeMillis")),
         external_id=str(
             item.get(
                 "trackId",
                 "",
             )
         ),
+        preview_url=str(item.get("previewUrl") or ""),
     )
 
     return DirectAlbumResult(
         provider="apple_music",
         album=track.album,
-        album_artist=(
-            track.album_artist
-        ),
+        album_artist=(track.album_artist),
         tracks=(track,),
     )
-
 
 
 def find_apple_track_in_album(
@@ -939,27 +735,15 @@ def find_apple_track_in_album(
     Sucht einen Track per offizieller Lookup-API innerhalb einer bekannten
     Apple-Collection. Es findet kein Textabgleich statt.
     """
-    logger = get_diagnostic_logger(
-        "apple_music"
-    )
-    lookup = (
-        lookup_func
-        or lookup_apple_album_by_id
-    )
+    logger = get_diagnostic_logger("apple_music")
+    lookup = lookup_func or lookup_apple_album_by_id
     unique_countries: list[str] = []
 
     for country in countries:
-        normalized = str(
-            country
-        ).strip().upper()
+        normalized = str(country).strip().upper()
 
-        if (
-            normalized
-            and normalized not in unique_countries
-        ):
-            unique_countries.append(
-                normalized
-            )
+        if normalized and normalized not in unique_countries:
+            unique_countries.append(normalized)
 
     for country in unique_countries:
         try:
@@ -980,20 +764,10 @@ def find_apple_track_in_album(
             continue
 
         for track in result.tracks:
-            actual_track = _as_int(
-                track.track
-            )
-            actual_disc = (
-                _as_int(
-                    track.disc
-                )
-                or 1
-            )
+            actual_track = _as_int(track.track)
+            actual_disc = _as_int(track.disc) or 1
 
-            if (
-                actual_track == track_number
-                and actual_disc == disc_number
-            ):
+            if actual_track == track_number and actual_disc == disc_number:
                 logger.info(
                     "Exakte Nachsuche gefunden | Store=%s | "
                     "Collection-ID=%s | Disc=%s | Track=%s | "
@@ -1052,9 +826,7 @@ def _lookup_apple_album(
             }
         )
     )
-    logger = get_diagnostic_logger(
-        "apple_music"
-    )
+    logger = get_diagnostic_logger("apple_music")
     dump_path = _write_apple_lookup_dump(
         album_id,
         country,
@@ -1098,9 +870,7 @@ def _lookup_apple_album(
         dump_path,
     )
 
-    for index, item in enumerate(
-        results
-    ):
+    for index, item in enumerate(results):
         if not isinstance(
             item,
             dict,
@@ -1116,9 +886,7 @@ def _lookup_apple_album(
             )
             continue
 
-        wrapper_type = item.get(
-            "wrapperType"
-        )
+        wrapper_type = item.get("wrapperType")
         kind = item.get("kind")
         item_collection_id = str(
             item.get(
@@ -1126,18 +894,10 @@ def _lookup_apple_album(
                 "",
             )
         )
-        track_number = item.get(
-            "trackNumber"
-        )
-        disc_number = item.get(
-            "discNumber"
-        )
-        track_id = item.get(
-            "trackId"
-        )
-        track_name = item.get(
-            "trackName"
-        )
+        track_number = item.get("trackNumber")
+        disc_number = item.get("discNumber")
+        track_id = item.get("trackId")
+        track_name = item.get("trackName")
 
         logger.debug(
             "Apple-Eintrag | Index=%d | Store=%s | Collection-ID=%s | "
@@ -1153,12 +913,7 @@ def _lookup_apple_album(
             track_number,
             track_id,
             track_name,
-            ",".join(
-                sorted(
-                    str(key)
-                    for key in item.keys()
-                )
-            ),
+            ",".join(sorted(str(key) for key in item.keys())),
         )
 
         if wrapper_type == "collection":
@@ -1171,15 +926,9 @@ def _lookup_apple_album(
                     index,
                     country,
                     album_id,
-                    item.get(
-                        "collectionName"
-                    ),
-                    item.get(
-                        "artistName"
-                    ),
-                    item.get(
-                        "trackCount"
-                    ),
+                    item.get("collectionName"),
+                    item.get("artistName"),
+                    item.get("trackCount"),
                 )
             else:
                 logger.info(
@@ -1209,9 +958,7 @@ def _lookup_apple_album(
                 track_number,
                 track_id,
                 track_name,
-                "; ".join(
-                    rejection_reasons
-                ),
+                "; ".join(rejection_reasons),
             )
             continue
 
@@ -1283,23 +1030,20 @@ def _lookup_apple_album(
             album_artist=album_artist,
             album=album_name,
             genre=str(item.get("primaryGenreName", "")),
-            year=_year(
-                str(item.get("releaseDate", ""))
-            ),
+            year=_year(str(item.get("releaseDate", ""))),
             track=_number(item.get("trackNumber")),
             total_tracks=_number(item.get("trackCount")),
             disc=_number(item.get("discNumber")),
             total_discs=_number(item.get("discCount")),
             copyright=copyright_value,
-            duration_ms=_optional_int(
-                item.get("trackTimeMillis")
-            ),
+            duration_ms=_optional_int(item.get("trackTimeMillis")),
             external_id=str(
                 item.get(
                     "trackId",
                     "",
                 )
             ),
+            preview_url=str(item.get("previewUrl") or ""),
         )
         for item in track_items
     )
@@ -1330,19 +1074,13 @@ def _apple_track_rejection_reasons(
 ) -> list[str]:
     reasons: list[str] = []
 
-    if item.get(
-        "wrapperType"
-    ) != "track":
-        reasons.append(
-            "wrapperType ist nicht 'track'"
-        )
+    if item.get("wrapperType") != "track":
+        reasons.append("wrapperType ist nicht 'track'")
 
     kind = item.get("kind")
 
     if kind != "song":
-        reasons.append(
-            f"kind ist {kind!r} statt 'song'"
-        )
+        reasons.append(f"kind ist {kind!r} statt 'song'")
 
     item_collection_id = str(
         item.get(
@@ -1351,46 +1089,26 @@ def _apple_track_rejection_reasons(
         )
     )
 
-    if (
-        item_collection_id
-        and item_collection_id
-        != str(
-            requested_collection_id
-        )
-    ):
-        reasons.append(
-            "collectionId stimmt nicht"
-        )
+    if item_collection_id and item_collection_id != str(requested_collection_id):
+        reasons.append("collectionId stimmt nicht")
 
-    if item.get(
-        "trackNumber"
-    ) in (
+    if item.get("trackNumber") in (
         None,
         "",
     ):
-        reasons.append(
-            "trackNumber fehlt"
-        )
+        reasons.append("trackNumber fehlt")
 
-    if item.get(
-        "discNumber"
-    ) in (
+    if item.get("discNumber") in (
         None,
         "",
     ):
-        reasons.append(
-            "discNumber fehlt"
-        )
+        reasons.append("discNumber fehlt")
 
-    if item.get(
-        "trackId"
-    ) in (
+    if item.get("trackId") in (
         None,
         "",
     ):
-        reasons.append(
-            "trackId fehlt"
-        )
+        reasons.append("trackId fehlt")
 
     if not str(
         item.get(
@@ -1398,9 +1116,7 @@ def _apple_track_rejection_reasons(
             "",
         )
     ).strip():
-        reasons.append(
-            "trackName fehlt"
-        )
+        reasons.append("trackName fehlt")
 
     return reasons
 
@@ -1410,10 +1126,7 @@ def _write_apple_lookup_dump(
     country: str,
     payload: dict,
 ) -> Path:
-    dump_directory = (
-        cache_directory()
-        / "apple"
-    )
+    dump_directory = cache_directory() / "apple"
     dump_directory.mkdir(
         parents=True,
         exist_ok=True,
@@ -1428,13 +1141,7 @@ def _write_apple_lookup_dump(
         "_",
         str(country).upper(),
     )
-    dump_path = (
-        dump_directory
-        / (
-            f"lookup_{safe_album_id}_"
-            f"{safe_country}.json"
-        )
-    )
+    dump_path = dump_directory / (f"lookup_{safe_album_id}_{safe_country}.json")
 
     try:
         dump_path.write_text(
@@ -1447,9 +1154,7 @@ def _write_apple_lookup_dump(
             encoding="utf-8",
         )
     except OSError:
-        get_diagnostic_logger(
-            "apple_music"
-        ).exception(
+        get_diagnostic_logger("apple_music").exception(
             "Apple-Rohantwort konnte nicht gespeichert werden: %s",
             dump_path,
         )
@@ -1487,14 +1192,11 @@ def _resolve_release_group(
         )
     )
 
-    release_id = str(
-        releases[0].get("id", "")
-    )
+    release_id = str(releases[0].get("id", ""))
 
     if not release_id:
         raise DirectAlbumLookupError(
-            "Für die MusicBrainz Release Group konnte "
-            "kein Release bestimmt werden."
+            "Für die MusicBrainz Release Group konnte kein Release bestimmt werden."
         )
 
     return release_id
@@ -1504,9 +1206,54 @@ def lookup_musicbrainz_release_by_id(
     release_id: str,
 ) -> DirectAlbumResult:
     """Lädt die vollständige Trackliste eines MusicBrainz-Releases."""
-    return _lookup_musicbrainz_release(
-        release_id
-    )
+    return _lookup_musicbrainz_release(release_id)
+
+
+def apple_collection_id_from_musicbrainz_release(
+    release_id: str,
+) -> str | None:
+    """
+    Ermittelt die Apple-Music-collectionId über die URL-Relationen.
+
+    MusicBrainz verweist bei vielen Releases direkt auf die passende
+    Apple-Music-Albumseite. Aus dieser URL lässt sich die collectionId
+    ableiten, mit der anschließend die zuverlässige Lookup-Trackliste
+    geladen werden kann.
+    """
+    try:
+        payload = _get_json(
+            "https://musicbrainz.org/ws/2/release/"
+            f"{release_id}?"
+            + urlencode(
+                {
+                    "inc": "url-rels",
+                    "fmt": "json",
+                }
+            )
+        )
+    except DirectAlbumLookupError:
+        return None
+
+    for relation in payload.get("relations", []) or []:
+        resource = str(
+            (relation.get("url") or {}).get("resource") or ""
+        )
+
+        if "apple.com" not in resource:
+            continue
+
+        try:
+            reference = parse_album_reference(resource)
+        except DirectAlbumReferenceError:
+            continue
+
+        if (
+            reference.provider == "apple_music"
+            and reference.reference_type == "album"
+        ):
+            return reference.reference_id
+
+    return None
 
 
 def _lookup_musicbrainz_release(
@@ -1517,19 +1264,14 @@ def _lookup_musicbrainz_release(
         f"{release_id}?"
         + urlencode(
             {
-                "inc": (
-                    "recordings+artist-credits+labels+"
-                    "release-groups+media+isrcs"
-                ),
+                "inc": ("recordings+artist-credits+labels+release-groups+media+isrcs"),
                 "fmt": "json",
             }
         )
     )
 
     album_name = str(payload.get("title", ""))
-    album_artist = _artist_credit(
-        payload.get("artist-credit", [])
-    )
+    album_artist = _artist_credit(payload.get("artist-credit", []))
     year = _year(str(payload.get("date", "")))
 
     label = ""
@@ -1561,11 +1303,7 @@ def _lookup_musicbrainz_release(
 
             tracks.append(
                 DirectAlbumTrack(
-                    title=str(
-                        recording.get("title")
-                        or track.get("title")
-                        or ""
-                    ),
+                    title=str(recording.get("title") or track.get("title") or ""),
                     artist=_artist_credit(
                         recording.get(
                             "artist-credit",
@@ -1577,10 +1315,7 @@ def _lookup_musicbrainz_release(
                     album=album_name,
                     genre="",
                     year=year,
-                    track=_number(
-                        track.get("position")
-                        or track.get("number")
-                    ),
+                    track=_number(track.get("position") or track.get("number")),
                     total_tracks=total_tracks,
                     disc=str(medium_index),
                     total_discs=total_discs,
@@ -1603,9 +1338,11 @@ def _lookup_musicbrainz_release(
 
 
 def _get_json(url: str) -> dict:
-    is_musicbrainz = url.startswith(
-        "https://musicbrainz.org/"
-    )
+    cached = http_cache.load(url)
+    if cached is not None:
+        return cached
+
+    is_musicbrainz = url.startswith("https://musicbrainz.org/")
 
     if is_musicbrainz:
         wait_for_musicbrainz_slot()
@@ -1623,7 +1360,9 @@ def _get_json(url: str) -> dict:
             request,
             timeout=TIMEOUT_SECONDS,
         ) as response:
-            return json.load(response)
+            payload = json.load(response)
+        http_cache.store(url, payload)
+        return payload
     except (
         HTTPError,
         URLError,
@@ -1646,11 +1385,7 @@ def _artist_credit(value: list[dict]) -> str:
         for credit in value
     ]
 
-    return ", ".join(
-        name
-        for name in names
-        if name
-    )
+    return ", ".join(name for name in names if name)
 
 
 def _normalize(value: str) -> str:
@@ -1658,11 +1393,7 @@ def _normalize(value: str) -> str:
         "NFKD",
         value.casefold(),
     )
-    value = "".join(
-        char
-        for char in value
-        if not unicodedata.combining(char)
-    )
+    value = "".join(char for char in value if not unicodedata.combining(char))
     value = re.sub(
         r"\b(?:feat(?:uring)?|ft)\.?\b.*$",
         "",
