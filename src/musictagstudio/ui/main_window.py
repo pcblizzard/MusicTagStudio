@@ -2504,6 +2504,7 @@ class MainWindow(QMainWindow):
             songs,
             settings.apple_country,
             self,
+            language=self.language,
         )
 
         if (

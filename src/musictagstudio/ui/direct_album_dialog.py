@@ -35,6 +35,7 @@ from ..direct_references import (
     DirectAlbumReferenceError,
     parse_album_reference,
 )
+from ..i18n import tr
 from ..models.song import Song
 from ..icons import make_icon
 from ..player.preview import PreviewPlayer
@@ -79,9 +80,12 @@ class DirectAlbumDialog(QDialog):
         songs: list[Song],
         apple_country: str,
         parent=None,
+        *,
+        language: str = "automatic",
     ):
         super().__init__(parent)
 
+        self.language = language
         self.songs = songs
         self.apple_country = apple_country
         self.result = None
@@ -106,7 +110,7 @@ class DirectAlbumDialog(QDialog):
         )
 
         self.setWindowTitle(
-            "Album oder Song über Anbieter-Link laden"
+            tr("direct_album_title", language)
         )
         self.resize(
             1250,
@@ -116,11 +120,7 @@ class DirectAlbumDialog(QDialog):
         layout = QVBoxLayout(self)
 
         info = QLabel(
-            "MusicTagStudio erstellt zunächst eine vollständige "
-            "Eins-zu-eins-Zuordnung zwischen lokalen Dateien und "
-            "Albumtracks. Dateiname, Titel, Disc-/Tracknummer, Dauer "
-            "und Reihenfolge werden gemeinsam bewertet. Vor dem "
-            "Vergleich kannst du jede Zuordnung manuell ändern."
+            tr("direct_album_info", language)
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -128,10 +128,10 @@ class DirectAlbumDialog(QDialog):
         input_layout = QHBoxLayout()
         self.input_edit = QLineEdit()
         self.input_edit.setPlaceholderText(
-            "Apple-Music-Album-/Song-Link oder MusicBrainz-Release"
+            tr("direct_album_placeholder", language)
         )
         self.load_button = QPushButton(
-            "Metadaten laden"
+            tr("load_metadata_btn", language)
         )
         self.load_button.clicked.connect(
             self._load
@@ -146,7 +146,7 @@ class DirectAlbumDialog(QDialog):
         layout.addLayout(input_layout)
 
         self.status_label = QLabel(
-            "Noch kein Album geladen."
+            tr("no_album_loaded", language)
         )
         self.status_label.setWordWrap(True)
         layout.addWidget(
@@ -159,14 +159,14 @@ class DirectAlbumDialog(QDialog):
         )
         self.table.setHorizontalHeaderLabels(
             [
-                "Lokale Datei",
-                "Lokaler Titel",
-                "Lokaler Track",
-                "Zugeordneter Albumtrack",
-                "Quelltitel",
-                "Sicherheit",
-                "Begründung",
-                "Vorschau",
+                tr("col_local_file", language),
+                tr("col_local_title", language),
+                tr("col_local_track", language),
+                tr("col_mapped_track", language),
+                tr("col_source_title", language),
+                tr("col_confidence", language),
+                tr("col_reason", language),
+                tr("col_preview", language),
             ]
         )
         self.table.setEditTriggers(
@@ -224,10 +224,10 @@ class DirectAlbumDialog(QDialog):
 
         buttons = QDialogButtonBox()
         self.compare_button = QPushButton(
-            "Metadaten vergleichen"
+            tr("compare_metadata", language)
         )
         cancel = QPushButton(
-            "Abbrechen"
+            tr("cancel", language)
         )
         buttons.addButton(
             self.compare_button,
@@ -254,7 +254,7 @@ class DirectAlbumDialog(QDialog):
         except DirectAlbumReferenceError as error:
             QMessageBox.warning(
                 self,
-                "Ungültiger Album-Link",
+                tr("invalid_link_title", self.language),
                 str(error),
             )
             return
@@ -266,11 +266,8 @@ class DirectAlbumDialog(QDialog):
         ):
             QMessageBox.warning(
                 self,
-                "Song-Link benötigt eine Datei",
-                (
-                    "Bitte markiere genau eine lokale Datei, "
-                    "wenn du einen Apple-Music-Song-Link verwendest."
-                ),
+                tr("song_link_needs_file_title", self.language),
+                tr("song_link_needs_file_msg", self.language),
             )
             return
 
@@ -278,7 +275,7 @@ class DirectAlbumDialog(QDialog):
         self.load_button.setEnabled(False)
         self.compare_button.setEnabled(False)
         self.status_label.setText(
-            "Album und Trackliste werden geladen …"
+            tr("album_loading", self.language)
         )
 
         worker = LookupWorker(
@@ -324,7 +321,7 @@ class DirectAlbumDialog(QDialog):
             )
             combo = QComboBox()
             combo.addItem(
-                "Nicht zuordnen",
+                tr("do_not_map", self.language),
                 -1,
             )
 
@@ -332,10 +329,12 @@ class DirectAlbumDialog(QDialog):
                 result.tracks
             ):
                 combo.addItem(
-                    (
-                        f"Disc {track.disc or '1'} · "
-                        f"Track {track.track}: "
-                        f"{self._track_display(track)}"
+                    tr(
+                        "combo_track_line",
+                        self.language,
+                        disc=track.disc or "1",
+                        track=track.track,
+                        title=self._track_display(track, self.language),
                     ),
                     track_index,
                 )
@@ -360,7 +359,7 @@ class DirectAlbumDialog(QDialog):
             preview_button = QPushButton()
             self._set_preview_button_icon(preview_button, "play")
             preview_button.setToolTip(
-                "30-Sekunden-Vorschau des zugeordneten Albumtracks abspielen"
+                tr("preview_tip", self.language)
             )
             preview_button.clicked.connect(
                 lambda _checked=False, index=row: self._toggle_preview(index)
@@ -396,7 +395,7 @@ class DirectAlbumDialog(QDialog):
                 row,
                 4,
                 QTableWidgetItem(
-                    self._track_display(match.track)
+                    self._track_display(match.track, self.language)
                 ),
             )
             self.table.setItem(
@@ -428,39 +427,37 @@ class DirectAlbumDialog(QDialog):
         )
 
         self.status_label.setText(
-            (
-                f"{result.album_artist} – {result.album}: "
-                f"{automatic_count} von {len(self.songs)} "
-                "Dateien automatisch zugeordnet. "
-                f"{ambiguous_count} Zuordnung(en) sollten "
-                "kontrolliert werden."
-                f"{self._prerelease_note(result)}"
+            tr(
+                "mapping_summary",
+                self.language,
+                artist=result.album_artist,
+                album=result.album,
+                auto=automatic_count,
+                total=len(self.songs),
+                ambiguous=ambiguous_count,
+                note=self._prerelease_note(result, self.language),
             )
         )
 
     @staticmethod
-    def _track_display(track) -> str:
+    def _track_display(track, language: str = "automatic") -> str:
         """Titel plus Hinweis, wenn der Track noch nicht veröffentlicht ist.
 
         Bei Vorabveröffentlichungen liefert Apple für noch nicht erschienene
         Titel Platzhalter wie „Track 2"; diese werden hier gekennzeichnet.
         """
         if not getattr(track, "is_streamable", True):
-            return f"{track.title} · noch nicht veröffentlicht"
+            return tr("track_not_released", language, title=track.title)
         return str(track.title)
 
     @staticmethod
-    def _prerelease_note(result) -> str:
+    def _prerelease_note(result, language: str = "automatic") -> str:
         """Zusatzhinweis für Vorabveröffentlichungen (tagesgenaues Zukunftsdatum)."""
         release_date = getattr(result, "release_date", "")
         if not is_prerelease_date(release_date):
             return ""
         day = localized_date(release_date)
-        return (
-            f" · Vorabveröffentlichung (Release: {day}). Noch nicht "
-            "veröffentlichte Titel sind bei Apple als Platzhalter (Track N) "
-            "gelistet und aktualisieren sich beim erneuten Laden nach Erscheinen."
-        )
+        return tr("prerelease_note", language, day=day)
 
     def _manual_mapping_changed(self):
         if self.result is None:
@@ -490,7 +487,7 @@ class DirectAlbumDialog(QDialog):
                 row,
                 5,
                 QTableWidgetItem(
-                    "Nicht zugeordnet"
+                    tr("not_mapped", self.language)
                 ),
             )
         else:
@@ -501,14 +498,14 @@ class DirectAlbumDialog(QDialog):
                 row,
                 4,
                 QTableWidgetItem(
-                    self._track_display(track)
+                    self._track_display(track, self.language)
                 ),
             )
             self.table.setItem(
                 row,
                 5,
                 QTableWidgetItem(
-                    "Manuell bestätigt"
+                    tr("manually_confirmed", self.language)
                 ),
             )
 
@@ -631,18 +628,11 @@ class DirectAlbumDialog(QDialog):
                 )
             )
             self.status_label.setText(
-                (
-                    "Eine Eins-zu-eins-Zuordnung ist erforderlich. "
-                    "Diese Albumtracks wurden mehrfach gewählt: "
-                    + duplicate_text
-                )
+                tr("one_to_one_required", self.language, tracks=duplicate_text)
             )
         elif missing_rows:
             self.status_label.setText(
-                (
-                    f"{len(missing_rows)} lokale Datei(en) "
-                    "sind noch nicht zugeordnet."
-                )
+                tr("unmapped_files", self.language, count=len(missing_rows))
             )
 
     def _failed(
@@ -651,7 +641,7 @@ class DirectAlbumDialog(QDialog):
     ):
         self.load_button.setEnabled(True)
         self.status_label.setText(
-            f"Album konnte nicht geladen werden: {message}"
+            tr("album_load_failed", self.language, message=message)
         )
 
     def _accept(self):
@@ -662,11 +652,8 @@ class DirectAlbumDialog(QDialog):
         ):
             QMessageBox.warning(
                 self,
-                "Zuordnung unvollständig",
-                (
-                    "Vor dem Metadatenvergleich muss jede lokale "
-                    "Datei genau einem Albumtrack zugeordnet sein."
-                ),
+                tr("mapping_incomplete_title", self.language),
+                tr("mapping_incomplete_msg", self.language),
             )
             return
 
