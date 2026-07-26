@@ -46,6 +46,26 @@ def test_search_amazon_opens_query_with_artist_and_album(monkeypatch):
     widget.deleteLater()
 
 
+def test_search_amazon_falls_back_to_current_artist(monkeypatch):
+    # Veröffentlichung ohne eigenen Künstlernamen -> Künstler-Kontext nutzen.
+    _app()
+    widget = MediaLibraryWidget()
+    widget.current_artist_name = "Danger Dan"
+    widget.current_group = SimpleNamespace(
+        title="Keine Angst", artist="", release_group_id="x"
+    )
+
+    opened: list[str] = []
+    monkeypatch.setattr(
+        "musictagstudio.ui.media_library_widget.webbrowser.open",
+        lambda url: opened.append(url),
+    )
+
+    widget._search_amazon()
+    assert opened and "k=Danger+Dan+Keine+Angst" in opened[0]
+    widget.deleteLater()
+
+
 def test_search_amazon_without_group_is_noop(monkeypatch):
     _app()
     widget = MediaLibraryWidget()

@@ -3691,8 +3691,12 @@ class MediaLibraryWidget(QWidget):
         group = self.current_group
         if group is None:
             return
+        # Manche Veröffentlichungen liefern keinen eigenen Künstlernamen; dann
+        # den aktuellen Künstler-Kontext verwenden, damit immer nach
+        # „Künstler + Album" gesucht wird.
+        artist = group.artist or self.current_artist_name
         terms = " ".join(
-            part for part in (group.artist, group.title) if part
+            part for part in (artist, group.title) if part
         ).strip()
         if not terms:
             return
