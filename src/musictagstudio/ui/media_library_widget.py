@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -165,6 +166,33 @@ class Worker(QRunnable):
         self.signals.finished.emit(
             result
         )
+
+
+# Farbschema der Status-Chips (Text, Hintergrund) je lokalem Verfügbarkeits-
+# Status. Farben funktionieren sowohl auf hellem als auch dunklem Theme.
+_STATUS_CHIP_STYLES: dict[str, tuple[str, str, str]] = {
+    "Lokal verfügbar": ("Lokal verfügbar", "#ffffff", "#2e7d32"),
+    "Externe Quelle nicht erreichbar": (
+        "Quelle nicht erreichbar",
+        "#ffffff",
+        "#b26a00",
+    ),
+    "Nicht vorhanden": ("Nicht vorhanden", "#ffffff", "#5f6368"),
+    "Nein": ("Nicht vorhanden", "#ffffff", "#5f6368"),
+}
+
+
+def _status_chip(status: str) -> tuple[str, str]:
+    """Liefert (Beschriftung, Stylesheet) für den Status-Chip."""
+    text, fg, bg = _STATUS_CHIP_STYLES.get(
+        str(status or ""), _STATUS_CHIP_STYLES["Nicht vorhanden"]
+    )
+    style = (
+        f"QLabel#localStatusChip {{ color: {fg}; background: {bg};"
+        " border-radius: 8px; padding: 2px 10px; font-size: 11px;"
+        " font-weight: 600; }}"
+    )
+    return text, style
 
 
 def _resolve_deezer_previews(
@@ -652,6 +680,15 @@ class MediaLibraryWidget(QWidget):
             self.group_title
         )
 
+        # Status-Chip (Pille) statt Fließtext für die lokale Verfügbarkeit.
+        self.local_status_chip = QLabel("")
+        self.local_status_chip.setObjectName("localStatusChip")
+        chip_row = QHBoxLayout()
+        chip_row.setContentsMargins(0, 0, 0, 0)
+        chip_row.addWidget(self.local_status_chip)
+        chip_row.addStretch()
+        detail_text.addLayout(chip_row)
+
         self.group_meta = QLabel("")
         self.group_meta.setWordWrap(
             True
@@ -684,7 +721,6 @@ class MediaLibraryWidget(QWidget):
             detail_header
         )
 
-        service_row = QHBoxLayout()
         self.streaming_button = QPushButton(
             "Streaming prüfen"
         )
@@ -722,23 +758,22 @@ class MediaLibraryWidget(QWidget):
         self.spotify_button.clicked.connect(
             lambda: self._open_streaming_provider(self.spotify_button)
         )
-        service_row.addWidget(
-            self.streaming_button
-        )
-        service_row.addWidget(
-            self.quality_button
-        )
-        service_row.addWidget(
-            self.apple_button
-        )
-        detail_layout.addLayout(
-            service_row
-        )
-        provider_row = QHBoxLayout()
-        provider_row.addStretch()
-        provider_row.addWidget(self.tidal_button)
-        provider_row.addWidget(self.spotify_button)
-        detail_layout.addLayout(provider_row)
+        # Gruppe "Prüfen": Streaming-/Qualitätsabfragen.
+        check_group = QGroupBox("Prüfen")
+        check_layout = QHBoxLayout(check_group)
+        check_layout.setContentsMargins(8, 4, 8, 8)
+        check_layout.addWidget(self.streaming_button)
+        check_layout.addWidget(self.quality_button)
+        detail_layout.addWidget(check_group)
+
+        # Gruppe "Auf Dienst öffnen": Album beim jeweiligen Anbieter aufrufen.
+        service_group = QGroupBox("Auf Dienst öffnen")
+        service_layout = QHBoxLayout(service_group)
+        service_layout.setContentsMargins(8, 4, 8, 8)
+        service_layout.addWidget(self.apple_button)
+        service_layout.addWidget(self.tidal_button)
+        service_layout.addWidget(self.spotify_button)
+        detail_layout.addWidget(service_group)
 
         self.streaming_status = QLabel(
             "Streaming und Qualität wurden nicht abgefragt."
@@ -811,10 +846,13 @@ class MediaLibraryWidget(QWidget):
         self.enqueue_local_button.clicked.connect(
             self._enqueue_local_album
         )
-        local_actions = QHBoxLayout()
+        # Gruppe "Lokal": Aktionen für die lokal vorhandene Kopie.
+        local_group = QGroupBox("Lokal")
+        local_actions = QHBoxLayout(local_group)
+        local_actions.setContentsMargins(8, 4, 8, 8)
         local_actions.addWidget(self.open_local_button, 1)
         local_actions.addWidget(self.enqueue_local_button)
-        detail_layout.addLayout(local_actions)
+        detail_layout.addWidget(local_group)
 
         metadata_scroll = QScrollArea()
         metadata_scroll.setObjectName("releaseMetadataScroll")
@@ -1190,6 +1228,8 @@ class MediaLibraryWidget(QWidget):
         self.open_local_button.setProperty("local_path", "")
         self.open_local_button.setEnabled(False)
         self.enqueue_local_button.setEnabled(False)
+        self.local_status_chip.clear()
+        self.local_status_chip.setStyleSheet("")
         self._show_cover(None)
         self.group_title.setText(
             tr("search_running", self.language)
@@ -2123,7 +2163,10 @@ class MediaLibraryWidget(QWidget):
             group.title,
             group.release_group_id,
         )
-        self.group_meta.setText(" · ".join(v for v in (_type_text(group),group.first_release_date or "Datum unbekannt",_local_status_display(status)) if v))
+        self.group_meta.setText(" · ".join(v for v in (_type_text(group),group.first_release_date or "Datum unbekannt") if v))
+        chip_text, chip_style = _status_chip(status)
+        self.local_status_chip.setText(chip_text)
+        self.local_status_chip.setStyleSheet(chip_style)
         self._render_source_details(group, status)
         self.open_local_button.setProperty(
             "local_path",

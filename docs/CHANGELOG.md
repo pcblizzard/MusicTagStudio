@@ -1,5 +1,20 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Aufgeräumte Oberfläche: Nav-Icons, gruppiertes Detail-Panel, Status-Chips
+
+- Die Navigationsleiste links bekommt einheitliche SVG-Icons
+  (Startseite/Tagger/Medienbibliothek/Audio-Analyse/Bibliotheksprüfung sowie
+  „Song über Text finden") in der Palette-Farbe.
+- Das Detail-Panel der Medienbibliothek ordnet die Knöpfe jetzt in klare
+  Gruppen: **Prüfen** (Streaming/Qualität), **Auf Dienst öffnen**
+  (Apple Music/TIDAL/Spotify) und **Lokal** (im Tagger öffnen/Warteschlange).
+- Die lokale Verfügbarkeit erscheint als farbiger Status-Chip
+  (grün „Lokal verfügbar", orange „Quelle nicht erreichbar",
+  grau „Nicht vorhanden") statt als Fließtext.
+- Ein neuer Smoke-Test prüft, dass alle Werkzeugleisten-Knöpfe eindeutige,
+  nicht-leere Beschriftungen und keine doppelten Tooltips haben – so fällt ein
+  Beschriftungsfehler künftig sofort auf.
+
 ## Zufallswiedergabe: eigenes Icon je Modus
 
 - „Mit Verlauf“ und „Immer neu auslosen“ teilten sich in der Wiedergabe-Leiste

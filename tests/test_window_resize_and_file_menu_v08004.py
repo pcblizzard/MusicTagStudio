@@ -27,7 +27,7 @@ def test_settings_is_not_in_sidebar_and_remains_in_file_menu():
 
     workspace_block = text[
         text.index("workspace_pages = ("):
-        text.index("for name, index in workspace_pages")
+        text.index("for name, index, icon_name in workspace_pages")
     ]
     assert '("Einstellungen", 4)' not in workspace_block
     assert 'tr("settings", self.language)' in text
