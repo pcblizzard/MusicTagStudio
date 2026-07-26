@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
 from ..library_audit.checker import (
     audit_library,
 )
@@ -89,9 +90,11 @@ class LibraryAuditDialog(QDialog):
         parent=None,
         *,
         embedded: bool = False,
+        language: str = "automatic",
     ):
         super().__init__(parent)
 
+        self.language = language
         self.embedded = embedded
         self.selected_songs = selected_songs
         self.all_songs = all_songs
@@ -104,7 +107,7 @@ class LibraryAuditDialog(QDialog):
 
         if not self.embedded:
             self.setWindowTitle(
-                "Bibliotheksprüfung"
+                tr("library_audit", language)
             )
             self.resize(
                 1350,
@@ -118,7 +121,7 @@ class LibraryAuditDialog(QDialog):
         layout = QVBoxLayout(self)
 
         self.status_label = QLabel(
-            "Noch keine Prüfung durchgeführt."
+            tr("audit_not_run", language)
         )
         self.status_label.setWordWrap(True)
         layout.addWidget(
@@ -127,19 +130,19 @@ class LibraryAuditDialog(QDialog):
 
         self.filter_combo = QComboBox()
         self.filter_combo.addItem(
-            "Alle Hinweise",
+            tr("filter_all", language),
             "all",
         )
         self.filter_combo.addItem(
-            "Nur Fehler",
+            tr("filter_errors", language),
             "error",
         )
         self.filter_combo.addItem(
-            "Nur Warnungen",
+            tr("filter_warnings", language),
             "warning",
         )
         self.filter_combo.addItem(
-            "Nur Informationen",
+            tr("filter_info", language),
             "info",
         )
         self.filter_combo.currentIndexChanged.connect(
@@ -150,10 +153,7 @@ class LibraryAuditDialog(QDialog):
         )
 
         self.selected_button = QPushButton(
-            (
-                "Markierte Titel prüfen "
-                f"({len(selected_songs)})"
-            )
+            tr("check_selected", language, count=len(selected_songs))
         )
         self.selected_button.clicked.connect(
             lambda:
@@ -169,10 +169,7 @@ class LibraryAuditDialog(QDialog):
         )
 
         self.all_button = QPushButton(
-            (
-                "Alle gescannten Titel prüfen "
-                f"({len(all_songs)})"
-            )
+            tr("check_all", language, count=len(all_songs))
         )
         self.all_button.clicked.connect(
             lambda:
@@ -193,13 +190,13 @@ class LibraryAuditDialog(QDialog):
         self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels(
             [
-                "Stufe",
-                "Kategorie",
-                "Album",
-                "Titel",
-                "Meldung",
-                "Datei",
-                "Details",
+                tr("col_level", language),
+                tr("col_category", language),
+                tr("col_album", language),
+                tr("col_title", language),
+                tr("col_message", language),
+                tr("col_file", language),
+                tr("col_details", language),
             ]
         )
         self.table.setEditTriggers(
@@ -236,7 +233,7 @@ class LibraryAuditDialog(QDialog):
             details_widget
         )
         details_layout.addWidget(
-            QLabel("Details")
+            QLabel(tr("col_details", language))
         )
         self.details = QPlainTextEdit()
         self.details.setReadOnly(True)
@@ -277,15 +274,13 @@ class LibraryAuditDialog(QDialog):
         self.selected_songs = list(selected_songs)
         self.all_songs = list(all_songs)
         self.selected_button.setText(
-            "Markierte Titel prüfen "
-            f"({len(self.selected_songs)})"
+            tr("check_selected", self.language, count=len(self.selected_songs))
         )
         self.selected_button.setEnabled(
             bool(self.selected_songs)
         )
         self.all_button.setText(
-            "Alle gescannten Titel prüfen "
-            f"({len(self.all_songs)})"
+            tr("check_all", self.language, count=len(self.all_songs))
         )
         self.all_button.setEnabled(
             bool(self.all_songs)
@@ -299,7 +294,7 @@ class LibraryAuditDialog(QDialog):
             return
 
         self.status_label.setText(
-            "Bibliothek wird geprüft …"
+            tr("audit_running", self.language)
         )
         self.table.setRowCount(0)
         self.details.clear()
@@ -319,13 +314,15 @@ class LibraryAuditDialog(QDialog):
     ):
         self.summary = summary
         self.status_label.setText(
-            (
-                f"{summary.checked_files} Dateien · "
-                f"{summary.checked_albums} Alben · "
-                f"{summary.error_count} Fehler · "
-                f"{summary.warning_count} Warnungen · "
-                f"{summary.info_count} Informationen · "
-                f"Gesundheit {summary.health_score}/100"
+            tr(
+                "audit_summary",
+                self.language,
+                files=summary.checked_files,
+                albums=summary.checked_albums,
+                errors=summary.error_count,
+                warnings=summary.warning_count,
+                info=summary.info_count,
+                health=summary.health_score,
             )
         )
         self.refresh_table()
@@ -335,8 +332,7 @@ class LibraryAuditDialog(QDialog):
         message: str,
     ):
         self.status_label.setText(
-            "Prüfung fehlgeschlagen: "
-            + message
+            tr("audit_failed_status", self.language, message=message)
         )
 
     def refresh_table(self):
@@ -365,7 +361,8 @@ class LibraryAuditDialog(QDialog):
         ):
             values = [
                 severity_label(
-                    issue.severity
+                    issue.severity,
+                    self.language,
                 ),
                 issue.category,
                 issue.album_display,
@@ -373,7 +370,7 @@ class LibraryAuditDialog(QDialog):
                 issue.message,
                 issue.path,
                 (
-                    "Vorhanden"
+                    tr("master_present", self.language)
                     if issue.details
                     else ""
                 ),
@@ -412,17 +409,18 @@ class LibraryAuditDialog(QDialog):
 
         details = items[0].data(32)
         self.details.setPlainText(
-            details or "Keine weiteren Details."
+            details or tr("no_details", self.language)
         )
 
 
 def severity_label(
     severity: str,
+    language: str = "automatic",
 ) -> str:
     return {
-        "error": "Fehler",
-        "warning": "Warnung",
-        "info": "Info",
+        "error": tr("severity_error", language),
+        "warning": tr("severity_warning", language),
+        "info": tr("severity_info", language),
     }.get(
         severity,
         severity,

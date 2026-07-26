@@ -659,6 +659,7 @@ class MainWindow(QMainWindow):
             [],
             self,
             embedded=True,
+            language=self.language,
         )
         self.workspace_stack.addWidget(
             self.library_audit_workspace
