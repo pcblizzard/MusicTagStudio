@@ -229,6 +229,43 @@ def test_shuffle_modes_use_distinct_icons():
     )
 
 
+def test_player_error_uses_status_channel_not_title(monkeypatch):
+    class EmptySettings:
+        def __init__(self, *_args):
+            self.values = {}
+
+        def value(self, key, default=None):
+            return self.values.get(key, default)
+
+        def setValue(self, key, value):
+            self.values[key] = value
+
+        def remove(self, key):
+            self.values.pop(key, None)
+
+    monkeypatch.setattr(
+        "musictagstudio.player.widget.QSettings",
+        EmptySettings,
+    )
+    app = QApplication.instance() or QApplication([])
+    from musictagstudio.player.widget import PlayerBar
+
+    bar = PlayerBar()
+    before = bar.title_label.text()
+
+    events: list[tuple[str, int]] = []
+    bar.status_requested.connect(lambda msg, timeout: events.append((msg, timeout)))
+
+    bar._show_error("Die Audiodatei konnte nicht abgespielt werden.")
+
+    # Fehler geht in den Statuskanal, nicht in den Titel.
+    assert events == [("Die Audiodatei konnte nicht abgespielt werden.", 6000)]
+    assert bar.title_label.text() == before
+    bar.close()
+    bar.deleteLater()
+    app.processEvents()
+
+
 def test_queue_dialog_has_one_row_per_song_and_all_actions():
     app = QApplication.instance() or QApplication([])
     engine = PlayerEngine()

@@ -1,5 +1,12 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Einheitlicher Fehlerkanal für die Wiedergabe
+
+- Fehler beim Abspielen (z. B. nicht gefundene oder defekte Datei) überschreiben
+  nicht länger den angezeigten Titel in der Wiedergabe-Leiste, sondern erscheinen
+  als transiente Meldung in der App-Statusleiste – konsistent mit den übrigen
+  Statusmeldungen und nach einigen Sekunden automatisch wieder ausgeblendet.
+
 ## Warteschlange bleibt über Neustarts erhalten
 
 - Die Wiedergabe-Warteschlange (Titelliste und aktueller Titel) wird beim

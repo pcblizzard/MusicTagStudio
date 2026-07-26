@@ -814,6 +814,11 @@ class MainWindow(QMainWindow):
         self.player_bar.engine.song_changed.connect(
             self._player_song_changed
         )
+        # Einheitlicher Fehlerkanal: transiente Player-Meldungen in der
+        # Statusleiste anzeigen (statt im Titel-Label).
+        self.player_bar.status_requested.connect(
+            self._show_player_status
+        )
         self.play_pause_shortcut = QShortcut(
             QKeySequence(Qt.Key.Key_Space),
             self,
@@ -3231,6 +3236,10 @@ class MainWindow(QMainWindow):
         self.cover_label.setText(
             "Kein Cover vorhanden"
         )
+
+    def _show_player_status(self, message: str, timeout: int) -> None:
+        """Zeigt eine transiente Player-Meldung in der Statusleiste an."""
+        self.statusBar().showMessage(message, timeout)
 
     def closeEvent(self, event: QCloseEvent):
         if self.confirm_pending_changes():

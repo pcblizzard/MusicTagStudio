@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QSettings, QSize, Qt
+from PySide6.QtCore import QEvent, QSettings, QSize, Qt, Signal
 from PySide6.QtGui import QPalette, QPixmap
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import (
@@ -28,7 +28,16 @@ from .queue_dialog import QueueDialog
 from ..services.cover import load_cover
 
 
+# Anzeigedauer transienter Player-Fehlermeldungen in der App-Statusleiste.
+PLAYER_ERROR_TIMEOUT_MS = 6000
+
+
 class PlayerBar(QWidget):
+    # Einheitlicher Fehler-/Statuskanal: die Leiste meldet transiente Fehler
+    # (z. B. nicht abspielbare Datei) an die App, die sie in der Statusleiste
+    # anzeigt – statt den angezeigten Titel zu überschreiben.
+    status_requested = Signal(str, int)
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.engine = PlayerEngine(self)
@@ -507,5 +516,7 @@ class PlayerBar(QWidget):
         self.settings.setValue("player/volume", value)
 
     def _show_error(self, message: str) -> None:
-        self.title_label.setText(message)
+        # Transient über die App-Statusleiste melden, ohne den angezeigten
+        # Titel dauerhaft zu überschreiben.
+        self.status_requested.emit(message, PLAYER_ERROR_TIMEOUT_MS)
         self._set_play_icon(False)
