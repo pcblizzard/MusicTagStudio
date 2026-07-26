@@ -649,6 +649,7 @@ class MainWindow(QMainWindow):
             [],
             self,
             embedded=True,
+            language=self.language,
         )
         self.workspace_stack.addWidget(
             self.audio_analysis_workspace

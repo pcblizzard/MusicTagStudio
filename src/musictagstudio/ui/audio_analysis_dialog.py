@@ -66,6 +66,7 @@ from ..audio_analysis.spectrogram import (
     SpectrogramError,
     render_spectrogram,
 )
+from ..i18n import tr
 from ..models.song import Song
 from ..settings import load_settings
 
@@ -121,9 +122,11 @@ class AnalysisWorker(QObject):
         calculate_album_gain: bool,
         max_workers: int,
         force_refresh: bool,
+        language: str = "automatic",
     ):
         super().__init__()
 
+        self.language = language
         self.songs = songs
         self.installation = installation
         self.calculate_album_gain = (
@@ -152,11 +155,7 @@ class AnalysisWorker(QObject):
             ] = {}
 
             self.log_message.emit(
-                (
-                    "Analyse gestartet\n"
-                    f"Parallele FFmpeg-Prozesse: "
-                    f"{self.max_workers}\n"
-                )
+                tr("log_started", self.language, workers=self.max_workers)
             )
 
             uncached_songs: list[Song] = []
@@ -187,17 +186,14 @@ class AnalysisWorker(QObject):
                 self.progress.emit(
                     completed_count,
                     total,
-                    (
-                        "Aus Cache geladen: "
-                        f"{Path(song.path).name}"
+                    tr(
+                        "log_from_cache_progress",
+                        self.language,
+                        name=Path(song.path).name,
                     ),
                 )
                 self.log_message.emit(
-                    (
-                        "✓ "
-                        f"{Path(song.path).name}\n"
-                        "  Aus Analyse-Cache geladen"
-                    )
+                    tr("log_from_cache", self.language, name=Path(song.path).name)
                 )
 
             if (
@@ -245,19 +241,21 @@ class AnalysisWorker(QObject):
 
                             if result.peak_status == "critical":
                                 marker = "✗"
-                                detail = (
-                                    "Kritischer True Peak: "
-                                    f"{result.true_peak_db:.2f} dBTP"
+                                detail = tr(
+                                    "peak_critical_log",
+                                    self.language,
+                                    value=f"{result.true_peak_db:.2f}",
                                 )
                             elif result.peak_status == "elevated":
                                 marker = "⚠"
-                                detail = (
-                                    "Erhöhter True Peak: "
-                                    f"{result.true_peak_db:.2f} dBTP"
+                                detail = tr(
+                                    "peak_elevated_log",
+                                    self.language,
+                                    value=f"{result.true_peak_db:.2f}",
                                 )
                             else:
                                 marker = "✓"
-                                detail = "Unauffällig"
+                                detail = tr("peak_unremarkable", self.language)
 
                             self.log_message.emit(
                                 (
@@ -344,9 +342,11 @@ class AnalysisWorker(QObject):
                             ),
                         )
                         self.log_message.emit(
-                            (
-                                "✓ Album-ReplayGain aus Cache\n"
-                                f"  {key[0]} – {key[1]}"
+                            tr(
+                                "log_album_rg_cache",
+                                self.language,
+                                artist=key[0],
+                                album=key[1],
                             )
                         )
                         continue
@@ -354,15 +354,19 @@ class AnalysisWorker(QObject):
                     self.progress.emit(
                         completed_count,
                         total,
-                        (
-                            "Album-ReplayGain: "
-                            f"{key[0]} – {key[1]}"
+                        tr(
+                            "progress_album_rg",
+                            self.language,
+                            artist=key[0],
+                            album=key[1],
                         ),
                     )
                     self.log_message.emit(
-                        (
-                            "• Berechne Album-ReplayGain\n"
-                            f"  {key[0]} – {key[1]}"
+                        tr(
+                            "log_album_rg_calc",
+                            self.language,
+                            artist=key[0],
+                            album=key[1],
                         )
                     )
 
@@ -394,9 +398,9 @@ class AnalysisWorker(QObject):
                 total,
                 total,
                 (
-                    "Analyse abgebrochen"
+                    tr("analysis_cancelled_progress", self.language)
                     if self.cancel_event.is_set()
-                    else "Analyse abgeschlossen"
+                    else tr("analysis_done_progress", self.language)
                 ),
             )
             self.finished.emit()
@@ -460,9 +464,11 @@ class AudioAnalysisDialog(QDialog):
         parent=None,
         *,
         embedded: bool = False,
+        language: str = "automatic",
     ):
         super().__init__(parent)
 
+        self.language = language
         self.embedded = embedded
         self.selected_songs = selected_songs
         self.all_songs = all_songs
@@ -490,7 +496,7 @@ class AudioAnalysisDialog(QDialog):
 
         if not self.embedded:
             self.setWindowTitle(
-                "Audio-Analyse"
+                tr("audio_analysis", language)
             )
             self.resize(
                 1500,
@@ -504,18 +510,15 @@ class AudioAnalysisDialog(QDialog):
         layout = QVBoxLayout(self)
 
         if self.installation.available:
-            status_text = (
-                "FFmpeg gefunden: "
-                f"{self.installation.version}\n"
-                f"{self.installation.ffmpeg_path}\n"
-                f"Parallele Analysen: "
-                f"{self.max_workers}"
+            status_text = tr(
+                "ffmpeg_found",
+                language,
+                version=self.installation.version,
+                path=self.installation.ffmpeg_path,
+                workers=self.max_workers,
             )
         else:
-            status_text = (
-                "FFmpeg und ffprobe wurden nicht gefunden. "
-                "Die Analyse ist erst nach der Einrichtung verfügbar."
-            )
+            status_text = tr("ffmpeg_missing_long", language)
 
         self.status_label = QLabel(
             status_text
@@ -529,7 +532,7 @@ class AudioAnalysisDialog(QDialog):
         )
 
         self.statistics_label = QLabel(
-            "Noch keine Analyse durchgeführt."
+            tr("analysis_not_run", language)
         )
         self.statistics_label.setWordWrap(True)
         layout.addWidget(
@@ -537,28 +540,26 @@ class AudioAnalysisDialog(QDialog):
         )
 
         self.album_gain_checkbox = QCheckBox(
-            "Album-ReplayGain gemeinsam berechnen"
+            tr("album_rg_together", language)
         )
         self.album_gain_checkbox.setChecked(
             True
         )
         self.album_gain_checkbox.setToolTip(
-            "Analysiert alle ausgewählten Titel eines Albums "
-            "zusätzlich als zusammenhängendes Album."
+            tr("album_rg_tip", language)
         )
         layout.addWidget(
             self.album_gain_checkbox
         )
 
         self.force_refresh_checkbox = QCheckBox(
-            "Analyse-Cache ignorieren und neu berechnen"
+            tr("ignore_cache", language)
         )
         self.force_refresh_checkbox.setChecked(
             False
         )
         self.force_refresh_checkbox.setToolTip(
-            "Unveränderte Dateien werden normalerweise aus dem "
-            "lokalen Analyse-Cache geladen."
+            tr("ignore_cache_tip", language)
         )
         layout.addWidget(
             self.force_refresh_checkbox
@@ -570,10 +571,7 @@ class AudioAnalysisDialog(QDialog):
         )
 
         self.selected_button = QPushButton(
-            (
-                f"Markierte Titel analysieren "
-                f"({len(selected_songs)})"
-            )
+            tr("analyze_selected", language, count=len(selected_songs))
         )
         self.selected_button.clicked.connect(
             lambda:
@@ -583,10 +581,7 @@ class AudioAnalysisDialog(QDialog):
         )
 
         self.all_button = QPushButton(
-            (
-                f"Alle gescannten Titel analysieren "
-                f"({len(all_songs)})"
-            )
+            tr("analyze_all", language, count=len(all_songs))
         )
         self.all_button.clicked.connect(
             lambda:
@@ -596,7 +591,7 @@ class AudioAnalysisDialog(QDialog):
         )
 
         self.cancel_button = QPushButton(
-            "Analyse abbrechen"
+            tr("cancel_analysis_btn", language)
         )
         self.cancel_button.clicked.connect(
             self.cancel_analysis
@@ -636,19 +631,19 @@ class AudioAnalysisDialog(QDialog):
 
         self.tabs.addTab(
             self.track_table,
-            "Titelanalyse",
+            tr("tab_track_analysis", language),
         )
         self.tabs.addTab(
             self.album_table,
-            "Albumvergleich",
+            tr("tab_album_compare", language),
         )
         self.tabs.addTab(
             self.spectrogram_tab,
-            "Spektrogramm",
+            tr("tab_spectrogram", language),
         )
         self.tabs.addTab(
             self.log_output,
-            "Verlauf",
+            tr("tab_log", language),
         )
         layout.addWidget(
             self.tabs
@@ -662,7 +657,7 @@ class AudioAnalysisDialog(QDialog):
         )
 
         self.write_button = QPushButton(
-            "ReplayGain-Tags schreiben"
+            tr("write_rg_tags", language)
         )
         self.write_button.clicked.connect(
             self.write_replaygain
@@ -679,7 +674,7 @@ class AudioAnalysisDialog(QDialog):
         close_buttons.button(
             QDialogButtonBox.StandardButton.Close
         ).setText(
-            "Schließen"
+            tr("close_btn", language)
         )
 
         layout.addWidget(
@@ -709,45 +704,41 @@ class AudioAnalysisDialog(QDialog):
     ) -> QTableWidget:
         table = QTableWidget()
         table.setColumnCount(16)
+        lang = self.language
         table.setHorizontalHeaderLabels(
             [
-                "Datei",
-                "Codec",
-                "Rate",
-                "Bit",
-                "Kanäle",
-                "Bitrate",
-                "Dauer",
-                "LUFS",
-                "LRA",
-                "True Peak",
-                "Peak-Hinweis",
-                "Track Gain",
-                "Track Peak",
-                "Album Gain",
-                "Album Peak",
-                "Quelle",
+                tr("col_file", lang),
+                tr("col_codec", lang),
+                tr("col_rate", lang),
+                tr("col_bit", lang),
+                tr("col_channels", lang),
+                tr("col_bitrate", lang),
+                tr("col_duration", lang),
+                tr("col_lufs", lang),
+                tr("col_lra", lang),
+                tr("col_true_peak", lang),
+                tr("col_peak_note", lang),
+                tr("col_track_gain", lang),
+                tr("col_track_peak", lang),
+                tr("col_album_gain", lang),
+                tr("col_album_peak", lang),
+                tr("col_source", lang),
             ]
         )
         true_peak_header = table.horizontalHeaderItem(9)
         if true_peak_header is not None:
             true_peak_header.setToolTip(
-                "True Peak berücksichtigt auch Spitzen zwischen den "
-                "digitalen Abtastwerten. Deshalb kann der Sample Peak "
-                "unauffällig sein, während der True Peak eine mögliche "
-                "Übersteuerung anzeigt."
+                tr("true_peak_tip", lang)
             )
         peak_status_header = table.horizontalHeaderItem(10)
         if peak_status_header is not None:
             peak_status_header.setToolTip(
-                "Einordnung des True Peak: bis +1 dBTP unauffällig, "
-                "über +1 bis +2 dBTP erhöht und über +2 dBTP kritisch."
+                tr("peak_status_tip", lang)
             )
         track_peak_header = table.horizontalHeaderItem(12)
         if track_peak_header is not None:
             track_peak_header.setToolTip(
-                "Linearer ReplayGain-Spitzenwert, der aus dem gemessenen "
-                "True Peak berechnet wird."
+                tr("track_peak_tip", lang)
             )
         table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
@@ -778,19 +769,20 @@ class AudioAnalysisDialog(QDialog):
     ) -> QTableWidget:
         table = QTableWidget()
         table.setColumnCount(11)
+        lang = self.language
         table.setHorizontalHeaderLabels(
             [
-                "Album",
-                "Titel",
-                "Mehrheit",
-                "Ø Bitrate",
-                "Ø LUFS",
-                "Album Gain",
-                "Album Peak",
-                "Technische Abweichungen",
-                "Peak-Hinweise",
-                "Nicht analysiert",
-                "Gesundheit",
+                tr("col_album", lang),
+                tr("col_title", lang),
+                tr("col_majority", lang),
+                tr("col_avg_bitrate", lang),
+                tr("col_avg_lufs", lang),
+                tr("col_album_gain", lang),
+                tr("col_album_peak", lang),
+                tr("col_tech_outliers", lang),
+                tr("col_peak_notes", lang),
+                tr("col_not_analyzed", lang),
+                tr("col_health", lang),
             ]
         )
         table.setEditTriggers(
@@ -820,8 +812,7 @@ class AudioAnalysisDialog(QDialog):
         container_layout.setContentsMargins(0, 0, 0, 0)
 
         self.spectrogram_status = QLabel(
-            "Einen analysierten Titel markieren, um das "
-            "Spektrogramm anzuzeigen."
+            tr("spectrogram_hint", self.language)
         )
         self.spectrogram_status.setWordWrap(True)
         container_layout.addWidget(
@@ -881,15 +872,13 @@ class AudioAnalysisDialog(QDialog):
             self._spectrogram_shown_source = None
             self.spectrogram_view.clear()
             self.spectrogram_status.setText(
-                "Einen analysierten Titel markieren, um das "
-                "Spektrogramm anzuzeigen."
+                tr("spectrogram_hint", self.language)
             )
             return
 
         if not self.installation.available:
             self.spectrogram_status.setText(
-                "FFmpeg ist nicht verfügbar. Das Spektrogramm "
-                "kann nicht erzeugt werden."
+                tr("spectrogram_ffmpeg_missing", self.language)
             )
             return
 
@@ -898,7 +887,7 @@ class AudioAnalysisDialog(QDialog):
 
         self._spectrogram_source = path
         self.spectrogram_status.setText(
-            f"Spektrogramm wird erstellt: {Path(path).name} …"
+            tr("spectrogram_creating", self.language, name=Path(path).name)
         )
 
         task = _SpectrogramTask(
@@ -928,8 +917,7 @@ class AudioAnalysisDialog(QDialog):
 
         if pixmap.isNull():
             self.spectrogram_status.setText(
-                "Das erzeugte Spektrogramm konnte nicht "
-                "geladen werden."
+                tr("spectrogram_load_failed", self.language)
             )
             return
 
@@ -940,7 +928,7 @@ class AudioAnalysisDialog(QDialog):
             pixmap.size()
         )
         self.spectrogram_status.setText(
-            f"Spektrogramm: {Path(source_path).name}"
+            tr("spectrogram_ready", self.language, name=Path(source_path).name)
         )
 
     @Slot(str, str)
@@ -954,7 +942,7 @@ class AudioAnalysisDialog(QDialog):
 
         self.spectrogram_view.clear()
         self.spectrogram_status.setText(
-            f"Spektrogramm fehlgeschlagen: {message}"
+            tr("spectrogram_failed", self.language, message=message)
         )
 
     def set_songs(
@@ -966,8 +954,7 @@ class AudioAnalysisDialog(QDialog):
         self.all_songs = list(all_songs)
         running = self._thread_is_running()
         self.selected_button.setText(
-            "Markierte Titel analysieren "
-            f"({len(self.selected_songs)})"
+            tr("analyze_selected", self.language, count=len(self.selected_songs))
         )
         self.selected_button.setEnabled(
             bool(self.selected_songs)
@@ -975,8 +962,7 @@ class AudioAnalysisDialog(QDialog):
             and not running
         )
         self.all_button.setText(
-            "Alle gescannten Titel analysieren "
-            f"({len(self.all_songs)})"
+            tr("analyze_all", self.language, count=len(self.all_songs))
         )
         self.all_button.setEnabled(
             bool(self.all_songs)
@@ -994,8 +980,8 @@ class AudioAnalysisDialog(QDialog):
         if not self.installation.available:
             QMessageBox.warning(
                 self,
-                "FFmpeg fehlt",
-                "FFmpeg und ffprobe wurden nicht gefunden.",
+                tr("ffmpeg_missing_title", self.language),
+                tr("ffmpeg_missing_short", self.language),
             )
             return
 
@@ -1005,7 +991,7 @@ class AudioAnalysisDialog(QDialog):
         self.album_table.setRowCount(0)
         self.log_output.clear()
         self.statistics_label.setText(
-            "Analyse läuft …"
+            tr("analysis_running", self.language)
         )
         self.progress.setMaximum(
             len(songs)
@@ -1024,6 +1010,7 @@ class AudioAnalysisDialog(QDialog):
             self.album_gain_checkbox.isChecked(),
             self.max_workers,
             self.force_refresh_checkbox.isChecked(),
+            self.language,
         )
         self.worker.moveToThread(
             self.thread
@@ -1074,7 +1061,7 @@ class AudioAnalysisDialog(QDialog):
         if self.worker is not None:
             self.worker.cancel()
             self.status_label.setText(
-                "Analyse wird abgebrochen …"
+                tr("analysis_cancelling", self.language)
             )
 
     def update_progress(
@@ -1119,21 +1106,24 @@ class AudioAnalysisDialog(QDialog):
         )
 
         self.statistics_label.setText(
-            (
-                f"{total_count} Titel · "
-                f"{cache_count} aus Cache · "
-                f"{newly_analyzed_count} neu berechnet · "
-                f"{elapsed_seconds:.2f} Sekunden · "
-                f"Ø {average_seconds:.2f} Sekunden pro Titel"
+            tr(
+                "analysis_summary_stat",
+                self.language,
+                total=total_count,
+                cache=cache_count,
+                newly=newly_analyzed_count,
+                seconds=f"{elapsed_seconds:.2f}",
+                avg=f"{average_seconds:.2f}",
             )
         )
         self.append_log(
-            (
-                "Analyse-Zusammenfassung\n"
-                f"  Titel: {total_count}\n"
-                f"  Aus Cache: {cache_count}\n"
-                f"  Neu berechnet: {newly_analyzed_count}\n"
-                f"  Dauer: {elapsed_seconds:.2f} Sekunden"
+            tr(
+                "analysis_summary_log",
+                self.language,
+                total=total_count,
+                cache=cache_count,
+                newly=newly_analyzed_count,
+                seconds=f"{elapsed_seconds:.2f}",
             )
         )
 
@@ -1211,10 +1201,7 @@ class AudioAnalysisDialog(QDialog):
             )
         )
         self.status_label.setText(
-            (
-                f"Analyse abgeschlossen: "
-                f"{len(self.results)} Titel."
-            )
+            tr("analysis_finished_status", self.language, count=len(self.results))
         )
         self._refresh_track_table()
         self._refresh_album_table()
@@ -1232,7 +1219,7 @@ class AudioAnalysisDialog(QDialog):
         )
         QMessageBox.critical(
             self,
-            "Audioanalyse fehlgeschlagen",
+            tr("analysis_failed_title", self.language),
             message,
         )
 
@@ -1281,7 +1268,8 @@ class AudioAnalysisDialog(QDialog):
                     " dBTP",
                 ),
                 peak_status_label(
-                    result.peak_status
+                    result.peak_status,
+                    self.language,
                 ),
                 _format_gain(
                     result.replaygain_track_gain_db
@@ -1296,14 +1284,14 @@ class AudioAnalysisDialog(QDialog):
                     result.replaygain_album_peak
                 ),
                 (
-                    "Cache"
+                    tr("source_cache", self.language)
                     if result.from_cache
-                    else "Neu"
+                    else tr("source_new", self.language)
                 ),
             ]
 
             if result.error:
-                values[1] = "Fehler"
+                values[1] = tr("error_short", self.language)
                 values[7] = result.error
 
             for column, value in enumerate(
@@ -1431,33 +1419,37 @@ class AudioAnalysisDialog(QDialog):
 
                 if summary.technical_outliers:
                     tooltip_lines.append(
-                        "Technische Abweichungen:\n"
-                        + "\n".join(
-                            summary.technical_outliers
+                        tr(
+                            "tech_outliers_tip",
+                            self.language,
+                            items="\n".join(summary.technical_outliers),
                         )
                     )
 
                 if summary.elevated_peak_files:
                     tooltip_lines.append(
-                        "True Peak über 1 bis 2 dBTP:\n"
-                        + "\n".join(
-                            summary.elevated_peak_files
+                        tr(
+                            "peak_1_2_tip",
+                            self.language,
+                            items="\n".join(summary.elevated_peak_files),
                         )
                     )
 
                 if summary.critical_peak_files:
                     tooltip_lines.append(
-                        "True Peak über 2 dBTP:\n"
-                        + "\n".join(
-                            summary.critical_peak_files
+                        tr(
+                            "peak_over_2_tip",
+                            self.language,
+                            items="\n".join(summary.critical_peak_files),
                         )
                     )
 
                 if summary.missing_analysis_files:
                     tooltip_lines.append(
-                        "Nicht analysiert:\n"
-                        + "\n".join(
-                            summary.missing_analysis_files
+                        tr(
+                            "not_analyzed_tip",
+                            self.language,
+                            items="\n".join(summary.missing_analysis_files),
                         )
                     )
 
@@ -1492,12 +1484,8 @@ class AudioAnalysisDialog(QDialog):
 
         answer = QMessageBox.question(
             self,
-            "ReplayGain schreiben",
-            (
-                f"ReplayGain-Tags werden in "
-                f"{len(valid_results)} Dateien geschrieben.\n\n"
-                "Vorhandene ReplayGain-Tags überschreiben?"
-            ),
+            tr("write_rg_title", self.language),
+            tr("write_rg_question", self.language, count=len(valid_results)),
             QMessageBox.StandardButton.Yes
             | QMessageBox.StandardButton.No
             | QMessageBox.StandardButton.Cancel,
@@ -1516,14 +1504,14 @@ class AudioAnalysisDialog(QDialog):
         )
 
         progress_dialog = QProgressDialog(
-            "ReplayGain-Tags werden geschrieben …",
-            "Abbrechen",
+            tr("writing_rg", self.language),
+            tr("cancel", self.language),
             0,
             len(valid_results),
             self,
         )
         progress_dialog.setWindowTitle(
-            "ReplayGain schreiben"
+            tr("write_rg_title", self.language)
         )
         progress_dialog.setWindowModality(
             Qt.WindowModality.WindowModal
@@ -1542,9 +1530,12 @@ class AudioAnalysisDialog(QDialog):
                 break
 
             progress_dialog.setLabelText(
-                (
-                    f"{result.filename}\n"
-                    f"{index} / {len(valid_results)}"
+                tr(
+                    "writing_rg_label",
+                    self.language,
+                    filename=result.filename,
+                    index=index,
+                    total=len(valid_results),
                 )
             )
             QApplication.processEvents()
@@ -1566,25 +1557,21 @@ class AudioAnalysisDialog(QDialog):
 
         progress_dialog.close()
 
-        message = (
-            f"ReplayGain wurde in "
-            f"{saved} Dateien geschrieben."
-        )
+        message = tr("rg_written", self.language, count=saved)
 
         if progress_dialog.wasCanceled():
-            message += (
-                "\n\nDer Vorgang wurde abgebrochen."
-            )
+            message += tr("rg_cancelled", self.language)
 
         if failures:
-            message += (
-                "\n\nFehler:\n"
-                + "\n".join(failures)
+            message += tr(
+                "errors_block",
+                self.language,
+                errors="\n".join(failures),
             )
 
         QMessageBox.information(
             self,
-            "ReplayGain abgeschlossen",
+            tr("rg_done_title", self.language),
             message,
         )
 
@@ -1613,11 +1600,8 @@ class AudioAnalysisDialog(QDialog):
         if self._thread_is_running():
             answer = QMessageBox.question(
                 self,
-                "Analyse läuft",
-                (
-                    "Die Audioanalyse läuft noch. "
-                    "Wirklich abbrechen und schließen?"
-                ),
+                tr("analysis_running_title", self.language),
+                tr("analysis_running_close", self.language),
                 QMessageBox.StandardButton.Yes
                 | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
@@ -1657,15 +1641,16 @@ def automatic_worker_count() -> int:
 
 def peak_status_label(
     status: str,
+    language: str = "automatic",
 ) -> str:
     return {
-        "normal": "Unauffällig",
-        "elevated": "Erhöht",
-        "critical": "Kritisch",
-        "unknown": "Unbekannt",
+        "normal": tr("peak_normal", language),
+        "elevated": tr("peak_elevated", language),
+        "critical": tr("peak_critical", language),
+        "unknown": tr("peak_unknown", language),
     }.get(
         status,
-        "Unbekannt",
+        tr("peak_unknown", language),
     )
 
 
