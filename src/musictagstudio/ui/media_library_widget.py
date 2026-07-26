@@ -19,6 +19,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QIcon,
+    QPalette,
     QPixmap,
     QStandardItem,
     QStandardItemModel,
@@ -79,6 +80,7 @@ from ..settings import load_settings
 from ..i18n import tr
 from ..library_sources import IndexedAlbum
 from ..models.song import Song
+from ..icons import make_icon
 from ..player.preview import PreviewPlayer
 from ..services.cover import load_cover
 from ..providers.apple_music import (
@@ -2640,7 +2642,8 @@ class MediaLibraryWidget(QWidget):
                     ),
                 )
 
-            preview_button = QPushButton("▶")
+            preview_button = QPushButton()
+            self._set_preview_button_icon(preview_button, "play")
             preview_button.setEnabled(False)
             preview_button.clicked.connect(
                 lambda _checked=False, index=row: self._play_track(index)
@@ -2796,7 +2799,7 @@ class MediaLibraryWidget(QWidget):
             # normale Wiedergabe-Leiste), keine Vorschau-Markierung.
             if row < len(self._row_is_local) and self._row_is_local[row]:
                 button.setEnabled(True)
-                button.setText("▶")
+                self._set_preview_button_icon(button, "play")
                 button.setToolTip(
                     "Vollen Titel abspielen (lokal vorhanden)"
                 )
@@ -2809,8 +2812,19 @@ class MediaLibraryWidget(QWidget):
             )
             button.setEnabled(bool(url))
             is_active = playing and row == self._playing_preview_row
-            button.setText("⏸" if is_active else "▶")
+            self._set_preview_button_icon(button, "pause" if is_active else "play")
             button.setToolTip("30-Sekunden-Vorschau abspielen")
+
+    def _set_preview_button_icon(self, button: QPushButton, name: str) -> None:
+        """Setzt das SVG-Play/Pause-Icon eines Vorschau-Knopfs (Palette-Farbe).
+
+        Die Eigenschaft ``previewState`` spiegelt den Zustand ("play"/"pause")
+        unabhängig vom gerenderten Icon wider.
+        """
+        color = self.palette().color(QPalette.ColorRole.ButtonText).name()
+        button.setIcon(make_icon(name, color))
+        button.setIconSize(QSize(16, 16))
+        button.setProperty("previewState", name)
 
     def _on_preview_state(self, _url: str, playing: bool) -> None:
         self._refresh_track_preview_buttons()
@@ -2825,7 +2839,7 @@ class MediaLibraryWidget(QWidget):
             title = _track_title(
                 self.current_tracks[self._playing_preview_row]
             )
-            self._set_status(f"▶ Vorschau läuft: {title}")
+            self._set_status(f"Vorschau läuft: {title}")
         elif not playing and self.current_tracks:
             self._set_status(
                 f"{len(self.current_tracks)} Titel geladen."

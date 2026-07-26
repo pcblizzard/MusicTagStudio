@@ -3,10 +3,12 @@ from __future__ import annotations
 from PySide6.QtCore import (
     QObject,
     QRunnable,
+    QSize,
     QThreadPool,
     Signal,
     Slot,
 )
+from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -33,6 +35,7 @@ from ..direct_references import (
     parse_album_reference,
 )
 from ..models.song import Song
+from ..icons import make_icon
 from ..player.preview import PreviewPlayer
 
 
@@ -352,7 +355,8 @@ class DirectAlbumDialog(QDialog):
                 combo,
             )
 
-            preview_button = QPushButton("▶")
+            preview_button = QPushButton()
+            self._set_preview_button_icon(preview_button, "play")
             preview_button.setToolTip(
                 "30-Sekunden-Vorschau des zugeordneten Albumtracks abspielen"
             )
@@ -521,7 +525,14 @@ class DirectAlbumDialog(QDialog):
             has_preview = bool(track and track.preview_url)
             button.setEnabled(has_preview)
             is_active = playing and row == self._playing_preview_row
-            button.setText("⏸" if is_active else "▶")
+            self._set_preview_button_icon(button, "pause" if is_active else "play")
+
+    def _set_preview_button_icon(self, button: QPushButton, name: str) -> None:
+        """Setzt das SVG-Play/Pause-Icon (Palette-Farbe) samt previewState."""
+        color = self.palette().color(QPalette.ColorRole.ButtonText).name()
+        button.setIcon(make_icon(name, color))
+        button.setIconSize(QSize(16, 16))
+        button.setProperty("previewState", name)
 
     def _on_preview_state(self, _url: str, _playing: bool) -> None:
         self._refresh_preview_buttons()

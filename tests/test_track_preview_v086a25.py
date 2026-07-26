@@ -133,7 +133,8 @@ def test_dialog_preview_button_enabled_only_with_url():
     # Track 1 hat eine Vorschau -> Knopf aktiv; Track 2 nicht -> inaktiv.
     assert dialog.preview_buttons[0].isEnabled() is True
     assert dialog.preview_buttons[1].isEnabled() is False
-    assert dialog.preview_buttons[0].text() in {"▶", "⏸"}
+    assert dialog.preview_buttons[0].property("previewState") in {"play", "pause"}
+    assert not dialog.preview_buttons[0].icon().isNull()
     dialog.done(0)
 
 
@@ -487,8 +488,10 @@ def test_media_library_only_playing_row_highlighted(monkeypatch):
     monkeypatch.setattr(widget.preview_player, "is_playing", lambda: True)
     widget._refresh_track_preview_buttons()
 
-    # Trotz identischer URL wird nur die spielende Zeile hervorgehoben.
-    assert widget.track_preview_buttons[0].text() == "⏸"
-    assert widget.track_preview_buttons[1].text() == "▶"
-    assert widget.track_preview_buttons[2].text() == "▶"
+    # Trotz identischer URL wird nur die spielende Zeile hervorgehoben
+    # (Play/Pause-Icon je Zeile über die previewState-Eigenschaft prüfbar).
+    assert widget.track_preview_buttons[0].property("previewState") == "pause"
+    assert widget.track_preview_buttons[1].property("previewState") == "play"
+    assert widget.track_preview_buttons[2].property("previewState") == "play"
+    assert not widget.track_preview_buttons[0].icon().isNull()
     widget.deleteLater()

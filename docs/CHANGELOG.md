@@ -1,5 +1,11 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Einheitliche Play/Pause-Icons in den Vorschau-Knöpfen
+
+- Die Vorschau-Knöpfe in der Medienbibliothek und im Direkt-Album-Dialog nutzen
+  jetzt dieselben SVG-Play/Pause-Icons wie die Wiedergabe-Leiste, statt der
+  bisherigen Text-Symbole „▶"/„⏸" – konsistentes, theme-gerechtes Erscheinungsbild.
+
 ## Einheitlicher Fehlerkanal für die Wiedergabe
 
 - Fehler beim Abspielen (z. B. nicht gefundene oder defekte Datei) überschreiben
