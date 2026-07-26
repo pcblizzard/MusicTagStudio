@@ -25,11 +25,12 @@ def test_primary_search_remains_musicbrainz_artist_search():
 def test_views_remain_available():
     text = source()
 
+    # Ansichts-Labels sind jetzt i18n-basiert (tr("view_*")).
     for label in (
-        '"Discografie"',
-        '"Tabelle"',
-        '"Coverraster"',
-        '"Cover + Liste"',
+        '"view_discography"',
+        '"view_table"',
+        '"view_covers"',
+        '"view_cover_list"',
     ):
         assert label in text
 

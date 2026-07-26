@@ -204,26 +204,30 @@ class Worker(QRunnable):
 
 # Farbschema der Status-Chips (Text, Hintergrund) je lokalem Verfügbarkeits-
 # Status. Farben funktionieren sowohl auf hellem als auch dunklem Theme.
+# Der erste Tupelwert ist ein i18n-Key (nicht der Anzeigetext selbst), damit
+# der Chip in der aktiven Sprache beschriftet wird. Die Dict-Keys links sind
+# interne Statuscodes (Daten) und bleiben unverändert.
 _STATUS_CHIP_STYLES: dict[str, tuple[str, str, str]] = {
-    "Lokal verfügbar": ("Lokal verfügbar", "#ffffff", "#2e7d32"),
+    "Lokal verfügbar": ("status_local_available", "#ffffff", "#2e7d32"),
     "Externe Quelle nicht erreichbar": (
-        "Quelle nicht erreichbar",
+        "status_source_unreachable",
         "#ffffff",
         "#b26a00",
     ),
-    "Nicht vorhanden": ("Lokal nicht verfügbar", "#ffffff", "#5f6368"),
-    "Nein": ("Lokal nicht verfügbar", "#ffffff", "#5f6368"),
+    "Nicht vorhanden": ("status_local_unavailable", "#ffffff", "#5f6368"),
+    "Nein": ("status_local_unavailable", "#ffffff", "#5f6368"),
 }
 
 
-def _status_label(status: str) -> str:
+def _status_label(status: str, language: str) -> str:
     """Nutzerlesbare Beschriftung eines lokalen Verfügbarkeitsstatus.
 
     Der interne Statuswert bleibt unverändert (Logik/Vergleiche); hier wird nur
     die Anzeige gemappt – u. a. „Nicht vorhanden" → „Lokal nicht verfügbar".
     """
     entry = _STATUS_CHIP_STYLES.get(str(status or ""))
-    return entry[0] if entry else "Lokal nicht verfügbar"
+    key = entry[0] if entry else "status_local_unavailable"
+    return tr(key, language)
 
 
 # Eigene, hellere Punktfarben als die (dunklen) Chip-Hintergründe – der Punkt
@@ -245,11 +249,12 @@ def _status_dot_icon(status: str) -> QIcon:
     return make_icon("dot", color, size=16)
 
 
-def _status_chip(status: str) -> tuple[str, str]:
+def _status_chip(status: str, language: str) -> tuple[str, str]:
     """Liefert (Beschriftung, Stylesheet) für den Status-Chip."""
-    text, fg, bg = _STATUS_CHIP_STYLES.get(
+    key, fg, bg = _STATUS_CHIP_STYLES.get(
         str(status or ""), _STATUS_CHIP_STYLES["Nicht vorhanden"]
     )
+    text = tr(key, language)
     style = (
         f"QLabel#localStatusChip {{ color: {fg}; background: {bg};"
         " border-radius: 8px; padding: 2px 10px; font-size: 11px;"
@@ -570,7 +575,7 @@ class MediaLibraryWidget(QWidget):
         )
 
         title = QLabel(
-            "Medienbibliothek"
+            tr("media_library", self.language)
         )
         title.setStyleSheet(
             "font-size: 22px; font-weight: 600;"
@@ -580,9 +585,7 @@ class MediaLibraryWidget(QWidget):
         )
 
         explanation = QLabel(
-            "Künstler suchen, Veröffentlichungen und Editionen anzeigen "
-            "und Tracklisten bei Bedarf laden. Streaming- und "
-            "Qualitätsabfragen starten nur auf Knopfdruck."
+            tr("ml_explanation", self.language)
         )
         explanation.setWordWrap(
             True
@@ -617,11 +620,10 @@ class MediaLibraryWidget(QWidget):
             self.search_button
         )
         self.discogs_refresh_button = QPushButton(
-            "Discogs live aktualisieren"
+            tr("discogs_refresh", self.language)
         )
         self.discogs_refresh_button.setToolTip(
-            "Ignoriert die lokale Discogs-Datenbank und lädt die "
-            "Diskografie erneut über die API."
+            tr("discogs_refresh_tip", self.language)
         )
         self.discogs_refresh_button.setEnabled(False)
         self.discogs_refresh_button.clicked.connect(
@@ -691,8 +693,7 @@ class MediaLibraryWidget(QWidget):
             180
         )
         self.debug_output.setPlaceholderText(
-            "Hier erscheinen MusicBrainz-Anfragen, "
-            "HTTP-Status und Trefferzahlen."
+            tr("debug_placeholder", self.language)
         )
         self.debug_output.hide()
         root.addWidget(
@@ -720,12 +721,12 @@ class MediaLibraryWidget(QWidget):
             self.artist_list,
             stretch=2,
         )
-        artist_layout.addWidget(QLabel("Verknüpfungen"))
+        artist_layout.addWidget(QLabel(tr("links", self.language)))
         self.relations_tree = QTreeWidget()
         self.relations_tree.setHeaderHidden(True)
         self.relations_tree.setRootIsDecorated(True)
         self.relations_tree.setToolTip(
-            "Ein Klick auf einen Künstler öffnet dessen Diskografie."
+            tr("relations_tip", self.language)
         )
         self.relations_tree.itemClicked.connect(self._relation_clicked)
         artist_layout.addWidget(self.relations_tree, stretch=1)
@@ -733,24 +734,24 @@ class MediaLibraryWidget(QWidget):
         group_panel = QWidget()
         group_layout = QVBoxLayout(group_panel)
         view_row = QHBoxLayout()
-        view_row.addWidget(QLabel("Veröffentlichungen"))
+        view_row.addWidget(QLabel(tr("releases", self.language)))
         view_row.addStretch()
-        view_row.addWidget(QLabel("Ansicht:"))
+        view_row.addWidget(QLabel(tr("view", self.language)))
         self.view_mode_combo = QComboBox()
-        for label, value in (("Discografie", "discography"), ("Tabelle", "table"), ("Coverraster", "covers"), ("Cover + Liste", "cover_list")):
-            self.view_mode_combo.addItem(label, value)
+        for key, value in (("view_discography", "discography"), ("view_table", "table"), ("view_covers", "covers"), ("view_cover_list", "cover_list")):
+            self.view_mode_combo.addItem(tr(key, self.language), value)
         self.view_mode_combo.currentIndexChanged.connect(self._view_mode_changed)
         view_row.addWidget(self.view_mode_combo)
-        view_row.addWidget(QLabel("Covergröße:"))
+        view_row.addWidget(QLabel(tr("cover_size", self.language)))
         self.cover_size_combo = QComboBox()
-        for label, value in (("Klein", "small"), ("Mittel", "medium"), ("Groß", "large"), ("Sehr groß", "xlarge")):
-            self.cover_size_combo.addItem(label, value)
+        for key, value in (("size_small", "small"), ("size_medium", "medium"), ("size_large", "large"), ("size_xlarge", "xlarge")):
+            self.cover_size_combo.addItem(tr(key, self.language), value)
         self.cover_size_combo.currentIndexChanged.connect(self._cover_size_changed)
         view_row.addWidget(self.cover_size_combo)
         group_layout.addLayout(view_row)
         self.release_view_stack = QStackedWidget()
         self.group_tree = QTreeWidget()
-        self.group_tree.setHeaderLabels(["Veröffentlichung", "Jahr", "Kategorie", "Quelle", "Status"])
+        self.group_tree.setHeaderLabels([tr("col_release", self.language), tr("col_year", self.language), tr("col_category", self.language), tr("col_source", self.language), tr("col_status", self.language)])
         self.group_tree.setIconSize(QSize(18,18)); self.group_tree.setIndentation(22); self.group_tree.setColumnCount(5)
         self.group_tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.group_tree.currentItemChanged.connect(self._group_selected)
@@ -761,7 +762,7 @@ class MediaLibraryWidget(QWidget):
         self._discography_sort_ascending = True
         self.release_view_stack.addWidget(self.group_tree)
         self.release_table = QTableWidget(0,7)
-        self.release_table.setHorizontalHeaderLabels(["Titel","Künstler","Jahr","Kategorie","Quelle","Label / Format","Status"])
+        self.release_table.setHorizontalHeaderLabels([tr("col_title", self.language), tr("col_artist", self.language), tr("col_year", self.language), tr("col_category", self.language), tr("col_source", self.language), tr("col_label_format", self.language), tr("col_status", self.language)])
         self.release_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.release_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.release_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -790,7 +791,7 @@ class MediaLibraryWidget(QWidget):
         detail_layout.setSpacing(6)
         detail_header = QHBoxLayout()
         self.cover_label = QLabel(
-            "Kein Cover verfügbar"
+            tr("cover_unavailable", self.language)
         )
         self.cover_label.setAlignment(
             Qt.AlignmentFlag.AlignCenter
@@ -803,7 +804,7 @@ class MediaLibraryWidget(QWidget):
             "border: 1px solid #3a3a3a; background: #171717;"
         )
         self.cover_label.setToolTip(
-            "Cover der aktuell gewählten Edition"
+            tr("cover_edition_tip", self.language)
         )
         detail_header.addWidget(
             self.cover_label
@@ -812,7 +813,7 @@ class MediaLibraryWidget(QWidget):
         detail_text = QVBoxLayout()
         detail_text.setSpacing(2)
         self.group_title = QLabel(
-            "Keine Veröffentlichung ausgewählt"
+            tr("no_release_selected", self.language)
         )
         self.group_title.setWordWrap(
             True
@@ -872,7 +873,7 @@ class MediaLibraryWidget(QWidget):
         )
 
         self.streaming_button = QPushButton(
-            "Streaming prüfen"
+            tr("streaming_check", self.language)
         )
         self.streaming_button.clicked.connect(
             self.check_streaming
@@ -881,7 +882,7 @@ class MediaLibraryWidget(QWidget):
             False
         )
         self.quality_button = QPushButton(
-            "Qualität prüfen"
+            tr("quality_check", self.language)
         )
         self.quality_button.clicked.connect(
             self.check_quality
@@ -910,14 +911,14 @@ class MediaLibraryWidget(QWidget):
         )
         # Fallback für Alben ohne digitale Version: Amazon-Suche (Deeplink,
         # kein Streaming-Check nötig, daher stets nutzbar bei gewähltem Album).
-        self.amazon_button = QPushButton("Bei Amazon suchen")
+        self.amazon_button = QPushButton(tr("amazon_search", self.language))
         self.amazon_button.setToolTip(
-            "Künstler + Album bei Amazon suchen (z. B. für CD/Vinyl)"
+            tr("amazon_search_tip", self.language)
         )
         self.amazon_button.setEnabled(False)
         self.amazon_button.clicked.connect(self._search_amazon)
         # Gruppe "Prüfen": Streaming-/Qualitätsabfragen.
-        check_group = QGroupBox("Prüfen")
+        check_group = QGroupBox(tr("group_check", self.language))
         check_layout = QHBoxLayout(check_group)
         check_layout.setContentsMargins(8, 4, 8, 8)
         check_layout.addWidget(self.streaming_button)
@@ -925,7 +926,7 @@ class MediaLibraryWidget(QWidget):
         detail_layout.addWidget(check_group)
 
         # Gruppe "Auf Dienst öffnen": Album beim jeweiligen Anbieter aufrufen.
-        service_group = QGroupBox("Auf Dienst öffnen")
+        service_group = QGroupBox(tr("group_open_service", self.language))
         service_layout = QHBoxLayout(service_group)
         service_layout.setContentsMargins(8, 4, 8, 8)
         service_layout.addWidget(self.apple_button)
@@ -935,7 +936,7 @@ class MediaLibraryWidget(QWidget):
         detail_layout.addWidget(service_group)
 
         self.streaming_status = QLabel(
-            "Streaming und Qualität wurden nicht abgefragt."
+            tr("streaming_not_checked", self.language)
         )
         self.streaming_status.setWordWrap(
             True
@@ -958,7 +959,7 @@ class MediaLibraryWidget(QWidget):
         )
         self.editorial_info.hide()
         detail_layout.addWidget(self.editorial_info)
-        self.editorial_more_button = QPushButton("Mehr anzeigen …")
+        self.editorial_more_button = QPushButton(tr("show_more", self.language))
         self.editorial_more_button.clicked.connect(
             self._show_full_editorial
         )
@@ -974,7 +975,7 @@ class MediaLibraryWidget(QWidget):
             self._edition_selected
         )
         edition_form.addRow(
-            "Edition:",
+            tr("edition_label", self.language),
             self.edition_combo,
         )
         self.edition_details = QLabel("")
@@ -982,7 +983,7 @@ class MediaLibraryWidget(QWidget):
             True
         )
         edition_form.addRow(
-            "Eckdaten:",
+            tr("edition_facts", self.language),
             self.edition_details,
         )
         detail_layout.addLayout(
@@ -990,7 +991,7 @@ class MediaLibraryWidget(QWidget):
         )
 
         self.open_local_button = QPushButton(
-            "Lokales Album im Tagger öffnen"
+            tr("open_local_tagger", self.language)
         )
         self.open_local_button.setEnabled(
             False
@@ -999,14 +1000,14 @@ class MediaLibraryWidget(QWidget):
             self._open_local
         )
         self.enqueue_local_button = QPushButton(
-            "Zur Warteschlange"
+            tr("to_queue", self.language)
         )
         self.enqueue_local_button.setEnabled(False)
         self.enqueue_local_button.clicked.connect(
             self._enqueue_local_album
         )
         # Gruppe "Lokal": Aktionen für die lokal vorhandene Kopie.
-        local_group = QGroupBox("Lokal")
+        local_group = QGroupBox(tr("group_local", self.language))
         local_actions = QHBoxLayout(local_group)
         local_actions.setContentsMargins(8, 4, 8, 8)
         local_actions.addWidget(self.open_local_button, 1)
@@ -1026,18 +1027,18 @@ class MediaLibraryWidget(QWidget):
         track_layout = QVBoxLayout(track_panel)
         track_layout.setContentsMargins(0, 4, 0, 0)
         track_layout.setSpacing(4)
-        track_layout.addWidget(QLabel("Trackliste"))
+        track_layout.addWidget(QLabel(tr("tracklist", self.language)))
         self.track_table = QTableWidget(
             0,
             5,
         )
         self.track_table.setHorizontalHeaderLabels(
             [
-                "CD",
-                "Track",
-                "Titel",
-                "Dauer",
-                "Wiedergabe",
+                tr("col_cd", self.language),
+                tr("col_track", self.language),
+                tr("col_title", self.language),
+                tr("col_duration", self.language),
+                tr("col_playback", self.language),
             ]
         )
         self.track_table.setEditTriggers(
@@ -2382,7 +2383,7 @@ class MediaLibraryWidget(QWidget):
             group.release_group_id,
         )
         self.group_meta.setText(" · ".join(v for v in (_type_text(group),group.first_release_date or "Datum unbekannt") if v))
-        chip_text, chip_style = _status_chip(status)
+        chip_text, chip_style = _status_chip(status, self.language)
         self.local_status_chip.setText(chip_text)
         self.local_status_chip.setStyleSheet(chip_style)
         self._render_source_details(group, status)
@@ -2598,7 +2599,7 @@ class MediaLibraryWidget(QWidget):
                             group
                         ),
                         source_text,
-                        _status_label(raw_status),
+                        _status_label(raw_status, self.language),
                     ]
                 )
                 # Ampel als farbiger Punkt (statt Emoji) in der Status-Spalte.
@@ -3819,7 +3820,7 @@ class MediaLibraryWidget(QWidget):
                     key,
                     "Nicht vorhanden",
                 )
-                item.setText(4, _status_label(raw_status))
+                item.setText(4, _status_label(raw_status, self.language))
                 item.setIcon(4, _status_dot_icon(raw_status))
 
         self._render_alternative_views()
