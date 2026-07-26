@@ -83,6 +83,51 @@ def test_spotify_album_search_uses_catalog_metadata(monkeypatch):
     assert result[0].confidence == 100
 
 
+def test_spotify_search_strips_parenthetical_suffix(monkeypatch):
+    captured: list[str] = []
+    responses = iter(
+        [
+            {"access_token": "spotify-token", "expires_in": 3600},
+            {
+                "albums": {
+                    "items": [
+                        {
+                            "id": "live-album",
+                            "name": "Das ist alles von der Kunstfreiheit gedeckt (Live)",
+                            "artists": [{"name": "Danger Dan"}],
+                            "release_date": "2023-06-02",
+                            "total_tracks": 16,
+                        }
+                    ]
+                }
+            },
+        ]
+    )
+
+    def fake(request):
+        captured.append(getattr(request, "full_url", ""))
+        return next(responses)
+
+    monkeypatch.setattr(spotify, "_cached_token", "")
+    monkeypatch.setattr(spotify, "request_json", fake)
+
+    result = spotify.search_albums(
+        "Das ist alles von der Kunstfreiheit gedeckt (Live In Berlin)",
+        "Danger Dan",
+        client_id="client",
+        client_secret="secret",
+        expected_track_count=16,
+        wanted_year="2023",
+    )
+
+    # Die Suchquery enthält den Kern-Titel ohne den Klammerzusatz.
+    search_url = captured[-1]
+    assert "Berlin" not in search_url
+    assert "Kunstfreiheit" in search_url
+    # Trotz abweichendem Zusatz („Live" statt „Live In Berlin") ein Treffer.
+    assert result and result[0].confidence >= 70
+
+
 def test_tidal_album_search_parses_json_api_included_resources(monkeypatch):
     requested_urls: list[str] = []
     responses = iter(

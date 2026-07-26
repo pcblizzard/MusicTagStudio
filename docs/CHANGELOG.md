@@ -8,6 +8,10 @@
   jetzt auch einen **identischen Kern-Titel** (vor dem Zusatz) als Treffer –
   aber nur, wenn beide Titel einen Zusatz haben, damit Studio- und Live-Version
   nicht verwechselt werden.
+- Zusätzlich sucht Spotify jetzt **ohne den Klammerzusatz**: Spotifys
+  feldgebundene Phrasensuche (`album:"…"`) lieferte das „(Live)"-Album sonst gar
+  nicht erst als Kandidaten zurück. Das Scoring bewertet danach weiterhin den
+  vollständigen Titel.
 
 ## Echte Apple-Titel für veröffentlichte Vorab-Tracks
 

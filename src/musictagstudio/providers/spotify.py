@@ -10,6 +10,7 @@ from .oauth_catalog import CatalogProviderError, request_json
 from .streaming_catalog import (
     CatalogAlbumCandidate,
     album_confidence,
+    album_core_title,
     optional_int,
 )
 
@@ -34,8 +35,14 @@ def search_albums(
     limit: int = 10,
 ) -> list[CatalogAlbumCandidate]:
     token = _access_token(client_id, client_secret)
+    # Ohne den Klammerzusatz suchen: Spotifys feldgebundene Phrasensuche
+    # (album:"…") findet sonst z. B. „… (Live)" nicht, wenn MusicBrainz
+    # „… (Live In Berlin)" führt. Das Scoring bewertet danach den vollen Titel.
+    search_album = album_core_title(album)
     query = " ".join(
-        value for value in (f'album:"{album}"', f'artist:"{artist}"') if value
+        value
+        for value in (f'album:"{search_album}"', f'artist:"{artist}"')
+        if value
     )
     params = urlencode(
         {

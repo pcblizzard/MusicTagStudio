@@ -26,18 +26,27 @@ def album_has_suffix(title: str) -> bool:
     return bool(_ALBUM_SUFFIX_RE.search(str(title or "").strip()))
 
 
-def core_album_key(title: str) -> str:
-    """Normalisierter Titel ohne abschließende Klammerzusätze.
+def album_core_title(title: str) -> str:
+    """Lesbarer Titel ohne abschließende Klammerzusätze (Text bleibt erhalten).
 
-    „Das ist alles … (Live In Berlin)" und „… (Live in Berlin 2022)" ergeben
-    denselben Kern-Schlüssel.
+    „Das ist alles … (Live In Berlin)" -> „Das ist alles …". Wird der Titel
+    komplett entfernt, bleibt der Originaltitel erhalten.
     """
     core = str(title or "").strip()
     previous = None
     while core != previous:
         previous = core
         core = _ALBUM_SUFFIX_RE.sub("", core).strip()
-    return normalize_catalog_text(core)
+    return core or str(title or "").strip()
+
+
+def core_album_key(title: str) -> str:
+    """Normalisierter Titel ohne abschließende Klammerzusätze.
+
+    „Das ist alles … (Live In Berlin)" und „… (Live in Berlin 2022)" ergeben
+    denselben Kern-Schlüssel.
+    """
+    return normalize_catalog_text(album_core_title(title))
 
 
 def album_confidence(
