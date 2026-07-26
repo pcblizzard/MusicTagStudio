@@ -1,5 +1,11 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Python 3.14 unterstützt
+
+- Das Projekt läuft jetzt auch unter **Python 3.14** (getestet: alle
+  Abhängigkeiten mit 3.14-Wheels, ruff + mypy sauber, komplette Testsuite grün).
+  Die CI prüft neben 3.12 und 3.13 zusätzlich 3.14.
+
 ## Trackliste zeigt die eigene Edition farbig
 
 - In der Trackliste sind lokal vorhandene Titel jetzt dezent **grün**, fehlende
