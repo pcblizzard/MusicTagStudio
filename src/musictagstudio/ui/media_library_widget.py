@@ -2734,7 +2734,9 @@ class MediaLibraryWidget(QWidget):
             if row >= len(self.track_preview_urls):
                 break
 
-            key = _preview_title_key(_track_title(track))
+            # Reiner Titel ohne Künstler-Suffix (track_title hängt " - Artist"
+            # an; die Streaming-Map ist aber nur nach dem Titel verschlüsselt).
+            key = _preview_title_key(getattr(track, "title", ""))
             self.track_preview_urls[row] = mapping.get(key, "")
 
         self._refresh_track_preview_buttons()

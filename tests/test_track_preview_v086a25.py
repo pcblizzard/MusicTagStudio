@@ -434,10 +434,18 @@ def test_previews_resolved_matches_by_title_despite_duplicate_track_numbers():
     widget = MediaLibraryWidget()
     widget.current_group = None
     # Discogs-artige Doppelnummerierung: zwei Zeilen mit Tracknummer 1.
+    # Titel tragen zusätzlich den Künstler; der Abgleich darf nur den reinen
+    # Titel verwenden (track_title würde " - Artist" anhängen).
     widget._tracks_loaded(
         [
-            Track(disc_number=1, track_number=1, title="Kirchheim Horizont"),
-            Track(disc_number=1, track_number=1, title="Bordertown"),
+            Track(
+                disc_number=1, track_number=1,
+                title="Kirchheim Horizont", artist="Juse Ju",
+            ),
+            Track(
+                disc_number=1, track_number=1,
+                title="Bordertown", artist="Juse Ju",
+            ),
         ]
     )
 
