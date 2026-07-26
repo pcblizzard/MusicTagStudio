@@ -27,6 +27,7 @@ from ..cover_management.batch import (
 from ..cover_management.manager import (
     CoverManager,
 )
+from ..i18n import tr
 
 
 class WorkerSignals(QObject):
@@ -45,6 +46,7 @@ class BatchCoverWorker(QRunnable):
         manager: CoverManager,
         plans: list[AlbumCoverPlan],
         reuse_existing_master: bool,
+        language: str = "automatic",
     ):
         super().__init__()
         self.manager = manager
@@ -52,6 +54,7 @@ class BatchCoverWorker(QRunnable):
         self.reuse_existing_master = (
             reuse_existing_master
         )
+        self.language = language
         self.signals = WorkerSignals()
 
     @Slot()
@@ -86,7 +89,7 @@ class BatchCoverWorker(QRunnable):
 
                     if not candidates:
                         raise RuntimeError(
-                            "Kein Cover gefunden."
+                            tr("no_cover_found", self.language)
                         )
 
                     candidate = max(
@@ -116,7 +119,7 @@ class BatchCoverWorker(QRunnable):
         self.signals.progress.emit(
             len(self.plans),
             len(self.plans),
-            "Verarbeitung abgeschlossen",
+            tr("processing_done", self.language),
         )
         self.signals.finished.emit(
             {
@@ -132,17 +135,19 @@ class BatchCoverDialog(QDialog):
         manager: CoverManager,
         plans: list[AlbumCoverPlan],
         parent=None,
+        language: str = "automatic",
     ):
         super().__init__(parent)
 
         self.manager = manager
         self.plans = plans
+        self.language = language
         self.thread_pool = (
             QThreadPool.globalInstance()
         )
 
         self.setWindowTitle(
-            "Cover für mehrere Alben"
+            tr("batch_cover_title", language)
         )
         self.resize(
             980,
@@ -162,12 +167,13 @@ class BatchCoverDialog(QDialog):
         )
 
         info = QLabel(
-            f"{len(plans)} Alben · "
-            f"{total_tracks} Audiodateien · "
-            f"{existing_count} vorhandene Master-Cover. "
-            "Vorhandene Master-Cover werden wiederverwendet. "
-            "Für fehlende Cover wird automatisch die beste "
-            "unterstützte Quelle gewählt."
+            tr(
+                "batch_cover_info",
+                language,
+                albums=len(plans),
+                tracks=total_tracks,
+                existing=existing_count,
+            )
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -178,11 +184,11 @@ class BatchCoverDialog(QDialog):
         )
         self.table.setHorizontalHeaderLabels(
             [
-                "Album",
-                "Titel",
-                "Master-Cover",
-                "Auflösung",
-                "Status",
+                tr("col_album", language),
+                tr("col_title", language),
+                tr("master_cover", language),
+                tr("resolution", language),
+                tr("col_status", language),
             ]
         )
         self.table.setEditTriggers(
@@ -196,16 +202,16 @@ class BatchCoverDialog(QDialog):
                 plan.display_name,
                 str(plan.track_count),
                 (
-                    "Vorhanden"
+                    tr("master_present", language)
                     if existing is not None
-                    else "Fehlt"
+                    else tr("master_missing", language)
                 ),
                 (
                     existing.dimensions
                     if existing is not None
                     else ""
                 ),
-                "Bereit",
+                tr("status_ready", language),
             ]
 
             for column, value in enumerate(
@@ -238,14 +244,14 @@ class BatchCoverDialog(QDialog):
         layout.addWidget(self.progress)
 
         self.status_label = QLabel(
-            "Noch nicht gestartet."
+            tr("status_not_started", language)
         )
         layout.addWidget(
             self.status_label
         )
 
         self.start_button = QPushButton(
-            "Cover-Verarbeitung starten"
+            tr("start_cover_processing", language)
         )
         self.start_button.clicked.connect(
             self.start_processing
@@ -269,6 +275,7 @@ class BatchCoverDialog(QDialog):
             self.manager,
             self.plans,
             reuse_existing_master=True,
+            language=self.language,
         )
         worker.signals.progress.connect(
             self.update_progress
@@ -303,9 +310,11 @@ class BatchCoverDialog(QDialog):
         failures = payload["failures"]
 
         self.status_label.setText(
-            (
-                f"{len(results)} Alben verarbeitet, "
-                f"{len(failures)} Fehler."
+            tr(
+                "batch_cover_progress",
+                self.language,
+                done=len(results),
+                failed=len(failures),
             )
         )
 
@@ -326,29 +335,27 @@ class BatchCoverDialog(QDialog):
                 4,
                 QTableWidgetItem(
                     (
-                        f"Fehler: {failure}"
+                        tr("error_status", self.language, message=failure)
                         if failure
-                        else "Abgeschlossen"
+                        else tr("row_done", self.language)
                     )
                 ),
             )
 
-        message = (
-            f"{len(results)} Alben wurden verarbeitet."
-        )
+        message = tr("batch_cover_done_msg", self.language, count=len(results))
 
         if failures:
-            message += (
-                "\n\nFehler:\n"
-                + "\n".join(
-                    f"{name}: {error}"
-                    for name, error in failures
-                )
+            message += tr(
+                "errors_block",
+                self.language,
+                errors="\n".join(
+                    f"{name}: {error}" for name, error in failures
+                ),
             )
 
         QMessageBox.information(
             self,
-            "Cover-Verarbeitung abgeschlossen",
+            tr("cover_batch_done_title", self.language),
             message,
         )
 
@@ -359,6 +366,6 @@ class BatchCoverDialog(QDialog):
         self.start_button.setEnabled(True)
         QMessageBox.critical(
             self,
-            "Cover-Verarbeitung fehlgeschlagen",
+            tr("cover_failed_title", self.language),
             message,
         )

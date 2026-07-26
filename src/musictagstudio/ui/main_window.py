@@ -2409,6 +2409,7 @@ class MainWindow(QMainWindow):
                 manager,
                 plans,
                 self,
+                language=self.language,
             )
             dialog.exec()
             self.refresh_active_editor()
