@@ -1,5 +1,12 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Amazon-Suche als Fallback
+
+- Die Gruppe „Auf Dienst öffnen" hat einen neuen Knopf **„Bei Amazon suchen"**:
+  öffnet eine Amazon-Suche nach Künstler + Album (z. B. für CD/Vinyl bei Alben
+  ohne digitale Version). Reiner Such-Deeplink, kein Streaming-Check nötig; die
+  Länder-Domain richtet sich nach der eingestellten Region (Standard amazon.de).
+
 ## TIDAL/Spotify: Live-Alben mit abweichendem Zusatz finden
 
 - Bei der Streaming-Prüfung wurden Alben mit abweichendem Klammerzusatz

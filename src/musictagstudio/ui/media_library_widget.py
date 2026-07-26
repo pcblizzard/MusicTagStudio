@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import urlencode
 import html
 import logging
 import re
@@ -92,6 +93,19 @@ from .formatting import localized_date
 def _is_placeholder_title(title: str) -> bool:
     """True für Anbieter-Platzhalter wie „Track 2" (Vorabveröffentlichungen)."""
     return bool(re.fullmatch(r"track\s*\d+", str(title or "").strip().casefold()))
+
+
+# Amazon-Länder-Domains je Länderkürzel (Standard: .de).
+_AMAZON_TLDS: dict[str, str] = {
+    "DE": "de", "AT": "de", "CH": "de",
+    "US": "com", "GB": "co.uk", "UK": "co.uk",
+    "FR": "fr", "IT": "it", "ES": "es", "NL": "nl",
+    "CA": "ca", "JP": "co.jp", "AU": "com.au",
+}
+
+
+def _amazon_tld(country: str) -> str:
+    return _AMAZON_TLDS.get(str(country or "").strip().upper(), "de")
 from ..player.preview import PreviewPlayer
 from ..services.cover import load_cover
 from ..providers.apple_music import (
@@ -877,6 +891,14 @@ class MediaLibraryWidget(QWidget):
         self.spotify_button.clicked.connect(
             lambda: self._open_streaming_provider(self.spotify_button)
         )
+        # Fallback für Alben ohne digitale Version: Amazon-Suche (Deeplink,
+        # kein Streaming-Check nötig, daher stets nutzbar bei gewähltem Album).
+        self.amazon_button = QPushButton("Bei Amazon suchen")
+        self.amazon_button.setToolTip(
+            "Künstler + Album bei Amazon suchen (z. B. für CD/Vinyl)"
+        )
+        self.amazon_button.setEnabled(False)
+        self.amazon_button.clicked.connect(self._search_amazon)
         # Gruppe "Prüfen": Streaming-/Qualitätsabfragen.
         check_group = QGroupBox("Prüfen")
         check_layout = QHBoxLayout(check_group)
@@ -892,6 +914,7 @@ class MediaLibraryWidget(QWidget):
         service_layout.addWidget(self.apple_button)
         service_layout.addWidget(self.tidal_button)
         service_layout.addWidget(self.spotify_button)
+        service_layout.addWidget(self.amazon_button)
         detail_layout.addWidget(service_group)
 
         self.streaming_status = QLabel(
@@ -2337,6 +2360,8 @@ class MediaLibraryWidget(QWidget):
         self.apple_button.setEnabled(False)
         self.tidal_button.setEnabled(False)
         self.spotify_button.setEnabled(False)
+        # Amazon-Suche braucht keinen Check und ist bei gewähltem Album stets nutzbar.
+        self.amazon_button.setEnabled(True)
         cached_streaming = self._streaming_results.get(group.release_group_id)
         if group.release_group_id not in self._streaming_results:
             cached_streaming = self._load_saved_streaming_result(group)
@@ -3660,6 +3685,20 @@ class MediaLibraryWidget(QWidget):
         url = str(button.property("url") or "")
         if url:
             webbrowser.open(url)
+
+    def _search_amazon(self) -> None:
+        """Öffnet eine Amazon-Suche nach Künstler + Album (Fallback ohne Digital)."""
+        group = self.current_group
+        if group is None:
+            return
+        terms = " ".join(
+            part for part in (group.artist, group.title) if part
+        ).strip()
+        if not terms:
+            return
+        tld = _amazon_tld(load_settings().apple_country)
+        url = f"https://www.amazon.{tld}/s?" + urlencode({"k": terms})
+        webbrowser.open(url)
 
     def _open_local(
         self,
