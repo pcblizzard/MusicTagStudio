@@ -2626,6 +2626,7 @@ class MainWindow(QMainWindow):
             feature_handling=settings.feature_handling,
             warnings=result.warnings,
             parent=self,
+            language=self.language,
         )
 
         if (
@@ -2738,6 +2739,7 @@ class MainWindow(QMainWindow):
             primary_source="musicbrainz",
             feature_handling=settings.feature_handling,
             parent=self,
+            language=self.language,
         )
 
         if (

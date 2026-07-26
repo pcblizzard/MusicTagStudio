@@ -20,8 +20,8 @@ from ..comparison_logic import (
     FieldComparison,
     build_field_comparisons,
 )
+from ..i18n import tr
 from ..models.metadata import (
-    FIELD_LABELS,
     MetadataCandidate,
 )
 from ..models.song import Song
@@ -34,11 +34,11 @@ _STATUS_COLUMN = len(SOURCE_ORDER) + 2
 _COLUMN_COUNT = len(SOURCE_ORDER) + 3
 
 
-def _header_labels() -> list[str]:
+def _header_labels(language: str = "automatic") -> list[str]:
     return (
-        ["Feld"]
+        [tr("col_field", language)]
         + [SOURCE_LABELS[source] for source in SOURCE_ORDER]
-        + ["Auswahl", "Hinweis"]
+        + [tr("col_selection", language), tr("col_hint", language)]
     )
 
 
@@ -57,6 +57,7 @@ class ComparisonDialog(QDialog):
         feature_handling: str,
         warnings: list[str] | None = None,
         parent=None,
+        language: str = "automatic",
     ):
         super().__init__(parent)
 
@@ -64,6 +65,7 @@ class ComparisonDialog(QDialog):
         self.candidates = candidates
         self.primary_source = primary_source
         self.feature_handling = feature_handling
+        self.language = language
 
         self.selected_fields: set[str] = set()
         self.selected_values: dict[str, str] = {}
@@ -79,7 +81,7 @@ class ComparisonDialog(QDialog):
             QComboBox,
         ] = {}
 
-        self.setWindowTitle("Metadaten vergleichen")
+        self.setWindowTitle(tr("comp_title", language))
         self.resize(1260, 680)
 
         layout = QVBoxLayout(self)
@@ -90,25 +92,20 @@ class ComparisonDialog(QDialog):
         )
 
         info = QLabel(
-            f"Bevorzugte Quelle: {preferred_name}. "
-            "Du kannst für jedes Feld einzeln zwischen den vorhandenen "
-            "Werten wählen. Erst der spätere Klick auf "
-            "„Änderungen speichern“ schreibt in die FLAC-Datei."
+            tr("comp_info", language, source=preferred_name)
         )
         info.setWordWrap(True)
         layout.addWidget(info)
 
         legend = QLabel(
-            "Blau: durch eine andere Quelle ergänzt · "
-            "Orange: Anbieter liefern unterschiedliche Werte"
+            tr("comp_legend", language)
         )
         legend.setWordWrap(True)
         layout.addWidget(legend)
 
         if warnings:
             warning = QLabel(
-                "Hinweise: "
-                + " | ".join(warnings)
+                tr("comp_warnings", language, warnings=" | ".join(warnings))
             )
             warning.setWordWrap(True)
             layout.addWidget(warning)
@@ -118,7 +115,7 @@ class ComparisonDialog(QDialog):
             _COLUMN_COUNT,
         )
         self.table.setHorizontalHeaderLabels(
-            _header_labels()
+            _header_labels(language)
         )
         self.table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
@@ -161,10 +158,10 @@ class ComparisonDialog(QDialog):
         self.button_box = QDialogButtonBox()
 
         self.apply_button = QPushButton(
-            "Auswahl in Editor übernehmen"
+            tr("apply_to_editor", language)
         )
         self.cancel_button = QPushButton(
-            "Abbrechen"
+            tr("cancel", language)
         )
 
         self.button_box.addButton(
@@ -191,7 +188,7 @@ class ComparisonDialog(QDialog):
         comparison: FieldComparison,
     ):
         field_item = QTableWidgetItem(
-            FIELD_LABELS[comparison.field_name]
+            tr(f"field_{comparison.field_name}", self.language)
         )
         self.table.setItem(
             row,
@@ -293,10 +290,11 @@ class ComparisonDialog(QDialog):
             selector.currentData()
         )
 
+        # Sentinel-Keys (stabil fuer Vergleiche), Anzeige uebersetzt.
         messages: list[str] = []
 
         if comparison.has_conflict:
-            messages.append("Konflikt")
+            messages.append("comp_conflict")
 
         if (
             selected_source != self.primary_source
@@ -306,24 +304,24 @@ class ComparisonDialog(QDialog):
                 "",
             )
         ):
-            messages.append("Ergänzt")
+            messages.append("comp_supplemented")
 
         if selected_source == self.primary_source:
-            messages.append("Bevorzugt")
+            messages.append("comp_preferred")
 
         status_item = self.table.item(
             row,
             _STATUS_COLUMN,
         )
         status_item.setText(
-            ", ".join(messages)
+            ", ".join(tr(message, self.language) for message in messages)
         )
 
         if comparison.has_conflict:
             status_item.setBackground(
                 CONFLICT_BACKGROUND
             )
-        elif "Ergänzt" in messages:
+        elif "comp_supplemented" in messages:
             status_item.setBackground(
                 SUPPLEMENT_BACKGROUND
             )
@@ -351,7 +349,7 @@ class ComparisonDialog(QDialog):
         font.setBold(True)
         header_item.setFont(font)
         header_item.setToolTip(
-            "Bevorzugte Metadatenquelle"
+            tr("preferred_source_tip", self.language)
         )
 
     def _accept_selection(self):
