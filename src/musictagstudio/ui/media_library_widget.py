@@ -1194,9 +1194,13 @@ class MediaLibraryWidget(QWidget):
         Der Abgleich erfolgt über den **Titel** – editionsübergreifend robust.
         Ein reiner Nummern-Abgleich wäre falsch, weil unterschiedliche Editionen
         (Standard/Deluxe) an derselben Position verschiedene Titel haben können
-        (Deluxe-Track 14 ≠ Standard-Track 14). Die Tracknummer dient daher nur
-        als Fallback für **Platzhalter**-Titel (Vorabveröffentlichungen wie
-        „Track 11"), wo online noch kein echter Titel vorliegt.
+        (Deluxe-Track 14 ≠ Standard-Track 14).
+
+        Der Titelvergleich läuft in zwei Stufen: erst exakt, dann tolerant –
+        Klammerzusätze und feat.-Angaben werden ignoriert, damit lokale
+        Varianten wie „Fickt euch alle (Bonustrack)" zum Online-Titel „Fickt
+        euch alle" passen. Die Tracknummer dient nur noch als Fallback für
+        **Platzhalter**-Titel (Vorabveröffentlichungen wie „Track 11").
         """
         wanted_title = _normalized(track.title)
         start_index = next(
@@ -1207,6 +1211,19 @@ class MediaLibraryWidget(QWidget):
             ),
             -1,
         )
+
+        if start_index < 0:
+            # Toleranter Abgleich: „… (Bonustrack)", „… [Live]", feat.-Zusätze.
+            wanted_fuzzy = _preview_title_key(track.title)
+            start_index = next(
+                (
+                    index
+                    for index, song in enumerate(songs)
+                    if wanted_fuzzy
+                    and _preview_title_key(song.title) == wanted_fuzzy
+                ),
+                -1,
+            )
 
         if start_index < 0 and _is_placeholder_title(track.title):
             start_index = next(

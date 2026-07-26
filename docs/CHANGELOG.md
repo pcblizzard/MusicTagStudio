@@ -13,6 +13,10 @@
   unterschiedliche Songs sind) werden dadurch nicht mehr fälschlich als
   vorhanden markiert. Die Tracknummer dient nur noch als Fallback für
   Platzhalter-Titel bei Vorabveröffentlichungen.
+- Der Titelvergleich ist zusätzlich **tolerant**: Klammerzusätze und
+  feat.-Angaben werden ignoriert, sodass lokale Varianten wie „Fickt euch alle
+  (Bonustrack)" korrekt zum Online-Titel „Fickt euch alle" passen und nicht
+  fälschlich als fehlend gelten.
 
 ## Klarere Statusbeschriftung
 

@@ -527,6 +527,55 @@ def test_tracklist_tints_local_green_and_missing_red(tmp_path):
     widget.deleteLater()
 
 
+def test_local_title_with_bonustrack_suffix_still_matches(tmp_path):
+    # Lokale Datei "Fickt euch alle (Bonustrack)" muss zum Online-Titel
+    # "Fickt euch alle" passen (Klammerzusatz wird ignoriert).
+    _app()
+    from types import SimpleNamespace
+
+    from musictagstudio.media_library.service import Track
+    from musictagstudio.models.song import Song
+    from musictagstudio.ui.media_library_widget import (
+        MediaLibraryWidget,
+        _TRACK_LOCAL_TINT,
+        _TRACK_MISSING_TINT,
+    )
+
+    f8 = tmp_path / "08.flac"
+    f9 = tmp_path / "09.flac"
+    f8.write_bytes(b"")
+    f9.write_bytes(b"")
+
+    widget = MediaLibraryWidget()
+    widget.current_artist_name = "Danger Dan"
+    widget.set_local_songs(
+        [
+            Song(title="Fickt euch alle (Bonustrack)", artist="Danger Dan",
+                 album_artist="Danger Dan", album="Dinkelbrot & Ölsardinen",
+                 disc="1", track="8", path=str(f8)),
+            Song(title="Rumsitzen [Bonustrack]", artist="Danger Dan",
+                 album_artist="Danger Dan", album="Dinkelbrot & Ölsardinen",
+                 disc="1", track="9", path=str(f9)),
+        ]
+    )
+    widget.current_group = SimpleNamespace(
+        title="Dinkelbrot & Ölsardinen", artist="Danger Dan", release_group_id="d"
+    )
+    widget._tracks_loaded(
+        [
+            Track(disc_number=1, track_number=8, title="Fickt euch alle", artist="Danger Dan"),
+            Track(disc_number=1, track_number=9, title="Rumsitzen", artist="Danger Dan"),
+            Track(disc_number=1, track_number=10, title="Ganz anderer Song", artist="Danger Dan"),
+        ]
+    )
+
+    assert widget._row_is_local == [True, True, False]
+    assert widget.track_table.item(0, 2).background().color() == _TRACK_LOCAL_TINT
+    assert widget.track_table.item(1, 2).background().color() == _TRACK_LOCAL_TINT
+    assert widget.track_table.item(2, 2).background().color() == _TRACK_MISSING_TINT
+    widget.deleteLater()
+
+
 def test_different_edition_ordering_not_false_matched(tmp_path):
     # Standard-Edition lokal: Track 14 = "SongB". Angezeigt wird die Deluxe-
     # Edition, deren Track 14 = "SongA" ist. Der Titel-Abgleich darf SongA NICHT
