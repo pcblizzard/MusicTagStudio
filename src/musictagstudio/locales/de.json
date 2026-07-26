@@ -596,6 +596,7 @@
   "spectrogram_load_failed": "Das erzeugte Spektrogramm konnte nicht geladen werden.",
   "spectrogram_ready": "Spektrogramm: {name}",
   "start_cover_processing": "Cover-Verarbeitung starten",
+  "status_ext_source_unreachable": "Externe Quelle nicht erreichbar",
   "status_local_available": "Lokal verfügbar",
   "status_local_unavailable": "Lokal nicht verfügbar",
   "status_not_started": "Noch nicht gestartet.",

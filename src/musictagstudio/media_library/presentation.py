@@ -4,6 +4,7 @@ from dataclasses import replace
 import re
 import unicodedata
 
+from ..i18n import tr
 from .discogs import DiscogsRelease
 from .service import ArtistCandidate, ReleaseGroup, Track
 
@@ -108,13 +109,16 @@ def label_artist_statistics(
     return sorted(result, key=lambda item: (-item[1], item[0].casefold()))
 
 
-def local_status_display(status: str) -> str:
-    return {
-        "Lokal verfügbar": "🟢 Lokal verfügbar",
-        "Externe Quelle nicht erreichbar": "🟡 Externe Quelle nicht erreichbar",
-        "Nicht vorhanden": "⚪ Lokal nicht verfügbar",
-        "Nein": "⚪ Lokal nicht verfügbar",
-    }.get(str(status or ""), "⚪ Lokal nicht verfügbar")
+def local_status_display(status: str, language: str = "automatic") -> str:
+    # Interne Statuscodes (Daten) -> Emoji + uebersetzter Anzeigetext.
+    mapping = {
+        "Lokal verfügbar": ("🟢 ", "status_local_available"),
+        "Externe Quelle nicht erreichbar": ("🟡 ", "status_ext_source_unreachable"),
+        "Nicht vorhanden": ("⚪ ", "status_local_unavailable"),
+        "Nein": ("⚪ ", "status_local_unavailable"),
+    }
+    emoji, key = mapping.get(str(status or ""), ("⚪ ", "status_local_unavailable"))
+    return emoji + tr(key, language)
 
 
 def release_source_details(

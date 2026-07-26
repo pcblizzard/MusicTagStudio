@@ -2258,7 +2258,8 @@ class MediaLibraryWidget(QWidget):
                 self.local_album_status.get(
                     _normalized(group.title),
                     "Nicht vorhanden",
-                )
+                ),
+                self.language,
             )
             extra = " · ".join([*group.labels[:2],*group.formats[:3]])
             values=(group.title,display_artist,group.first_release_date[:4],_category(group),source,extra,local)
