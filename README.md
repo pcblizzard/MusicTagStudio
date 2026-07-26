@@ -134,9 +134,9 @@ betas), as PySide6 does not yet provide wheels for them.
 ```powershell
 git clone https://github.com/pcblizzard/MusicTagStudio.git
 cd MusicTagStudio
-py -3.13 -m pip install --upgrade pip
-py -3.13 -m pip install -e .
-py -3.13 -m musictagstudio.main
+py -3.14 -m pip install --upgrade pip
+py -3.14 -m pip install -e .
+py -3.14 -m musictagstudio.main
 ```
 
 Audio analysis, ReplayGain and acoustic fingerprinting need `ffmpeg`,
@@ -147,7 +147,7 @@ features work without them.
 automatically, no `PATH` needed):
 
 ```powershell
-py -3.13 scripts/fetch_tools.py
+py -3.14 scripts/fetch_tools.py
 ```
 
 This places `ffmpeg.exe`, `ffprobe.exe` and `fpcalc.exe` under `tools/`
@@ -192,11 +192,11 @@ Keep a separate, verified backup of every important music library.
 ## Development and tests
 
 ```powershell
-py -3.13 -m pip install -e ".[dev]"
-py -3.13 -m pytest
-py -3.13 -m ruff check src tests
-py -3.13 -m mypy
-py -3.13 scripts/release_check.py
+py -3.14 -m pip install -e ".[dev]"
+py -3.14 -m pytest
+py -3.14 -m ruff check src tests
+py -3.14 -m mypy
+py -3.14 scripts/release_check.py
 ```
 
 The release check compiles the source tree, runs the complete test suite and

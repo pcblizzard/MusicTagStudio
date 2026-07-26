@@ -148,9 +148,9 @@ sollten vermieden werden, da PySide6 dafür noch keine Wheels bereitstellt.
 ```powershell
 git clone https://github.com/pcblizzard/MusicTagStudio.git
 cd MusicTagStudio
-py -3.13 -m pip install --upgrade pip
-py -3.13 -m pip install -e .
-py -3.13 -m musictagstudio.main
+py -3.14 -m pip install --upgrade pip
+py -3.14 -m pip install -e .
+py -3.14 -m musictagstudio.main
 ```
 
 Für Audioanalyse, ReplayGain und den akustischen Fingerabdruck werden
@@ -161,7 +161,7 @@ Lyrics- und Player-Funktionen laufen auch ohne diese Werkzeuge.
 sie dort automatisch, kein PATH nötig):
 
 ```powershell
-py -3.13 scripts/fetch_tools.py
+py -3.14 scripts/fetch_tools.py
 ```
 
 Damit landen `ffmpeg.exe`, `ffprobe.exe` und `fpcalc.exe` unter `tools/`
@@ -211,11 +211,11 @@ Backup.
 ## Entwicklung und Tests
 
 ```powershell
-py -3.13 -m pip install -e ".[dev]"
-py -3.13 -m pytest
-py -3.13 -m ruff check src tests
-py -3.13 -m mypy
-py -3.13 scripts/release_check.py
+py -3.14 -m pip install -e ".[dev]"
+py -3.14 -m pytest
+py -3.14 -m ruff check src tests
+py -3.14 -m mypy
+py -3.14 scripts/release_check.py
 ```
 
 Die Release-Prüfung kompiliert den Quellcode, führt die vollständige Testsuite
