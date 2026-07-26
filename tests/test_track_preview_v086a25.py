@@ -488,6 +488,63 @@ def test_resolve_apple_track_names_excludes_placeholders_and_unstreamable(monkey
     assert mapping == {(1, 1): "Die meisten meiner Freunde", (1, 11): "Keine Angst"}
 
 
+def test_tracklist_tints_local_green_and_missing_red(tmp_path):
+    # Teilweise lokal vorhandenes Album: vorhandene Titel grün, fehlende rot.
+    _app()
+    from types import SimpleNamespace
+
+    from musictagstudio.media_library.service import Track
+    from musictagstudio.models.song import Song
+    from musictagstudio.ui.media_library_widget import (
+        MediaLibraryWidget,
+        _TRACK_LOCAL_TINT,
+        _TRACK_MISSING_TINT,
+    )
+
+    local_file = tmp_path / "01.flac"
+    local_file.write_bytes(b"")
+
+    widget = MediaLibraryWidget()
+    widget.current_artist_name = "Danger Dan"
+    widget.set_local_songs(
+        [
+            Song(title="Vorhanden", artist="Danger Dan", album_artist="Danger Dan",
+                 album="Edition", disc="1", track="1", path=str(local_file)),
+        ]
+    )
+    widget.current_group = SimpleNamespace(
+        title="Edition", artist="Danger Dan", release_group_id="e"
+    )
+    widget._tracks_loaded(
+        [
+            Track(disc_number=1, track_number=1, title="Vorhanden", artist="Danger Dan"),
+            Track(disc_number=1, track_number=2, title="Fehlt", artist="Danger Dan"),
+        ]
+    )
+
+    assert widget.track_table.item(0, 2).background().color() == _TRACK_LOCAL_TINT
+    assert widget.track_table.item(1, 2).background().color() == _TRACK_MISSING_TINT
+    widget.deleteLater()
+
+
+def test_tracklist_no_tint_when_nothing_local():
+    # Kein lokaler Titel -> neutrale Liste (keine Rot-Flut bei fremden Alben).
+    _app()
+    from musictagstudio.media_library.service import Track
+    from musictagstudio.ui.media_library_widget import MediaLibraryWidget
+
+    widget = MediaLibraryWidget()
+    widget.current_group = None
+    widget._tracks_loaded(
+        [Track(disc_number=1, track_number=1, title="X", artist="A")]
+    )
+    # Standard-Hintergrund (kein gesetzter Brush).
+    from PySide6.QtCore import Qt
+
+    assert widget.track_table.item(0, 2).background().style() == Qt.BrushStyle.NoBrush
+    widget.deleteLater()
+
+
 def test_placeholder_track_shows_local_title(tmp_path):
     # Vorab-Album: Anbieter liefert Platzhalter „Track 11", die Datei liegt
     # aber lokal als „Keine Angst" vor -> Trackliste zeigt den lokalen Titel.

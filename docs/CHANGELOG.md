@@ -1,5 +1,14 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Trackliste zeigt die eigene Edition farbig
+
+- In der Trackliste sind lokal vorhandene Titel jetzt dezent **grün**, fehlende
+  dezent **rot** hinterlegt – so erkennt man auf einen Blick, welche Ausgabe man
+  besitzt (praktisch bei mehreren Editionen mit unterschiedlicher Trackzahl).
+  Die Einfärbung erscheint nur, wenn mindestens ein Titel lokal vorliegt; sonst
+  bleibt die Liste neutral. Eine Zusammenfassung nennt zusätzlich „X von Y
+  Titeln lokal vorhanden".
+
 ## Klarere Statusbeschriftung
 
 - Der lokale Verfügbarkeitsstatus „Nicht vorhanden" heißt jetzt überall

@@ -22,6 +22,7 @@ from PySide6.QtCore import (
     Qt,
 )
 from PySide6.QtGui import (
+    QColor,
     QIcon,
     QPalette,
     QPixmap,
@@ -106,6 +107,12 @@ _AMAZON_TLDS: dict[str, str] = {
 
 def _amazon_tld(country: str) -> str:
     return _AMAZON_TLDS.get(str(country or "").strip().upper(), "de")
+
+
+# Halbtransparente Zeilen-Tönung in der Trackliste: grün = lokal vorhanden,
+# rot = fehlt. Der niedrige Alphawert blendet sich in helle wie dunkle Themes.
+_TRACK_LOCAL_TINT = QColor(46, 200, 90, 45)
+_TRACK_MISSING_TINT = QColor(230, 70, 70, 45)
 from ..player.preview import PreviewPlayer
 from ..services.cover import load_cover
 from ..providers.apple_music import (
@@ -2780,6 +2787,10 @@ class MediaLibraryWidget(QWidget):
                     song = local_songs[index]
             matched_local.append(song)
         self._row_is_local = [song is not None for song in matched_local]
+        # Einfärbung nur, wenn das Album zumindest teilweise lokal vorliegt –
+        # so erkennt man, welche Edition man besitzt. Bei gar keinem lokalen
+        # Titel bleibt die Liste neutral.
+        any_local = any(self._row_is_local)
         # Zeilen mit Platzhalter-Titel („Track 11"), die *nicht* lokal ersetzt
         # wurden – für sie werden anschließend echte Apple-Namen nachgeladen.
         self._placeholder_rows: list[int] = []
@@ -2820,12 +2831,17 @@ class MediaLibraryWidget(QWidget):
             for column, value in enumerate(
                 values
             ):
+                cell = QTableWidgetItem(value)
+                if any_local:
+                    cell.setBackground(
+                        _TRACK_LOCAL_TINT
+                        if local_song is not None
+                        else _TRACK_MISSING_TINT
+                    )
                 self.track_table.setItem(
                     row,
                     column,
-                    QTableWidgetItem(
-                        value
-                    ),
+                    cell,
                 )
 
             preview_button = QPushButton()
@@ -2842,9 +2858,20 @@ class MediaLibraryWidget(QWidget):
             )
 
         self.track_table.resizeColumnsToContents()
-        self._set_status(
-            f"{len(tracks)} Titel geladen."
-        )
+        local_count = sum(self._row_is_local)
+        if local_count == len(tracks) and tracks:
+            self._set_status(
+                f"{len(tracks)} Titel geladen · alle lokal vorhanden."
+            )
+        elif local_count:
+            self._set_status(
+                f"{len(tracks)} Titel geladen · {local_count} davon lokal "
+                "vorhanden (grün = vorhanden, rot = fehlt)."
+            )
+        else:
+            self._set_status(
+                f"{len(tracks)} Titel geladen."
+            )
         self._refresh_track_preview_buttons()
         self._start_preview_resolution(tracks)
         self._start_apple_name_resolution(tracks)
