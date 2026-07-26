@@ -37,6 +37,11 @@ dev = [
     "pytest>=9",
     "ruff>=0.12",
 ]
+# Optionales Offline-Übersetzungsmodell für scripts/translate_i18n.py
+# (--provider argos / --fallback-argos). Nur Entwicklung, nicht in der App.
+translate = [
+    "argostranslate>=1.9",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

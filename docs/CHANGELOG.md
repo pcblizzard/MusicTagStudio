@@ -13,6 +13,10 @@
   ein `--estimate`-Trockenlauf und `--google-languages` schützen die Kontingente.
   API-Schlüssel kommen nur aus Umgebungsvariablen; die App ruft zur Laufzeit
   **keine** Übersetzungsdienste auf.
+- Zusätzlich **Argos Translate** als dritter, komplett **offline** und
+  budgetfreier Provider: `--provider argos` (alles offline) oder
+  `--fallback-argos` (offline weiter, sobald das DeepL-Budget erreicht ist).
+  Optionaler Dev-Extra `pip install ".[translate]"`; nicht Teil der App.
 
 ## Python 3.14 unterstützt
 

@@ -21,9 +21,16 @@ Ablauf:
      -> übernimmt die getroffene Auswahl in locales/es.json.
 
 Weitere Optionen:
-  --all-deepl   Alle in LANG_MAP hinterlegten Zielsprachen (aktuell ~30).
-  --overwrite   Auch bereits vorhandene Keys neu übersetzen.
-  --source de   Quellsprache (Standard de).
+  --all-deepl        Alle in LANG_MAP hinterlegten Zielsprachen (aktuell ~30).
+  --overwrite        Auch bereits vorhandene Keys neu übersetzen.
+  --source de        Quellsprache (Standard de).
+  --estimate         Nur Zeichen schätzen, nicht übersetzen.
+  --google-cap N     Harte Google-Zeichengrenze/Monat (Standard 490000).
+  --google-languages Nur diese Sprachen mit Google gegenprüfen.
+
+Offline-Übersetzung (kein API-Budget) via Argos – benötigt `pip install ".[translate]"`:
+  --provider argos   Alles offline mit Argos übersetzen (gratis, unbegrenzt).
+  --fallback-argos   Bei erreichtem DeepL-Budget offline mit Argos weitermachen.
 """
 
 from __future__ import annotations
@@ -155,6 +162,54 @@ def google_translate(text: str, google_code: str, key: str, source: str) -> str:
     return str(payload["data"]["translations"][0]["translatedText"])
 
 
+# Interne Sprachcodes -> Argos-Code (ISO 639-1). pt_PT/pt_BR teilen sich "pt".
+ARGOS_MAP: dict[str, str] = {
+    "en": "en", "es": "es", "fr": "fr", "it": "it", "pt_PT": "pt", "pt_BR": "pt",
+    "nl": "nl", "pl": "pl", "ru": "ru", "ja": "ja", "zh": "zh", "cs": "cs",
+    "da": "da", "fi": "fi", "sv": "sv", "tr": "tr", "uk": "uk", "el": "el",
+    "hu": "hu", "ro": "ro", "sk": "sk", "bg": "bg", "ko": "ko", "id": "id",
+    "et": "et", "lv": "lv", "lt": "lt", "sl": "sl", "ar": "ar", "nb": "nb",
+}
+
+_argos_ready: set[tuple[str, str]] = set()
+
+
+def _ensure_argos(from_code: str, to_code: str) -> None:
+    """Stellt sicher, dass das Argos-Modell from->to (ggf. via Englisch) da ist."""
+    if (from_code, to_code) in _argos_ready:
+        return
+    import argostranslate.package as pkg
+
+    installed = {(p.from_code, p.to_code) for p in pkg.get_installed_packages()}
+
+    def install(a: str, b: str) -> bool:
+        if (a, b) in installed:
+            return True
+        pkg.update_package_index()
+        match = next(
+            (p for p in pkg.get_available_packages() if p.from_code == a and p.to_code == b),
+            None,
+        )
+        if match is None:
+            return False
+        pkg.install_from_path(match.download())
+        installed.add((a, b))
+        return True
+
+    if not install(from_code, to_code):
+        # Kein Direktmodell -> über Englisch pivotieren (Argos übernimmt das).
+        if not (install(from_code, "en") and install("en", to_code)):
+            raise RuntimeError(f"Kein Argos-Modell {from_code}->{to_code} verfügbar.")
+    _argos_ready.add((from_code, to_code))
+
+
+def argos_translate(text: str, to_code: str, source: str) -> str:
+    import argostranslate.translate as translate
+
+    _ensure_argos(source, to_code)
+    return str(translate.translate(text, source, to_code))
+
+
 def deepl_usage(key: str) -> tuple[int, int]:
     """(verbraucht, Limit) an Zeichen laut DeepL – für die harte Budgetgrenze."""
     host = "api-free.deepl.com" if key.strip().endswith(":fx") else "api.deepl.com"
@@ -240,6 +295,55 @@ def run_estimate(args, source_catalog) -> int:
     return 0
 
 
+def _require_argos() -> bool:
+    try:
+        import argostranslate.translate  # noqa: F401
+        return True
+    except ModuleNotFoundError:
+        print(
+            "Fehler: Paket 'argostranslate' fehlt. Installieren mit:\n"
+            "  py -3.14 -m pip install \".[translate]\"",
+            file=sys.stderr,
+        )
+        return False
+
+
+def run_argos(args, source_catalog) -> int:
+    """Übersetzt vollständig offline mit Argos – ohne API, Budget oder Google."""
+    if not _require_argos():
+        return 2
+    print("Provider: Argos (offline, ohne Budget/Google).")
+    for lang in args.languages:
+        if lang == args.source or lang not in ARGOS_MAP:
+            print(f"Überspringe {lang} (unbekannt oder = Quelle).")
+            continue
+        to_code = ARGOS_MAP[lang]
+        catalog = load_catalog(lang)
+        review: dict[str, dict[str, str]] = {}
+        added = flagged = 0
+        for key, source_text in _missing_items(source_catalog, lang, args.overwrite):
+            protected, mapping = _protect(source_text)
+            try:
+                raw = argos_translate(protected, to_code, args.source)
+            except Exception as error:  # noqa: BLE001 – Argos-Modellfehler nicht fatal
+                print(f"  {lang}/{key}: Argos-Fehler ({error}).")
+                continue
+            out, ok = _restore(raw, mapping)
+            catalog[key] = out
+            added += 1
+            if not ok:
+                review[key] = {
+                    "argos": out,
+                    "chosen": "argos",
+                    "placeholder_warnung": "Platzhalter evtl. verändert!",
+                }
+                flagged += 1
+        save_catalog(lang, catalog)
+        _finish_review(lang, review)
+        print(f"{lang}: {added} via Argos übernommen ({flagged} mit Platzhalter-Warnung).")
+    return 0
+
+
 def run_translate(args) -> int:
     deepl_key = os.environ.get("DEEPL_API_KEY", "").strip()
     google_key = os.environ.get("GOOGLE_TRANSLATE_API_KEY", "").strip()
@@ -251,6 +355,9 @@ def run_translate(args) -> int:
 
     if args.estimate:
         return run_estimate(args, source_catalog)
+
+    if args.provider == "argos":
+        return run_argos(args, source_catalog)
 
     if not deepl_key:
         print("Fehler: DEEPL_API_KEY ist nicht gesetzt.", file=sys.stderr)
@@ -273,6 +380,7 @@ def run_translate(args) -> int:
         print("Hinweis: GOOGLE_TRANSLATE_API_KEY fehlt – ohne Zweitmeinung/Konflikte.")
 
     deepl_spent = 0
+    fell_back = False  # nach DeepL-Budget-Stopp auf Argos umgeschaltet
     for lang in args.languages:
         if lang == args.source or lang not in LANG_MAP:
             print(f"Überspringe {lang} (unbekannt oder = Quelle).")
@@ -287,24 +395,31 @@ def run_translate(args) -> int:
 
         for key, source_text in _missing_items(source_catalog, lang, args.overwrite):
             # Harte DeepL-Grenze: nicht überschreiten.
-            if deepl_spent + len(source_text) > deepl_remaining:
-                print(f"  DeepL-Budget erreicht – Abbruch bei {lang}/{key}.")
-                save_catalog(lang, catalog)
-                _finish_review(lang, review)
-                print(f"{lang}: {added} übernommen, {conflicts} Konflikte (DeepL-Budget-Stopp).")
-                return 0
+            if not fell_back and deepl_spent + len(source_text) > deepl_remaining:
+                if args.fallback_argos and _require_argos():
+                    fell_back = True
+                    print("  DeepL-Budget erreicht – ab hier Argos (offline).")
+                else:
+                    print(f"  DeepL-Budget erreicht – Abbruch bei {lang}/{key}.")
+                    save_catalog(lang, catalog)
+                    _finish_review(lang, review)
+                    print(f"{lang}: {added} übernommen, {conflicts} Konflikte (DeepL-Budget-Stopp).")
+                    return 0
 
             protected, mapping = _protect(source_text)
             try:
-                deepl_raw = deepl_translate(protected, deepl_code, deepl_key, args.source)
-            except (HTTPError, URLError, KeyError, ValueError) as error:
-                print(f"  {lang}/{key}: DeepL-Fehler ({error}) – übersprungen.")
+                if fell_back:
+                    primary_raw = argos_translate(protected, ARGOS_MAP[lang], args.source)
+                else:
+                    primary_raw = deepl_translate(protected, deepl_code, deepl_key, args.source)
+                    deepl_spent += len(source_text)
+            except Exception as error:  # noqa: BLE001 – einzelner Fehler nicht fatal
+                print(f"  {lang}/{key}: Übersetzungsfehler ({error}) – übersprungen.")
                 continue
-            deepl_spent += len(source_text)
-            deepl_out, deepl_ok = _restore(deepl_raw, mapping)
+            deepl_out, deepl_ok = _restore(primary_raw, mapping)
 
             google_out = None
-            if use_google_for_lang and not google_stopped:
+            if not fell_back and use_google_for_lang and not google_stopped:
                 # Harte Google-Grenze: davor stoppen, NICHT überschreiten.
                 if google_used + len(source_text) > args.google_cap:
                     google_stopped = True
@@ -398,6 +513,14 @@ def main() -> int:
     parser.add_argument(
         "--google-languages", type=_parse_languages, default=None,
         help="Nur diese Sprachen mit Google gegenprüfen (Rest DeepL-only).",
+    )
+    parser.add_argument(
+        "--provider", choices=("deepl", "argos"), default="deepl",
+        help="Primärer Übersetzer: deepl (API) oder argos (offline, gratis).",
+    )
+    parser.add_argument(
+        "--fallback-argos", action="store_true",
+        help="Bei erreichtem DeepL-Budget offline mit Argos weitermachen statt zu stoppen.",
     )
     args = parser.parse_args()
 
