@@ -12,7 +12,9 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        # Ränder der unterstützten Spanne (requires-python >=3.12): Untergrenze
+        # 3.12 und neueste 3.14. Die Mitte (3.13) liegt sicher dazwischen.
+        python-version: ["3.12", "3.14"]
     env:
       # Headless Qt: erzwingt das Offscreen-Backend, damit QMediaPlayer/
       # QAudioOutput ohne Audiogerät nicht nativ abstürzen (flaky auf 3.12).
