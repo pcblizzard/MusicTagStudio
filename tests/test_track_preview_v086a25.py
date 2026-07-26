@@ -417,6 +417,77 @@ def test_single_track_matches_by_title_not_colliding_number(tmp_path):
     widget.deleteLater()
 
 
+def test_apple_names_merged_into_placeholder_rows():
+    # Ohne lokale Datei ersetzt der echte Apple-Name den Platzhalter „Track 11".
+    _app()
+    from musictagstudio.media_library.service import Track
+    from musictagstudio.ui.media_library_widget import MediaLibraryWidget
+
+    widget = MediaLibraryWidget()
+    widget.current_group = None  # keine echte Netzwerkauflösung im Test
+    widget._tracks_loaded(
+        [
+            Track(disc_number=1, track_number=10, title="Track 10", artist="Danger Dan"),
+            Track(disc_number=1, track_number=11, title="Track 11", artist="Danger Dan"),
+        ]
+    )
+    assert widget._placeholder_rows == [0, 1]
+
+    widget._apple_names_resolved(
+        widget._apple_name_token, {(1, 11): "Keine Angst"}
+    )
+    # Track 11 hat einen echten Namen -> ersetzt; Track 10 bleibt Platzhalter.
+    assert widget.track_table.item(1, 2).text() == "Keine Angst - Danger Dan"
+    assert widget.track_table.item(0, 2).text() == "Track 10 - Danger Dan"
+
+    # Veralteter Token wird ignoriert.
+    widget._apple_names_resolved(999, {(1, 10): "Sollte nicht"})
+    assert widget.track_table.item(0, 2).text() == "Track 10 - Danger Dan"
+    widget.deleteLater()
+
+
+def test_resolve_apple_track_names_excludes_placeholders_and_unstreamable(monkeypatch):
+    from musictagstudio.direct_album_lookup import DirectAlbumResult, DirectAlbumTrack
+    from musictagstudio.providers import apple_music
+    from musictagstudio.ui import media_library_widget as mlw
+
+    monkeypatch.setattr(
+        apple_music,
+        "search_album_variants",
+        lambda *a, **k: [
+            apple_music.AppleAlbumCandidate(
+                collection_id="1", album="Keine Angst", artist="Danger Dan",
+                track_count=3, year="2026", country="DE", confidence=99,
+            )
+        ],
+    )
+
+    def _t(title, track, streamable):
+        return DirectAlbumTrack(
+            title=title, artist="Danger Dan", album_artist="Danger Dan",
+            album="Keine Angst", genre="", year="2026", track=track,
+            total_tracks="3", disc="1", total_discs="1",
+            is_streamable=streamable,
+        )
+
+    from musictagstudio import direct_album_lookup
+    monkeypatch.setattr(
+        direct_album_lookup,
+        "lookup_apple_album_by_id",
+        lambda album_id, *, country: DirectAlbumResult(
+            provider="apple_music", album="Keine Angst", album_artist="Danger Dan",
+            tracks=(
+                _t("Die meisten meiner Freunde", "1", True),
+                _t("Track 2", "2", False),  # Platzhalter + nicht streambar
+                _t("Keine Angst", "11", True),
+            ),
+        ),
+    )
+
+    mapping = mlw._resolve_apple_track_names("Keine Angst", "Danger Dan", 3, "DE")
+    assert mapping == {(1, 1): "Die meisten meiner Freunde", (1, 11): "Keine Angst"}
+
+
 def test_placeholder_track_shows_local_title(tmp_path):
     # Vorab-Album: Anbieter liefert Platzhalter „Track 11", die Datei liegt
     # aber lokal als „Keine Angst" vor -> Trackliste zeigt den lokalen Titel.

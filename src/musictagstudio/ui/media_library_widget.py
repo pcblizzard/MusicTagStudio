@@ -312,6 +312,67 @@ def _resolve_apple_previews(
     return _preview_map_from_tracks(result.tracks)
 
 
+def _resolve_apple_track_names(
+    album: str,
+    artist: str,
+    expected_track_count: int,
+    country: str,
+) -> dict[tuple[int, int], str]:
+    """Echte Apple-Titel je (Disc, Track) für bereits veröffentlichte Titel.
+
+    Für Vorabveröffentlichungen liefern Discogs/MusicBrainz Platzhalter
+    („Track 11"), obwohl einzelne Titel bei Apple schon erschienen sind. Diese
+    echten Namen werden hier geholt (nur streambare, keine Platzhalter), damit
+    sie die Trackliste auch ohne lokale Datei korrekt anzeigt.
+    """
+    from ..direct_album_lookup import (
+        DirectAlbumLookupError,
+        lookup_apple_album_by_id,
+    )
+    from ..providers.apple_music import (
+        MINIMUM_ALBUM_CONFIDENCE,
+        AppleMusicProviderError,
+        search_album_variants,
+    )
+
+    try:
+        candidates = search_album_variants(
+            album,
+            artist,
+            expected_track_count=expected_track_count,
+            country=country,
+        )
+    except AppleMusicProviderError:
+        return {}
+
+    best = next(
+        (
+            candidate
+            for candidate in candidates
+            if candidate.confidence >= MINIMUM_ALBUM_CONFIDENCE
+        ),
+        None,
+    )
+    if best is None:
+        return {}
+
+    try:
+        result = lookup_apple_album_by_id(best.collection_id, country=best.country)
+    except DirectAlbumLookupError:
+        return {}
+
+    mapping: dict[tuple[int, int], str] = {}
+    for track in result.tracks:
+        if not track.is_streamable or _is_placeholder_title(track.title):
+            continue
+        try:
+            key = (int(track.disc or 1), int(track.track))
+        except (TypeError, ValueError):
+            continue
+        mapping[key] = track.title
+    return mapping
+
+
 def _preview_title_key(title: str) -> str:
     """Normalisiert einen Titel für den Vorschau-Abgleich.
 
@@ -415,6 +476,8 @@ class MediaLibraryWidget(QWidget):
         # vollen Titel statt einer 30-Sekunden-Vorschau.
         self._row_is_local: list[bool] = []
         self._preview_token = 0
+        # Token gegen veraltete Apple-Namensauflösungen (Platzhalter-Titel).
+        self._apple_name_token = 0
         # Zeilenindex der aktuell spielenden Vorschau (-1 = keine). Die
         # Hervorhebung erfolgt zeilen- statt urlbasiert, weil bei Mehrfach-
         # Discs dieselbe Vorschau-URL mehreren Zeilen zugeordnet sein kann.
@@ -2682,6 +2745,9 @@ class MediaLibraryWidget(QWidget):
                     song = local_songs[index]
             matched_local.append(song)
         self._row_is_local = [song is not None for song in matched_local]
+        # Zeilen mit Platzhalter-Titel („Track 11"), die *nicht* lokal ersetzt
+        # wurden – für sie werden anschließend echte Apple-Namen nachgeladen.
+        self._placeholder_rows: list[int] = []
         self.track_table.setRowCount(
             len(tracks)
         )
@@ -2694,14 +2760,19 @@ class MediaLibraryWidget(QWidget):
             # Liefert der Anbieter einen Platzhalter („Track 11") und liegt die
             # Datei lokal vor, den echten lokalen Titel + Dauer anzeigen.
             local_song = matched_local[row]
-            if local_song is not None and _is_placeholder_title(track.title):
-                title_text = (
-                    f"{local_song.title} - {local_song.artist}"
-                    if local_song.artist
-                    else local_song.title
-                )
-                if not duration_text:
-                    duration_text = _duration(local_duration_ms(local_song.path))
+            if _is_placeholder_title(track.title):
+                if local_song is not None:
+                    title_text = (
+                        f"{local_song.title} - {local_song.artist}"
+                        if local_song.artist
+                        else local_song.title
+                    )
+                    if not duration_text:
+                        duration_text = _duration(
+                            local_duration_ms(local_song.path)
+                        )
+                else:
+                    self._placeholder_rows.append(row)
             values = (
                 str(
                     track.disc_number
@@ -2741,6 +2812,43 @@ class MediaLibraryWidget(QWidget):
         )
         self._refresh_track_preview_buttons()
         self._start_preview_resolution(tracks)
+        self._start_apple_name_resolution(tracks)
+
+    def _start_apple_name_resolution(self, tracks: list) -> None:
+        """Lädt echte Apple-Namen für verbliebene Platzhalter-Titel nach."""
+        group = self.current_group
+        if group is None or not tracks or not self._placeholder_rows:
+            return
+
+        self._apple_name_token += 1
+        token = self._apple_name_token
+        settings = load_settings()
+        self._run(
+            _resolve_apple_track_names,
+            group.title,
+            group.artist,
+            len(tracks),
+            settings.apple_country,
+            finished=lambda mapping, resolved=token: (
+                self._apple_names_resolved(resolved, mapping)
+            ),
+            failed=lambda _error: None,
+        )
+
+    def _apple_names_resolved(self, token: int, mapping: dict) -> None:
+        if token != self._apple_name_token or not mapping:
+            return
+        for row in self._placeholder_rows:
+            if not (0 <= row < len(self.current_tracks)):
+                continue
+            track = self.current_tracks[row]
+            key = (track.disc_number, track.track_number)
+            name = mapping.get(key)
+            if not name:
+                continue
+            display = f"{name} - {track.artist}" if track.artist else name
+            self.track_table.setItem(row, 2, QTableWidgetItem(display))
+        self.track_table.resizeColumnsToContents()
 
     def _discogs_tracks_loaded(
         self,

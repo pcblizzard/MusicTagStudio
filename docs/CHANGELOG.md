@@ -1,5 +1,13 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Echte Apple-Titel für veröffentlichte Vorab-Tracks
+
+- Zeigt die Trackliste für eine Vorabveröffentlichung Platzhalter („Track 11")
+  und liegt der Titel nicht lokal vor, werden nach der Prüfung die **echten
+  Apple-Namen** für bereits veröffentlichte Titel nachgeladen (nur streambare,
+  echte Namen). Noch nicht erschienene Titel bleiben „Track N", weil ihr Name
+  bei keiner Quelle existiert.
+
 ## Vorab-Feinschliff: lokale Titel und lokalisiertes Datum
 
 - Liefert der Anbieter für eine Vorabveröffentlichung einen Platzhalter
