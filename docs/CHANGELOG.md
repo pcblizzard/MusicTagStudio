@@ -8,6 +8,11 @@
   Die Einfärbung erscheint nur, wenn mindestens ein Titel lokal vorliegt; sonst
   bleibt die Liste neutral. Eine Zusammenfassung nennt zusätzlich „X von Y
   Titeln lokal vorhanden".
+- Der Abgleich erfolgt über den **Titel**, nicht die Position. Editionen mit
+  abweichender Reihenfolge (Standard vs. Deluxe, bei denen z. B. Track 14
+  unterschiedliche Songs sind) werden dadurch nicht mehr fälschlich als
+  vorhanden markiert. Die Tracknummer dient nur noch als Fallback für
+  Platzhalter-Titel bei Vorabveröffentlichungen.
 
 ## Klarere Statusbeschriftung
 

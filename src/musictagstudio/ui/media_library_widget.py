@@ -1191,10 +1191,12 @@ class MediaLibraryWidget(QWidget):
     def _match_local_index(self, track, songs: list[Song]) -> int:
         """Findet den Index der lokalen Datei zu einem Albumtrack (oder -1).
 
-        Der Titel wird zuerst geprüft: Die angezeigte Veröffentlichung (z. B.
-        eine Single) kann eine andere Tracknummerierung haben als der lokale
-        Ordner (z. B. das ganze Album). Ein reiner Nummern-Abgleich würde dann
-        die falsche Datei treffen. Die Tracknummer dient nur noch als Fallback.
+        Der Abgleich erfolgt über den **Titel** – editionsübergreifend robust.
+        Ein reiner Nummern-Abgleich wäre falsch, weil unterschiedliche Editionen
+        (Standard/Deluxe) an derselben Position verschiedene Titel haben können
+        (Deluxe-Track 14 ≠ Standard-Track 14). Die Tracknummer dient daher nur
+        als Fallback für **Platzhalter**-Titel (Vorabveröffentlichungen wie
+        „Track 11"), wo online noch kein echter Titel vorliegt.
         """
         wanted_title = _normalized(track.title)
         start_index = next(
@@ -1206,7 +1208,7 @@ class MediaLibraryWidget(QWidget):
             -1,
         )
 
-        if start_index < 0:
+        if start_index < 0 and _is_placeholder_title(track.title):
             start_index = next(
                 (
                     index

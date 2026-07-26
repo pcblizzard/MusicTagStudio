@@ -527,6 +527,50 @@ def test_tracklist_tints_local_green_and_missing_red(tmp_path):
     widget.deleteLater()
 
 
+def test_different_edition_ordering_not_false_matched(tmp_path):
+    # Standard-Edition lokal: Track 14 = "SongB". Angezeigt wird die Deluxe-
+    # Edition, deren Track 14 = "SongA" ist. Der Titel-Abgleich darf SongA NICHT
+    # per Positionsnummer auf das lokale SongB legen (sonst faelschlich gruen).
+    _app()
+    from types import SimpleNamespace
+
+    from musictagstudio.media_library.service import Track
+    from musictagstudio.models.song import Song
+    from musictagstudio.ui.media_library_widget import (
+        MediaLibraryWidget,
+        _TRACK_LOCAL_TINT,
+        _TRACK_MISSING_TINT,
+    )
+
+    local_14 = tmp_path / "14.flac"
+    local_14.write_bytes(b"")
+
+    widget = MediaLibraryWidget()
+    widget.current_artist_name = "Artist"
+    widget.set_local_songs(
+        [
+            Song(title="SongB", artist="Artist", album_artist="Artist",
+                 album="Album", disc="1", track="14", path=str(local_14)),
+        ]
+    )
+    widget.current_group = SimpleNamespace(
+        title="Album", artist="Artist", release_group_id="d"
+    )
+    # Deluxe: Track 14 ist "SongA" (nicht lokal), zusaetzlich "SongB" an Pos 15.
+    widget._tracks_loaded(
+        [
+            Track(disc_number=1, track_number=14, title="SongA", artist="Artist"),
+            Track(disc_number=1, track_number=15, title="SongB", artist="Artist"),
+        ]
+    )
+
+    # SongA (Deluxe Track 14) ist NICHT lokal -> rot; SongB (per Titel) -> gruen.
+    assert widget._row_is_local == [False, True]
+    assert widget.track_table.item(0, 2).background().color() == _TRACK_MISSING_TINT
+    assert widget.track_table.item(1, 2).background().color() == _TRACK_LOCAL_TINT
+    widget.deleteLater()
+
+
 def test_tracklist_no_tint_when_nothing_local():
     # Kein lokaler Titel -> neutrale Liste (keine Rot-Flut bei fremden Alben).
     _app()
