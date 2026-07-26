@@ -13,6 +13,11 @@ from musictagstudio.ui.main_window import MainWindow
 def test_settings_workspace_clears_sidebar_selection_and_updates_status():
     app = QApplication.instance() or QApplication([])
     window = MainWindow()
+    # Der Start plant load_configured_sources per QTimer.singleShot(0, ...) ein.
+    # Ohne konfigurierte Musikquelle springt das selbst nach Einstellungen und
+    # setzt eine eigene Statusmeldung. Diesen Startlauf zuerst abarbeiten, damit
+    # der Test unabhängig von der lokalen Konfiguration bzw. dem CI-Runner ist.
+    app.processEvents()
 
     settings_button = window.workspace_buttons.button(4)
     assert settings_button is None
