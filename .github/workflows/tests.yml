@@ -13,6 +13,10 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.12", "3.13"]
+    env:
+      # Headless Qt: erzwingt das Offscreen-Backend, damit QMediaPlayer/
+      # QAudioOutput ohne Audiogerät nicht nativ abstürzen (flaky auf 3.12).
+      QT_QPA_PLATFORM: offscreen
 
     steps:
       - uses: actions/checkout@v6
