@@ -1,5 +1,16 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Warteschlange bleibt über Neustarts erhalten
+
+- Die Wiedergabe-Warteschlange (Titelliste und aktueller Titel) wird beim
+  Beenden gespeichert und beim nächsten Start wiederhergestellt – bewusst
+  **pausiert**, es wird also nichts automatisch abgespielt.
+- Nicht mehr vorhandene Dateien werden beim Wiederherstellen still
+  übersprungen; sehr große Warteschlangen werden auf 500 Titel begrenzt, damit
+  die Einstellungsdatei nicht aufgebläht wird.
+- Cover-Bilder werden nicht mitgespeichert, sondern beim Laden wieder aus der
+  Datei gelesen.
+
 ## Diskografie: keine Feature-Alben, korrekte Vinyl-Tracknummern
 
 - Alben, auf denen der gesuchte Künstler nur als Gast/Feature auftritt

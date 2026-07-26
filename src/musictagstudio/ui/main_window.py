@@ -3234,6 +3234,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent):
         if self.confirm_pending_changes():
+            self.player_bar.save_queue()
             self.windows_system_media.stop()
             self.windows_media_keys.stop()
             self.player_bar.engine.stop()

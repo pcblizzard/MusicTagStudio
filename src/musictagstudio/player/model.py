@@ -1,9 +1,55 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 import random
 
 from ..models.song import Song
+
+
+# Obergrenze für die persistierte Warteschlange, damit sehr große Queues die
+# Einstellungsdatei nicht aufblähen.
+QUEUE_PERSIST_LIMIT = 500
+
+# Song-Felder, die persistiert werden (alle Textfelder inkl. Pfad). Die
+# Cover-Bytes werden bewusst nicht gespeichert – sie sind aus der Datei
+# rekonstruierbar und würden die Ablage unnötig vergrößern.
+_PERSISTED_SONG_FIELDS = tuple(
+    f.name for f in fields(Song) if f.name != "cover"
+)
+
+
+def song_to_dict(song: Song) -> dict[str, str]:
+    """Serialisiert einen Song ohne Cover-Bytes für die Ablage."""
+    return {name: str(getattr(song, name, "")) for name in _PERSISTED_SONG_FIELDS}
+
+
+def song_from_dict(data: dict) -> Song:
+    """Rekonstruiert einen Song aus persistierten Feldern (ohne Cover)."""
+    if not isinstance(data, dict):
+        data = {}
+
+    def get(name: str) -> str:
+        return str(data.get(name, ""))
+
+    # Explizite Konstruktion (statt **dict) für sauberes Typchecking.
+    return Song(
+        title=get("title"),
+        artist=get("artist"),
+        album_artist=get("album_artist"),
+        album=get("album"),
+        genre=get("genre"),
+        year=get("year"),
+        track=get("track"),
+        total_tracks=get("total_tracks"),
+        disc=get("disc"),
+        total_discs=get("total_discs"),
+        isrc=get("isrc"),
+        label=get("label"),
+        copyright=get("copyright"),
+        composer=get("composer"),
+        comment=get("comment"),
+        path=get("path"),
+    )
 
 
 @dataclass

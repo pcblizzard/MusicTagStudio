@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from PySide6.QtCore import QEvent, QSettings, QSize, Qt
 from PySide6.QtGui import QPalette, QPixmap
 from PySide6.QtMultimedia import QMediaPlayer
@@ -15,7 +18,12 @@ from PySide6.QtWidgets import (
 from ..models.song import Song
 from ..icons import make_icon
 from .engine import PlayerEngine
-from .model import format_milliseconds
+from .model import (
+    QUEUE_PERSIST_LIMIT,
+    format_milliseconds,
+    song_from_dict,
+    song_to_dict,
+)
 from .queue_dialog import QueueDialog
 from ..services.cover import load_cover
 
@@ -149,6 +157,59 @@ class PlayerBar(QWidget):
         self._muted_changed(saved_muted)
         self._apply_icons()
         self._icons_ready = True
+        self.restore_queue()
+
+    # -- Warteschlange speichern/wiederherstellen ----------------------------
+
+    def save_queue(self) -> None:
+        """Speichert die aktuelle Warteschlange (Songs + Index) beim Beenden."""
+        songs = self.engine.queue.songs[:QUEUE_PERSIST_LIMIT]
+        if not songs:
+            self.settings.remove("player/queue")
+            return
+        index = self.engine.queue.current_index
+        if index >= len(songs):
+            index = -1
+        payload = {
+            "songs": [song_to_dict(song) for song in songs],
+            "current_index": index,
+        }
+        self.settings.setValue("player/queue", json.dumps(payload))
+
+    def restore_queue(self) -> None:
+        """Stellt die gespeicherte Warteschlange wieder her (pausiert).
+
+        Nicht mehr vorhandene Dateien werden übersprungen; es wird bewusst
+        nichts automatisch abgespielt.
+        """
+        raw = self.settings.value("player/queue", "")
+        if not raw:
+            return
+        try:
+            payload = json.loads(str(raw))
+            entries = payload.get("songs", [])
+            saved_index = int(payload.get("current_index", -1))
+        except (ValueError, TypeError, AttributeError):
+            self.settings.remove("player/queue")
+            return
+
+        songs = []
+        start_index = 0
+        for position, entry in enumerate(entries):
+            song = song_from_dict(entry)
+            if not song.path or not Path(song.path).is_file():
+                continue
+            if position == saved_index:
+                # Position des gespeicherten Titels in der gefilterten Liste.
+                start_index = len(songs)
+            songs.append(song)
+
+        if not songs:
+            return
+
+        # autoplay=False: Die Queue wird nur geladen und angezeigt, nicht
+        # gestartet – der Nutzer entscheidet, ob weitergehört wird.
+        self.engine.set_queue(songs, start_index, autoplay=False)
 
     # -- Icons ---------------------------------------------------------------
 
