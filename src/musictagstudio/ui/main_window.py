@@ -824,6 +824,10 @@ class MainWindow(QMainWindow):
         self.player_bar.status_requested.connect(
             self._show_player_status
         )
+        # Gespeicherte Warteschlange wiederherstellen (pausiert). Bewusst erst
+        # hier, damit direkt konstruierte PlayerBar-Instanzen (z. B. in Tests)
+        # nicht die echte Ablage lesen.
+        self.player_bar.restore_queue()
         self.play_pause_shortcut = QShortcut(
             QKeySequence(Qt.Key.Key_Space),
             self,

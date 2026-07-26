@@ -352,16 +352,68 @@ def test_media_library_local_track_plays_full_song(tmp_path):
 
     emitted: dict = {}
     widget.play_local_tracks.connect(
-        lambda songs, index: emitted.update(count=len(songs), index=index)
+        lambda songs, index: emitted.update(
+            titles=[s.title for s in songs], index=index
+        )
     )
     widget._play_track(0)
-    assert emitted == {"count": 2, "index": 0}
+    # Nur die lokal vorhandenen Titel der Trackliste landen in der Queue –
+    # T2 liegt zwar lokal vor, ist aber kein Track dieser Veröffentlichung.
+    assert emitted == {"titles": ["T1"], "index": 0}
 
     # Nicht-lokaler Track ruft den Vorschau-Pfad auf.
     calls: list[int] = []
     widget._toggle_track_preview = lambda row: calls.append(row)
     widget._play_track(1)
     assert calls == [1]
+    widget.deleteLater()
+
+
+def test_single_track_matches_by_title_not_colliding_number(tmp_path):
+    # Szenario aus dem Bug-Report: Eine Single "Keine Angst" (1 Track, Nr. 1)
+    # liegt lokal im selben Ordner wie das Album (Track 01 = "Die meisten
+    # meiner Freunde", Track 11 = "Keine Angst"). Der reine Nummern-Abgleich
+    # traf frueher faelschlich Track 01.
+    _app()
+    from types import SimpleNamespace
+
+    from musictagstudio.media_library.service import Track
+    from musictagstudio.models.song import Song
+    from musictagstudio.ui.media_library_widget import MediaLibraryWidget
+
+    file_first = tmp_path / "01.flac"
+    file_title = tmp_path / "11.flac"
+    file_first.write_bytes(b"")
+    file_title.write_bytes(b"")
+
+    widget = MediaLibraryWidget()
+    widget.current_artist_name = "Danger Dan"
+    widget.set_local_songs(
+        [
+            Song(title="Die meisten meiner Freunde", artist="Danger Dan",
+                 album_artist="Danger Dan", album="Keine Angst",
+                 disc="1", track="1", path=str(file_first)),
+            Song(title="Keine Angst", artist="Danger Dan",
+                 album_artist="Danger Dan", album="Keine Angst",
+                 disc="1", track="11", path=str(file_title)),
+        ]
+    )
+    widget.current_group = SimpleNamespace(
+        title="Keine Angst", artist="Danger Dan", release_group_id="s"
+    )
+    # Single-Trackliste: nur "Keine Angst" als Track 1.
+    widget._tracks_loaded([Track(disc_number=1, track_number=1, title="Keine Angst")])
+
+    emitted: dict = {}
+    widget.play_local_tracks.connect(
+        lambda songs, index: emitted.update(
+            titles=[s.title for s in songs], index=index
+        )
+    )
+    widget._play_track(0)
+
+    # Nur der geklickte Titel (per Titel korrekt zugeordnet) landet in der Queue.
+    assert emitted == {"titles": ["Keine Angst"], "index": 0}
     widget.deleteLater()
 
 

@@ -1,5 +1,16 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Korrekte lokale Wiedergabe aus der Trackliste
+
+- Beim Klick auf einen Titel wird die lokale Datei jetzt zuerst über den
+  **Titel** zugeordnet (Tracknummer nur als Fallback). Eine Single kann eine
+  andere Nummerierung haben als der lokale Album-Ordner; der reine
+  Nummern-Abgleich traf sonst die falsche Datei (z. B. „Die meisten meiner
+  Freunde" statt „Keine Angst").
+- Die Wiedergabeliste enthält nur noch die **lokal vorhandenen Titel der
+  angezeigten Trackliste** – keine ordner-fremden Dateien mehr, die zufällig
+  im selben Ordner liegen (etwa weitere Album-Titel bei einer Single).
+
 ## Weiterer UI-Feinschliff und nachvollziehbare Fehler
 
 - **Rückgängig/Wiederholen** nutzen jetzt SVG-Icons statt der Text-Pfeile

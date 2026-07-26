@@ -1072,26 +1072,33 @@ class MediaLibraryWidget(QWidget):
         self._refresh_local_markers()
 
     def _match_local_index(self, track, songs: list[Song]) -> int:
-        """Findet den Index der lokalen Datei zu einem Albumtrack (oder -1)."""
+        """Findet den Index der lokalen Datei zu einem Albumtrack (oder -1).
+
+        Der Titel wird zuerst geprüft: Die angezeigte Veröffentlichung (z. B.
+        eine Single) kann eine andere Tracknummerierung haben als der lokale
+        Ordner (z. B. das ganze Album). Ein reiner Nummern-Abgleich würde dann
+        die falsche Datei treffen. Die Tracknummer dient nur noch als Fallback.
+        """
+        wanted_title = _normalized(track.title)
         start_index = next(
             (
                 index
                 for index, song in enumerate(songs)
-                if (
-                    _tag_number(song.disc) == int(track.disc_number or 0)
-                    and _tag_number(song.track) == int(track.track_number or 0)
-                )
+                if wanted_title and _normalized(song.title) == wanted_title
             ),
             -1,
         )
 
         if start_index < 0:
-            wanted_title = _normalized(track.title)
             start_index = next(
                 (
                     index
                     for index, song in enumerate(songs)
-                    if _normalized(song.title) == wanted_title
+                    if (
+                        _tag_number(song.disc) == int(track.disc_number or 0)
+                        and _tag_number(song.track)
+                        == int(track.track_number or 0)
+                    )
                 ),
                 -1,
             )
@@ -1099,16 +1106,35 @@ class MediaLibraryWidget(QWidget):
         return start_index
 
     def _local_playback_for_row(self, row: int) -> tuple[list[Song], int]:
-        """Liefert (Albumsongs, Startindex) oder ([], -1), wenn nicht lokal."""
+        """Liefert (Wiedergabeliste, Startindex) oder ([], -1).
+
+        Die Liste enthält nur die lokal vorhandenen Titel der *angezeigten*
+        Trackliste (in deren Reihenfolge). So landen keine ordner-fremden
+        Dateien in der Warteschlange – etwa andere Album-Titel, die im selben
+        lokalen Ordner liegen wie eine Single.
+        """
         if not (0 <= row < len(self.current_tracks)) or self.current_group is None:
             return [], -1
 
-        songs = self._current_local_album_songs()
+        album_songs = self._current_local_album_songs()
 
-        if not songs:
+        if not album_songs:
             return [], -1
 
-        return songs, self._match_local_index(self.current_tracks[row], songs)
+        playlist: list[Song] = []
+        start_index = -1
+        for track_row, track in enumerate(self.current_tracks):
+            match = self._match_local_index(track, album_songs)
+            if match < 0:
+                continue
+            if track_row == row:
+                start_index = len(playlist)
+            playlist.append(album_songs[match])
+
+        if not playlist:
+            return [], -1
+
+        return playlist, start_index
 
     def _play_local_track(self, row: int, _column: int) -> None:
         if not (0 <= row < len(self.current_tracks)):

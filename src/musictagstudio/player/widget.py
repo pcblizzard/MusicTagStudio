@@ -169,7 +169,6 @@ class PlayerBar(QWidget):
         self._muted_changed(saved_muted)
         self._apply_icons()
         self._icons_ready = True
-        self.restore_queue()
 
     # -- Warteschlange speichern/wiederherstellen ----------------------------
 
