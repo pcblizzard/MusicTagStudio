@@ -2769,7 +2769,7 @@ class MediaLibraryWidget(QWidget):
             edition
         )
         self._set_status(
-            "Trackliste wird geladen …"
+            tr("tracklist_loading", self.language)
         )
         if (
             edition.source == "discogs"
@@ -2888,16 +2888,20 @@ class MediaLibraryWidget(QWidget):
         local_count = sum(self._row_is_local)
         if local_count == len(tracks) and tracks:
             self._set_status(
-                f"{len(tracks)} Titel geladen · alle lokal vorhanden."
+                tr("tracks_loaded_all_local", self.language, count=len(tracks))
             )
         elif local_count:
             self._set_status(
-                f"{len(tracks)} Titel geladen · {local_count} davon lokal "
-                "vorhanden (grün = vorhanden, rot = fehlt)."
+                tr(
+                    "tracks_loaded_some_local",
+                    self.language,
+                    count=len(tracks),
+                    local=local_count,
+                )
             )
         else:
             self._set_status(
-                f"{len(tracks)} Titel geladen."
+                tr("tracks_loaded", self.language, count=len(tracks))
             )
         self._refresh_track_preview_buttons()
         self._start_preview_resolution(tracks)
@@ -3078,7 +3082,7 @@ class MediaLibraryWidget(QWidget):
                 button.setEnabled(True)
                 self._set_preview_button_icon(button, "play")
                 button.setToolTip(
-                    "Vollen Titel abspielen (lokal vorhanden)"
+                    tr("play_full_track_tip", self.language)
                 )
                 continue
 
@@ -3116,10 +3120,10 @@ class MediaLibraryWidget(QWidget):
             title = _track_title(
                 self.current_tracks[self._playing_preview_row]
             )
-            self._set_status(f"Vorschau läuft: {title}")
+            self._set_status(tr("preview_running", self.language, title=title))
         elif not playing and self.current_tracks:
             self._set_status(
-                f"{len(self.current_tracks)} Titel geladen."
+                tr("tracks_loaded", self.language, count=len(self.current_tracks))
             )
 
     def _load_category_icons(
@@ -3218,7 +3222,7 @@ class MediaLibraryWidget(QWidget):
             self._cover_generation
         )
         self.cover_label.setText(
-            "Cover wird geladen …"
+            tr("cover_loading", self.language)
         )
         self.cover_label.setPixmap(
             QPixmap()
@@ -3332,7 +3336,7 @@ class MediaLibraryWidget(QWidget):
                 QPixmap()
             )
             self.cover_label.setText(
-                "Kein Cover verfügbar"
+                tr("cover_unavailable", self.language)
             )
             return
 
@@ -3343,7 +3347,7 @@ class MediaLibraryWidget(QWidget):
 
         if not loaded:
             self.cover_label.setText(
-                "Cover nicht lesbar"
+                tr("cover_unreadable", self.language)
             )
             return
 
@@ -3379,17 +3383,21 @@ class MediaLibraryWidget(QWidget):
         self.cover_label.setText("")
         self.cover_label.setPixmap(scaled.copy(x, y, size.width(), size.height()))
         self.cover_label.setToolTip(
-            f"Künstlerbild von {artwork.source}\n{artwork.artist_url}"
+            tr(
+                "artist_image_from",
+                self.language,
+                source=artwork.source,
+                url=artwork.artist_url,
+            )
         )
 
     def _artist_artwork_failed(self, artist_id: str) -> None:
         if artist_id != self.current_artist_id or self.current_group is not None:
             return
         self.cover_label.setPixmap(QPixmap())
-        self.cover_label.setText("Kein Künstlerbild verfügbar")
+        self.cover_label.setText(tr("no_artist_image", self.language))
         self.cover_label.setToolTip(
-            "Weder Apple Music noch Discogs stellen ein geeignetes "
-            "Künstlerbild bereit."
+            tr("no_artist_image_tip", self.language)
         )
 
     def check_streaming(
@@ -3404,7 +3412,7 @@ class MediaLibraryWidget(QWidget):
             False
         )
         self.streaming_status.setText(
-            "Apple Music, TIDAL und Spotify werden geprüft …"
+            tr("streaming_checking", self.language)
         )
         expected_track_count = None
         edition_index = self.edition_combo.currentIndex()
@@ -3504,10 +3512,12 @@ class MediaLibraryWidget(QWidget):
             datetime.now().astimezone(),
         )
         checked_hint = (
-            ("Gespeichertes Ergebnis · " if saved else "")
-            + "Zuletzt geprüft: "
-            + checked_at.astimezone().strftime("%d.%m.%Y, %H:%M")
-            + ". "
+            (tr("saved_result_prefix", self.language) if saved else "")
+            + tr(
+                "last_checked_at",
+                self.language,
+                when=checked_at.astimezone().strftime("%d.%m.%Y, %H:%M"),
+            )
         )
         url = (
             "https://music.apple.com/de/album/"
@@ -3521,9 +3531,12 @@ class MediaLibraryWidget(QWidget):
             True
         )
         self.streaming_status.setText(
-            "Apple Music: gefunden · "
-            f"{best.track_count} Titel · "
-            f"Übereinstimmung {best.confidence} %. "
+            tr(
+                "apple_found",
+                self.language,
+                tracks=best.track_count,
+                confidence=best.confidence,
+            )
             + checked_hint
             + self._additional_streaming_summary(group.release_group_id)
         )
@@ -3538,7 +3551,11 @@ class MediaLibraryWidget(QWidget):
             self.prerelease_chip.clear()
             return
         self.prerelease_chip.setText(
-            f"Vorabveröffentlichung · {localized_date(release_date)}"
+            tr(
+                "prerelease_chip",
+                self.language,
+                date=localized_date(release_date),
+            )
         )
         self.prerelease_chip.setStyleSheet(
             "QLabel#prereleaseChip { color: #ffffff; background: #6f42c1;"
@@ -3546,8 +3563,7 @@ class MediaLibraryWidget(QWidget):
             " font-weight: 600; }"
         )
         self.prerelease_chip.setToolTip(
-            "Bei Apple als Vorabveröffentlichung gelistet; einige Titel sind "
-            "möglicherweise noch nicht erschienen."
+            tr("prerelease_tip", self.language)
         )
         self.prerelease_chip.show()
 
@@ -3555,7 +3571,7 @@ class MediaLibraryWidget(QWidget):
         self.apple_button.setEnabled(False)
         self.prerelease_chip.hide()
         self.streaming_status.setText(
-            "Apple Music: keine eindeutige Ausgabe gefunden. "
+            tr("apple_not_found", self.language)
             + self._streaming_checked_hint(group.release_group_id)
             + self._additional_streaming_summary(group.release_group_id)
         )
@@ -3574,10 +3590,10 @@ class MediaLibraryWidget(QWidget):
             checked_at = max(datetime.fromisoformat(value) for value in checked_values)
         except ValueError:
             return ""
-        return (
-            "Zuletzt geprüft: "
-            + checked_at.astimezone().strftime("%d.%m.%Y, %H:%M")
-            + ". "
+        return tr(
+            "last_checked_at",
+            self.language,
+            when=checked_at.astimezone().strftime("%d.%m.%Y, %H:%M"),
         )
 
     def _additional_streaming_summary(self, group_id: str) -> str:
@@ -3589,14 +3605,14 @@ class MediaLibraryWidget(QWidget):
             if result is not None:
                 if result.status is AvailabilityStatus.AVAILABLE:
                     parts.append(
-                        f"{label}: gefunden ({result.confidence} %)"
+                        tr("provider_found", self.language, label=label, confidence=result.confidence)
                     )
                 else:
-                    parts.append(f"{label}: nicht gefunden")
+                    parts.append(tr("provider_not_found", self.language, label=label))
             elif provider in errors:
-                parts.append(f"{label}: Fehler ({errors[provider]})")
+                parts.append(tr("provider_error", self.language, label=label, error=errors[provider]))
             else:
-                parts.append(f"{label}: nicht eingerichtet")
+                parts.append(tr("provider_not_configured", self.language, label=label))
         return " · ".join(parts) + "."
 
     def _apply_provider_buttons(
@@ -3710,7 +3726,7 @@ class MediaLibraryWidget(QWidget):
             f"<div><b>{html.escape(source)}</b> · {html.escape(detail)}</div>"
             for source, detail in compact_rows
         )
-        self.source_details.setText(f"<b>Quellen</b>{content}")
+        self.source_details.setText(f"<b>{tr('sources_label', self.language)}</b>{content}")
         self.source_details.setToolTip("\n".join(tooltip_rows))
         self.source_details.show()
 
@@ -3719,14 +3735,8 @@ class MediaLibraryWidget(QWidget):
     ) -> None:
         QMessageBox.information(
             self,
-            "Qualitätsprüfung",
-            (
-                "Die Qualitätsprüfung bleibt bewusst manuell. "
-                "Für verlässliche Bit-Tiefen und Abtastraten werden "
-                "noch die offiziellen beziehungsweise autorisierten "
-                "Schnittstellen von Qobuz, TIDAL und Deezer benötigt. "
-                "MusicTagStudio zeigt deshalb derzeit keine geratenen Werte an."
-            ),
+            tr("quality_check_title", self.language),
+            tr("quality_check_msg", self.language),
         )
 
     def open_apple(
@@ -3985,7 +3995,7 @@ class MediaLibraryWidget(QWidget):
             is not None
         )
         self.group_title.setText(
-            "Suche fehlgeschlagen"
+            tr("search_failed", self.language)
         )
         self.group_meta.setText(
             message
@@ -3996,8 +4006,7 @@ class MediaLibraryWidget(QWidget):
         self._refresh_debug_output()
         self.suggestion_label.hide()
         self._set_status(
-            "Fehler: "
-            + message
+            tr("error_status", self.language, message=message)
         )
 
     def _request_editorial(

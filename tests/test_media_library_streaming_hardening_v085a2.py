@@ -72,6 +72,7 @@ def test_streaming_result_survives_view_changes_and_restart() -> None:
 
 
 def test_every_successful_streaming_check_shows_its_timestamp() -> None:
-    assert '"Zuletzt geprüft: "' in SOURCE
-    assert '("Gespeichertes Ergebnis · " if saved else "")' in SOURCE
+    # Zeitstempel-/Gespeichert-Hinweis sind i18n-basiert (tr-Keys).
+    assert '"last_checked_at"' in SOURCE
+    assert '"saved_result_prefix"' in SOURCE
     assert "+ checked_hint" in SOURCE
