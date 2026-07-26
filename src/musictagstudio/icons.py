@@ -98,7 +98,12 @@ _ICONS: dict[str, str] = {
         '<path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></g>'
     ),
     # Gefüllter Statuspunkt (Ampel-Ersatz) – Farbe kommt über {color}.
-    "dot": '<circle cx="12" cy="12" r="6" fill="{color}"/>',
+    # Etwas größer und mit dezentem Rand für bessere Sichtbarkeit auf hellem
+    # wie dunklem Hintergrund.
+    "dot": (
+        '<circle cx="12" cy="12" r="8" fill="{color}" '
+        'stroke="{color}" stroke-opacity="0.35" stroke-width="2"/>'
+    ),
     "queue": (
         '<g fill="none" stroke="{color}" stroke-width="1.8" '
         'stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></g>'

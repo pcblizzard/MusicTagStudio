@@ -187,12 +187,23 @@ _STATUS_CHIP_STYLES: dict[str, tuple[str, str, str]] = {
 }
 
 
+# Eigene, hellere Punktfarben als die (dunklen) Chip-Hintergründe – der Punkt
+# muss auf hellem Baumhintergrund gut sichtbar sein, während die Chips dunkel
+# bleiben, damit ihr weißer Text lesbar ist.
+_STATUS_DOT_COLORS: dict[str, str] = {
+    "Lokal verfügbar": "#3ecf5a",
+    "Externe Quelle nicht erreichbar": "#f0a33e",
+    "Nicht vorhanden": "#9aa0a6",
+    "Nein": "#9aa0a6",
+}
+
+
 def _status_dot_icon(status: str) -> QIcon:
-    """Farbiger Statuspunkt (Ampel-Ersatz) passend zum Chip-Farbschema."""
-    _text, _fg, background = _STATUS_CHIP_STYLES.get(
-        str(status or ""), _STATUS_CHIP_STYLES["Nicht vorhanden"]
+    """Farbiger Statuspunkt (Ampel-Ersatz) – hell genug zum Erkennen."""
+    color = _STATUS_DOT_COLORS.get(
+        str(status or ""), _STATUS_DOT_COLORS["Nicht vorhanden"]
     )
-    return make_icon("dot", background, size=12)
+    return make_icon("dot", color, size=16)
 
 
 def _status_chip(status: str) -> tuple[str, str]:
