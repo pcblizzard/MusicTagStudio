@@ -17,7 +17,8 @@ def test_comment_field_is_visible():
     text = source_text()
 
     assert '"comment",' in text
-    assert '"comment": "Kommentar:"' in text
+    # Editor-Feldbeschriftungen sind jetzt i18n-basiert (tr("field_<name>")).
+    assert 'tr(f"field_{name}", self.language) + ":"' in text
 
 
 def test_columns_are_interactive_and_persistent():

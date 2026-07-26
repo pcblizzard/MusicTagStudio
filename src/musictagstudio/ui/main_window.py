@@ -74,7 +74,7 @@ from ..providers.musicbrainz import (
 from ..services.scanner import scan_folder_detailed
 from ..services.release_text import create_release_text
 from ..settings import load_settings, save_settings
-from ..i18n import tr
+from ..i18n import tr, tr_plural
 from ..theme import (
     BUTTON_CHANGED,
     BUTTON_NORMAL,
@@ -217,7 +217,9 @@ class MainWindow(QMainWindow):
         self.tagger_left_widget = left_widget
         left_layout = QVBoxLayout(left_widget)
 
-        self.folder_label = QLabel(f"Ordner: {self.folder}")
+        self.folder_label = QLabel(
+            tr("folder_label_single", self.language, path=self.folder)
+        )
 
         self.select_button = QPushButton(
             tr("music_folder", self.language)
@@ -340,18 +342,18 @@ class MainWindow(QMainWindow):
         self.table.setColumnCount(len(self.table_fields))
         self.table.setHorizontalHeaderLabels(
             [
-                "Track",
-                "Titel",
-                "Künstler",
-                "Album",
-                "Disc",
-                "Jahr",
-                "ISRC",
-                "Label",
-                "Copyright",
-                "Komponist",
-                "Kommentar",
-                "Datei",
+                tr("col_track", self.language),
+                tr("col_title", self.language),
+                tr("col_artist", self.language),
+                tr("col_album", self.language),
+                tr("col_disc", self.language),
+                tr("col_year", self.language),
+                tr("col_isrc", self.language),
+                tr("col_label", self.language),
+                tr("col_copyright", self.language),
+                tr("col_composer", self.language),
+                tr("col_comment", self.language),
+                tr("col_file", self.language),
             ]
         )
 
@@ -467,14 +469,14 @@ class MainWindow(QMainWindow):
         right_layout = QVBoxLayout(right_widget)
 
         self.selection_label = QLabel(
-            "Kein Titel ausgewählt"
+            tr("no_track_selected", self.language)
         )
         self.selection_label.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
         right_layout.addWidget(self.selection_label)
 
-        self.cover_label = QLabel("Kein Cover vorhanden")
+        self.cover_label = QLabel(tr("no_cover", self.language))
         self.cover_label.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
@@ -505,17 +507,20 @@ class MainWindow(QMainWindow):
         self.editor_fields: dict[str, QLineEdit] = {}
 
         labels = {
-            "title": "Titel:",
-            "artist": "Künstler:",
-            "album_artist": "Albumkünstler:",
-            "album": "Album:",
-            "genre": "Genre:",
-            "year": "Jahr:",
-            "isrc": "ISRC:",
-            "label": "Label:",
-            "copyright": "Copyright:",
-            "composer": "Komponist:",
-            "comment": "Kommentar:",
+            name: tr(f"field_{name}", self.language) + ":"
+            for name in (
+                "title",
+                "artist",
+                "album_artist",
+                "album",
+                "genre",
+                "year",
+                "isrc",
+                "label",
+                "copyright",
+                "composer",
+                "comment",
+            )
         }
 
         for name in (
@@ -943,7 +948,7 @@ class MainWindow(QMainWindow):
     ) -> None:
         self.folder = folder
         self.folder_label.setText(
-            f"Ordner: {folder}"
+            tr("folder_label_single", self.language, path=folder)
         )
         self.switch_workspace(
             0
@@ -1238,14 +1243,9 @@ class MainWindow(QMainWindow):
             )
         )
         self.more_artist_button.setToolTip(
-            (
-                f"Discografie von {artist} öffnen"
-                if artist
-                else (
-                    "Markiere Titel mit demselben "
-                    "Albumkünstler."
-                )
-            )
+            tr("discography_of", self.language, artist=artist)
+            if artist
+            else tr("more_artist_hint", self.language)
         )
 
     def show_more_from_artist(
@@ -1314,20 +1314,11 @@ class MainWindow(QMainWindow):
         )
 
         if not rows:
-            tooltip = (
-                "Markiere die Titel eines Albums, "
-                "um eine BBCode-Textvorlage zu erstellen."
-            )
+            tooltip = tr("release_hint_none", self.language)
         elif len(album_keys) > 1:
-            tooltip = (
-                "Die Auswahl enthält mehrere Alben. "
-                "Bitte markiere nur die Titel eines Albums."
-            )
+            tooltip = tr("release_hint_multi", self.language)
         else:
-            tooltip = (
-                "Erstellt die BBCode-Textvorlage für "
-                "das ausgewählte Album."
-            )
+            tooltip = tr("release_hint_ok", self.language)
 
         self.release_text_button.setToolTip(
             tooltip
@@ -1338,15 +1329,15 @@ class MainWindow(QMainWindow):
         enabled = len(rows) == 1 and 0 <= rows[0] < len(self.songs)
         self.lyrics_button.setEnabled(enabled)
         self.lyrics_button.setToolTip(
-            "Lyrics für den ausgewählten Titel anzeigen"
+            tr("lyrics_enabled_hint", self.language)
             if enabled
-            else "Bitte genau einen Titel auswählen."
+            else tr("select_one_track", self.language)
         )
         self.player_button.setEnabled(enabled)
         self.player_button.setToolTip(
-            "Ausgewählten lokalen Titel abspielen"
+            tr("play_track_tip", self.language)
             if enabled
-            else "Bitte genau einen Titel auswählen."
+            else tr("select_one_track", self.language)
         )
 
     def play_selected_song(self) -> None:
@@ -1359,13 +1350,17 @@ class MainWindow(QMainWindow):
             return
         if not self.player_bar.play_songs(self.songs, row):
             self.statusBar().showMessage(
-                "Die ausgewählte Audiodatei ist nicht erreichbar.",
+                tr("audio_unreachable", self.language),
                 5000,
             )
             return
         song = self.songs[row]
         self.statusBar().showMessage(
-            f"Wiedergabe: {song.title or Path(song.path).name}",
+            tr(
+                "playing",
+                self.language,
+                title=song.title or Path(song.path).name,
+            ),
             3000,
         )
 
@@ -1376,20 +1371,24 @@ class MainWindow(QMainWindow):
     ) -> None:
         if not self.player_bar.play_songs(songs, start_index):
             self.statusBar().showMessage(
-                "Die ausgewählte Audiodatei ist nicht erreichbar.",
+                tr("audio_unreachable", self.language),
                 5000,
             )
             return
         song = songs[start_index]
         self.statusBar().showMessage(
-            f"Wiedergabe: {song.title or Path(song.path).name}",
+            tr(
+                "playing",
+                self.language,
+                title=song.title or Path(song.path).name,
+            ),
             3000,
         )
 
     def _enqueue_media_library_tracks(self, songs: list[Song]) -> None:
         count = self.player_bar.engine.enqueue_songs(songs)
         self.statusBar().showMessage(
-            f"{count} Titel zur Warteschlange hinzugefügt.",
+            tr("enqueued", self.language, count=count),
             4000,
         )
 
@@ -1583,21 +1582,24 @@ class MainWindow(QMainWindow):
         ],
     ) -> bool:
         field_labels = {
-            "title": "Titel",
-            "artist": "Künstler",
-            "album_artist": "Albumkünstler",
-            "album": "Album",
-            "genre": "Genre",
-            "year": "Jahr",
-            "track": "Track",
-            "total_tracks": "Gesamttracks",
-            "disc": "Disc",
-            "total_discs": "Gesamt-Discs",
-            "isrc": "ISRC",
-            "label": "Label",
-            "copyright": "Copyright",
-            "composer": "Komponist",
-            "comment": "Kommentar",
+            name: tr(f"field_{name}", self.language)
+            for name in (
+                "title",
+                "artist",
+                "album_artist",
+                "album",
+                "genre",
+                "year",
+                "track",
+                "total_tracks",
+                "disc",
+                "total_discs",
+                "isrc",
+                "label",
+                "copyright",
+                "composer",
+                "comment",
+            )
         }
         changes: list[
             tuple[str, str, str, str]
@@ -1754,7 +1756,11 @@ class MainWindow(QMainWindow):
             self.folder = sources[0].path
             if len(sources) == 1:
                 self.folder_label.setText(
-                    f"Ordner: {sources[0].path}"
+                    tr(
+                        "folder_label_single",
+                        self.language,
+                        path=sources[0].path,
+                    )
                 )
             else:
                 names = ", ".join(
@@ -1762,7 +1768,11 @@ class MainWindow(QMainWindow):
                     for source in sources
                 )
                 self.folder_label.setText(
-                    f"Musikquellen: {names}"
+                    tr(
+                        "folder_label_multi",
+                        self.language,
+                        names=names,
+                    )
                 )
 
         if not settings.music_sources:
@@ -1770,7 +1780,7 @@ class MainWindow(QMainWindow):
                 4
             )
             self.statusBar().showMessage(
-                "Bitte zuerst eine Musikquelle hinzufügen.",
+                tr("add_source_first", self.language),
                 8000,
             )
             return
@@ -1938,7 +1948,11 @@ class MainWindow(QMainWindow):
             self.folder = sources[0].path
             if len(sources) == 1:
                 self.folder_label.setText(
-                    f"Ordner: {sources[0].path}"
+                    tr(
+                        "folder_label_single",
+                        self.language,
+                        path=sources[0].path,
+                    )
                 )
             else:
                 names = ", ".join(
@@ -1946,7 +1960,11 @@ class MainWindow(QMainWindow):
                     for source in sources
                 )
                 self.folder_label.setText(
-                    f"Musikquellen: {names}"
+                    tr(
+                        "folder_label_multi",
+                        self.language,
+                        names=names,
+                    )
                 )
 
         if songs:
@@ -1956,10 +1974,11 @@ class MainWindow(QMainWindow):
 
         self.source_scan_worker = None
         self.statusBar().showMessage(
-            (
-                f"Bibliothek aktualisiert: "
-                f"{len(songs)} Titel, "
-                f"{len(self.library_index)} Alben"
+            tr(
+                "library_updated",
+                self.language,
+                tracks=len(songs),
+                albums=len(self.library_index),
             ),
             6000,
         )
@@ -2017,7 +2036,11 @@ class MainWindow(QMainWindow):
         if folder:
             self.folder = folder
             self.folder_label.setText(
-                f"Ordner: {folder}"
+                tr(
+                    "folder_label_single",
+                    self.language,
+                    path=folder,
+                )
             )
             self.scan_music()
 
@@ -2247,7 +2270,11 @@ class MainWindow(QMainWindow):
         self.update_dirty_state()
 
         self.selection_label.setText(
-            f"1 Titel · {song.album or 'ohne Album'}"
+            tr(
+                "selection_one_msg",
+                self.language,
+                album=song.album or tr("no_album", self.language),
+            )
         )
         self.show_cover(load_cover(song.path))
 
@@ -2286,8 +2313,16 @@ class MainWindow(QMainWindow):
         self.loading_editor = False
         self.has_unsaved_changes = False
         album_count = len(album_keys)
-        album_word = "Album" if album_count == 1 else "Alben"
-        self.selection_label.setText(f"{len(rows)} Titel · {album_count} {album_word}")
+        album_word = tr_plural("album_count", album_count, self.language)
+        self.selection_label.setText(
+            tr(
+                "selection_multi_msg",
+                self.language,
+                tracks=len(rows),
+                albums=album_count,
+                album_word=album_word,
+            )
+        )
         self.show_multiple_selection_cover(rows)
         self.proposal_button.setEnabled(False)
         self.update_save_button()
@@ -2415,7 +2450,7 @@ class MainWindow(QMainWindow):
             )
             QMessageBox.critical(
                 self,
-                "Cover-Verarbeitung fehlgeschlagen",
+                tr("cover_failed_title", self.language),
                 str(error),
             )
             return
@@ -2426,13 +2461,13 @@ class MainWindow(QMainWindow):
 
         QMessageBox.information(
             self,
-            "Cover gespeichert",
-            (
-                f"Master: {result.master_path}\n\n"
-                f"400-px-Cover: "
-                f"{result.folder_cover_path}\n\n"
-                f"In {result.embedded_files} "
-                "Audiodateien eingebettet."
+            tr("cover_saved_title", self.language),
+            tr(
+                "cover_saved_msg",
+                self.language,
+                master=result.master_path,
+                folder_cover=result.folder_cover_path,
+                embedded=result.embedded_files,
             ),
         )
 
@@ -2524,20 +2559,22 @@ class MainWindow(QMainWindow):
         self.update_optional_columns()
         self.refresh_active_editor()
 
-        message = (
-            f"{saved} Titel wurden über den direkten "
-            "Album-Link aktualisiert."
+        message = tr(
+            "direct_album_done_msg",
+            self.language,
+            count=saved,
         )
 
         if failed:
-            message += (
-                "\n\nFehler:\n"
-                + "\n".join(failed)
+            message += tr(
+                "errors_block",
+                self.language,
+                errors="\n".join(failed),
             )
 
         QMessageBox.information(
             self,
-            "Direkte Albumabfrage abgeschlossen",
+            tr("direct_album_done_title", self.language),
             message,
         )
 
@@ -2602,8 +2639,8 @@ class MainWindow(QMainWindow):
         if len(self.active_rows) != 1:
             QMessageBox.information(
                 self,
-                "Nach Klang identifizieren",
-                "Bitte genau einen Titel auswählen.",
+                tr("identify_by_sound", self.language),
+                tr("identify_select_one_msg", self.language),
             )
             return
 
@@ -2617,8 +2654,8 @@ class MainWindow(QMainWindow):
         if not Path(song.path).is_file():
             QMessageBox.warning(
                 self,
-                "Nach Klang identifizieren",
-                "Die Audiodatei wurde nicht gefunden.",
+                tr("identify_by_sound", self.language),
+                tr("identify_file_missing_msg", self.language),
             )
             return
 
@@ -2628,10 +2665,8 @@ class MainWindow(QMainWindow):
         if not api_key:
             QMessageBox.information(
                 self,
-                "Nach Klang identifizieren",
-                "Es ist kein AcoustID-Key hinterlegt. Bitte in den "
-                "Einstellungen einen AcoustID-Application-Key eintragen "
-                "(von acoustid.org/new-application).",
+                tr("identify_by_sound", self.language),
+                tr("identify_no_key_msg", self.language),
             )
             return
 
@@ -2671,7 +2706,7 @@ class MainWindow(QMainWindow):
         if error_message:
             QMessageBox.warning(
                 self,
-                "Nach Klang identifizieren",
+                tr("identify_by_sound", self.language),
                 error_message,
             )
             return
@@ -2679,9 +2714,8 @@ class MainWindow(QMainWindow):
         if not candidates:
             QMessageBox.information(
                 self,
-                "Nach Klang identifizieren",
-                "Über den akustischen Fingerabdruck wurde kein passender "
-                "MusicBrainz-Eintrag gefunden.",
+                tr("identify_by_sound", self.language),
+                tr("identify_no_match_msg", self.language),
             )
             return
 
@@ -2718,8 +2752,8 @@ class MainWindow(QMainWindow):
             rows = list(range(len(self.songs)))
 
         progress = QProgressDialog(
-            "Metadatenanbieter werden abgefragt …",
-            "Abbrechen",
+            tr("querying_providers", self.language),
+            tr("cancel", self.language),
             0,
             len(rows),
             self,
@@ -2816,17 +2850,18 @@ class MainWindow(QMainWindow):
 
         self.update_optional_columns()
 
-        message = f"{saved} Titel wurden gespeichert."
+        message = tr("batch_saved_msg", self.language, count=saved)
 
         if failed:
-            message += (
-                "\n\nFehler:\n"
-                + "\n".join(failed)
+            message += tr(
+                "errors_block",
+                self.language,
+                errors="\n".join(failed),
             )
 
         QMessageBox.information(
             self,
-            "Batch-Verarbeitung abgeschlossen",
+            tr("batch_done_title", self.language),
             message,
         )
 
@@ -2880,8 +2915,8 @@ class MainWindow(QMainWindow):
         if count > 1:
             suffix = " *" if self.has_unsaved_changes else ""
             self.save_button.setText(
-                f"Änderungen auf {count} Titel anwenden"
-                f"{suffix}"
+                tr("apply_to_tracks", self.language, count=count)
+                + suffix
             )
         else:
             self.save_button.setText(
@@ -2920,7 +2955,7 @@ class MainWindow(QMainWindow):
             if failed:
                 QMessageBox.critical(
                     self,
-                    "Speichern fehlgeschlagen",
+                    tr("save_failed_title", self.language),
                     "\n".join(
                         failed
                     ),
@@ -2934,8 +2969,8 @@ class MainWindow(QMainWindow):
 
         QMessageBox.information(
             self,
-            "Gespeichert",
-            "Metadaten wurden gespeichert.",
+            tr("saved_title", self.language),
+            tr("saved_msg", self.language),
         )
 
     def save_batch_edits(self):
@@ -2949,12 +2984,11 @@ class MainWindow(QMainWindow):
 
         answer = QMessageBox.question(
             self,
-            "Mehrfachbearbeitung bestätigen",
-            (
-                f"Die markierten Felder werden auf "
-                f"{len(rows)} Titel angewendet.\n\n"
-                "Nicht bearbeitete Felder und individuelle "
-                "Tracknummern bleiben unverändert."
+            tr("batch_confirm_title", self.language),
+            tr(
+                "batch_confirm_msg",
+                self.language,
+                count=len(rows),
             ),
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Cancel,
@@ -3001,20 +3035,23 @@ class MainWindow(QMainWindow):
         if saved_rows:
             self.display_multiple_songs(rows)
 
-        message = (
-            f"{len(saved_rows)} von {len(rows)} "
-            "Titeln wurden aktualisiert."
+        message = tr(
+            "batch_edit_done_msg",
+            self.language,
+            saved=len(saved_rows),
+            total=len(rows),
         )
 
         if failed:
-            message += (
-                "\n\nFehler:\n"
-                + "\n".join(failed)
+            message += tr(
+                "errors_block",
+                self.language,
+                errors="\n".join(failed),
             )
 
         QMessageBox.information(
             self,
-            "Mehrfachbearbeitung abgeschlossen",
+            tr("batch_edit_done_title", self.language),
             message,
         )
 
@@ -3025,18 +3062,17 @@ class MainWindow(QMainWindow):
         count = len(self.active_rows)
 
         if count > 1:
-            message = (
-                f"Die Änderungen für {count} Titel "
-                "wurden noch nicht gespeichert."
+            message = tr(
+                "unsaved_multi_msg",
+                self.language,
+                count=count,
             )
         else:
-            message = (
-                "Die Änderungen wurden noch nicht gespeichert."
-            )
+            message = tr("unsaved_single_msg", self.language)
 
         answer = QMessageBox.warning(
             self,
-            "Ungespeicherte Änderungen",
+            tr("unsaved_title", self.language),
             message,
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
@@ -3204,7 +3240,7 @@ class MainWindow(QMainWindow):
         self.current_row = -1
 
         self.selection_label.setText(
-            "Kein Titel ausgewählt"
+            tr("no_track_selected", self.language)
         )
         self.save_button.setEnabled(False)
         self.save_button.setText(BUTTON_NORMAL)

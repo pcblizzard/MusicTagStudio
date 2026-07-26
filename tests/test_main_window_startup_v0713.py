@@ -26,8 +26,9 @@ def test_comment_is_registered_in_optional_fields_and_table():
         '"comment",'
         in text
     )
+    # Tabellen-Spaltenkopf ist jetzt i18n-basiert (tr("col_comment")).
     assert (
-        '"Kommentar",'
+        'tr("col_comment"'
         in text
     )
     assert (
