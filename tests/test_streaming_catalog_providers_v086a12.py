@@ -3,7 +3,46 @@ from __future__ import annotations
 from musictagstudio.media_library.streaming import service
 from musictagstudio.media_library.streaming.models import AvailabilityStatus
 from musictagstudio.providers import spotify, tidal
-from musictagstudio.providers.streaming_catalog import CatalogAlbumCandidate
+from musictagstudio.providers.streaming_catalog import (
+    CatalogAlbumCandidate,
+    album_confidence,
+    core_album_key,
+)
+
+
+def _confidence(wanted: str, album: str, *, year_match=True, tracks_match=True) -> int:
+    return album_confidence(
+        wanted_album=wanted,
+        wanted_artist="Danger Dan",
+        wanted_year="2023",
+        expected_track_count=16,
+        album=album,
+        artist="Danger Dan",
+        year="2023" if year_match else "2022",
+        track_count=16 if tracks_match else 15,
+    )
+
+
+def test_live_edition_suffix_variants_match_via_core_title():
+    # MusicBrainz: "(Live In Berlin)", Streaming-Dienste: "(Live)".
+    wanted = "Das ist alles von der Kunstfreiheit gedeckt (Live In Berlin)"
+    album = "Das ist alles von der Kunstfreiheit gedeckt (Live)"
+    assert core_album_key(wanted) == core_album_key(album)
+    # Ohne Jahres-/Trackbonus liegt der Wert dank Kern-Treffer trotzdem >= 70.
+    assert _confidence(wanted, album, year_match=False, tracks_match=False) >= 70
+
+
+def test_studio_and_live_versions_are_not_confused():
+    # Studio-Titel (kein Zusatz) darf die Live-Version NICHT als Treffer werten.
+    wanted = "Das ist alles von der Kunstfreiheit gedeckt (Live In Berlin)"
+    studio = "Das ist alles von der Kunstfreiheit gedeckt"
+    # Kein Kern-Bonus (Studio hat keinen Zusatz) -> nur Teilstring 38 + 25 < 70.
+    assert _confidence(wanted, studio, year_match=False, tracks_match=False) < 70
+
+
+def test_exact_title_still_scores_highest():
+    title = "Das ist alles von der Kunstfreiheit gedeckt (Live)"
+    assert _confidence(title, title) >= 90
 
 
 def test_spotify_album_search_uses_catalog_metadata(monkeypatch):

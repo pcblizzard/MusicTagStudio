@@ -1,5 +1,14 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## TIDAL/Spotify: Live-Alben mit abweichendem Zusatz finden
+
+- Bei der Streaming-Prüfung wurden Alben mit abweichendem Klammerzusatz
+  fälschlich als „nicht gefunden" gemeldet – etwa wenn MusicBrainz
+  „… (Live In Berlin)" führt, die Dienste aber „… (Live)". Der Abgleich wertet
+  jetzt auch einen **identischen Kern-Titel** (vor dem Zusatz) als Treffer –
+  aber nur, wenn beide Titel einen Zusatz haben, damit Studio- und Live-Version
+  nicht verwechselt werden.
+
 ## Echte Apple-Titel für veröffentlichte Vorab-Tracks
 
 - Zeigt die Trackliste für eine Vorabveröffentlichung Platzhalter („Track 11")

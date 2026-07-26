@@ -18,6 +18,28 @@ class CatalogAlbumCandidate:
     country: str
 
 
+_ALBUM_SUFFIX_RE = re.compile(r"[\(\[][^\)\]]*[\)\]]\s*$")
+
+
+def album_has_suffix(title: str) -> bool:
+    """True, wenn der Titel mit einem Klammerzusatz endet (z. B. „(Live …)")."""
+    return bool(_ALBUM_SUFFIX_RE.search(str(title or "").strip()))
+
+
+def core_album_key(title: str) -> str:
+    """Normalisierter Titel ohne abschließende Klammerzusätze.
+
+    „Das ist alles … (Live In Berlin)" und „… (Live in Berlin 2022)" ergeben
+    denselben Kern-Schlüssel.
+    """
+    core = str(title or "").strip()
+    previous = None
+    while core != previous:
+        previous = core
+        core = _ALBUM_SUFFIX_RE.sub("", core).strip()
+    return normalize_catalog_text(core)
+
+
 def album_confidence(
     *,
     wanted_album: str,
@@ -33,10 +55,21 @@ def album_confidence(
     album_key = normalize_catalog_text(album)
     wanted_artist_key = normalize_catalog_text(wanted_artist)
     artist_key = normalize_catalog_text(artist)
+    wanted_core = core_album_key(wanted_album)
 
     score = 0
     if wanted_album_key and wanted_album_key == album_key:
         score += 65
+    elif (
+        wanted_core
+        and wanted_core == core_album_key(album)
+        and album_has_suffix(wanted_album)
+        and album_has_suffix(album)
+    ):
+        # Gleicher Kern-Titel, nur der Zusatz unterscheidet sich (z. B. zwei
+        # Varianten desselben Live-Albums). Beide müssen einen Zusatz haben,
+        # damit nicht Studio- und Live-Version verwechselt werden.
+        score += 50
     elif wanted_album_key and (
         wanted_album_key in album_key or album_key in wanted_album_key
     ):
