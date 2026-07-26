@@ -1791,16 +1791,8 @@ class MainWindow(QMainWindow):
             )
             QMessageBox.warning(
                 self,
-                "Musikquelle nicht gefunden",
-                (
-                    "Folgende hinterlegte Musikquelle(n) "
-                    "konnten nicht geladen werden:\n\n"
-                    f"{lines}\n\n"
-                    "Bereits indizierte Alben bleiben in der "
-                    "Medienbibliothek sichtbar. Sie können nur "
-                    "nicht im Tagger geöffnet werden, solange die "
-                    "Quelle offline ist."
-                ),
+                tr("source_missing_title", self.language),
+                tr("source_missing_msg", self.language, lines=lines),
             )
 
         if settings.scan_sources_on_startup:
@@ -1975,12 +1967,8 @@ class MainWindow(QMainWindow):
         if failures:
             QMessageBox.warning(
                 self,
-                "Einige Audiodateien wurden übersprungen",
-                (
-                    f"{len(failures)} Datei(en) konnten "
-                    "nicht eingelesen werden. "
-                    "Technische Details stehen in den Logs."
-                ),
+                tr("skipped_files_title", self.language),
+                tr("skipped_files_log_msg", self.language, count=len(failures)),
             )
 
     def _source_scan_failed(
@@ -1990,7 +1978,7 @@ class MainWindow(QMainWindow):
         self.source_scan_worker = None
         QMessageBox.warning(
             self,
-            "Musikquellen konnten nicht aktualisiert werden",
+            tr("sources_update_failed_title", self.language),
             message,
         )
 
@@ -2022,7 +2010,7 @@ class MainWindow(QMainWindow):
 
         folder = QFileDialog.getExistingDirectory(
             self,
-            "Musikordner auswählen",
+            tr("music_folder", self.language),
             self.folder or "",
         )
 
@@ -2040,11 +2028,8 @@ class MainWindow(QMainWindow):
         if not self.folder or not Path(self.folder).is_dir():
             QMessageBox.warning(
                 self,
-                "Ordner nicht gefunden",
-                (
-                    "Der Musikordner wurde nicht gefunden:"
-                    f"\n\n{self.folder or ''}"
-                ),
+                tr("folder_not_found_title", self.language),
+                tr("folder_not_found_msg", self.language, folder=self.folder or ""),
             )
             return
 
@@ -2062,29 +2047,28 @@ class MainWindow(QMainWindow):
                 in scan_result.failures[:20]
             )
             if len(scan_result.failures) > 20:
-                details += (
-                    "\n\n"
-                    f"… und {len(scan_result.failures) - 20} "
-                    "weitere Datei(en)."
+                details += "\n\n" + tr(
+                    "and_more_files",
+                    self.language,
+                    count=len(scan_result.failures) - 20,
                 )
             QMessageBox.warning(
                 self,
-                "Einige Audiodateien wurden übersprungen",
-                (
-                    f"Erkannt: {scan_result.detected_files}\n"
-                    f"Eingelesen: {scan_result.successful_files}\n"
-                    f"Übersprungen: {len(scan_result.failures)}"
-                    f"\n\n{details}"
+                tr("skipped_files_title", self.language),
+                tr(
+                    "skipped_files_scan_msg",
+                    self.language,
+                    detected=scan_result.detected_files,
+                    successful=scan_result.successful_files,
+                    skipped=len(scan_result.failures),
+                    details=details,
                 ),
             )
         elif scan_result.detected_files == 0:
             QMessageBox.information(
                 self,
-                "Keine Audiodateien gefunden",
-                (
-                    "Im gewählten Ordner wurden keine "
-                    "unterstützten Audiodateien gefunden."
-                ),
+                tr("no_audio_title", self.language),
+                tr("no_audio_msg", self.language),
             )
 
         self._apply_songs_to_tagger(

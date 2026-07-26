@@ -15,5 +15,6 @@ def test_main_window_loads_sources_at_startup():
     assert "QTimer.singleShot" in text
     assert "def load_configured_sources" in text
     assert "def scan_configured_sources" in text
-    assert "Musikquelle nicht gefunden" in text
-    assert "Bereits indizierte Alben bleiben" in text
+    # Offline-Quellen-Hinweis ist i18n-basiert (tr-Keys statt Fixtext).
+    assert 'tr("source_missing_title"' in text
+    assert 'tr("source_missing_msg"' in text
