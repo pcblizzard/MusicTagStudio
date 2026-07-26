@@ -112,9 +112,9 @@ def local_status_display(status: str) -> str:
     return {
         "Lokal verfügbar": "🟢 Lokal verfügbar",
         "Externe Quelle nicht erreichbar": "🟡 Externe Quelle nicht erreichbar",
-        "Nicht vorhanden": "⚪ Nicht vorhanden",
-        "Nein": "⚪ Nicht vorhanden",
-    }.get(str(status or ""), "⚪ Nicht vorhanden")
+        "Nicht vorhanden": "⚪ Lokal nicht verfügbar",
+        "Nein": "⚪ Lokal nicht verfügbar",
+    }.get(str(status or ""), "⚪ Lokal nicht verfügbar")
 
 
 def release_source_details(

@@ -204,9 +204,19 @@ _STATUS_CHIP_STYLES: dict[str, tuple[str, str, str]] = {
         "#ffffff",
         "#b26a00",
     ),
-    "Nicht vorhanden": ("Nicht vorhanden", "#ffffff", "#5f6368"),
-    "Nein": ("Nicht vorhanden", "#ffffff", "#5f6368"),
+    "Nicht vorhanden": ("Lokal nicht verfügbar", "#ffffff", "#5f6368"),
+    "Nein": ("Lokal nicht verfügbar", "#ffffff", "#5f6368"),
 }
+
+
+def _status_label(status: str) -> str:
+    """Nutzerlesbare Beschriftung eines lokalen Verfügbarkeitsstatus.
+
+    Der interne Statuswert bleibt unverändert (Logik/Vergleiche); hier wird nur
+    die Anzeige gemappt – u. a. „Nicht vorhanden" → „Lokal nicht verfügbar".
+    """
+    entry = _STATUS_CHIP_STYLES.get(str(status or ""))
+    return entry[0] if entry else "Lokal nicht verfügbar"
 
 
 # Eigene, hellere Punktfarben als die (dunklen) Chip-Hintergründe – der Punkt
@@ -2554,7 +2564,7 @@ class MediaLibraryWidget(QWidget):
                             group
                         ),
                         source_text,
-                        raw_status,
+                        _status_label(raw_status),
                     ]
                 )
                 # Ampel als farbiger Punkt (statt Emoji) in der Status-Spalte.
@@ -3755,7 +3765,7 @@ class MediaLibraryWidget(QWidget):
                     key,
                     "Nicht vorhanden",
                 )
-                item.setText(4, raw_status)
+                item.setText(4, _status_label(raw_status))
                 item.setIcon(4, _status_dot_icon(raw_status))
 
         self._render_alternative_views()

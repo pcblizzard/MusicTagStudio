@@ -16,7 +16,7 @@ def test_local_statuses_have_beta_symbols():
     assert _local_status_display("Externe Quelle nicht erreichbar") == (
         "🟡 Externe Quelle nicht erreichbar"
     )
-    assert _local_status_display("Nicht vorhanden") == "⚪ Nicht vorhanden"
+    assert _local_status_display("Nicht vorhanden") == "⚪ Lokal nicht verfügbar"
 
 
 def test_status_dot_icons_differ_per_status():

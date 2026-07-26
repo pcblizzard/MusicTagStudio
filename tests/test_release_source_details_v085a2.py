@@ -44,7 +44,7 @@ def test_apple_music_result_is_reflected() -> None:
     assert "MusicBrainz" not in details
     assert details["Discogs"] == "Veröffentlichung und Editionen"
     assert details["Apple Music"] == "Verfügbarkeit bestätigt"
-    assert details["Lokale Bibliothek"] == "⚪ Nicht vorhanden"
+    assert details["Lokale Bibliothek"] == "⚪ Lokal nicht verfügbar"
 
 
 def test_unknown_group_artist_falls_back_to_selected_artist() -> None:

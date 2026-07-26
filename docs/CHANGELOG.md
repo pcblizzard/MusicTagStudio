@@ -1,5 +1,12 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Klarere Statusbeschriftung
+
+- Der lokale Verfügbarkeitsstatus „Nicht vorhanden" heißt jetzt überall
+  **„Lokal nicht verfügbar"** – konsistent zu „Lokal verfügbar" (Chip,
+  Veröffentlichungsliste, Detail-Quellen, Kachelansicht). Die interne Logik
+  bleibt unverändert.
+
 ## Amazon-Suche als Fallback
 
 - Die Gruppe „Auf Dienst öffnen" hat einen neuen Knopf **„Bei Amazon suchen"**:
