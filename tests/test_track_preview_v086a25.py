@@ -576,6 +576,44 @@ def test_local_title_with_bonustrack_suffix_still_matches(tmp_path):
     widget.deleteLater()
 
 
+def test_studio_and_live_same_core_not_fuzzy_confused(tmp_path):
+    # Liste enthaelt "Beifahrersitz" UND "Beifahrersitz (Live)"; lokal existiert
+    # nur die Live-Version. Der tolerante Abgleich darf die Studio-Zeile NICHT
+    # faelschlich als vorhanden markieren (Kern-Titel ist mehrdeutig).
+    _app()
+    from types import SimpleNamespace
+
+    from musictagstudio.media_library.service import Track
+    from musictagstudio.models.song import Song
+    from musictagstudio.ui.media_library_widget import MediaLibraryWidget
+
+    live_file = tmp_path / "02.flac"
+    live_file.write_bytes(b"")
+
+    widget = MediaLibraryWidget()
+    widget.current_artist_name = "Kraftklub"
+    widget.set_local_songs(
+        [
+            Song(title="Beifahrersitz (Live)", artist="Kraftklub",
+                 album_artist="Kraftklub", album="Album",
+                 disc="1", track="2", path=str(live_file)),
+        ]
+    )
+    widget.current_group = SimpleNamespace(
+        title="Album", artist="Kraftklub", release_group_id="a"
+    )
+    widget._tracks_loaded(
+        [
+            Track(disc_number=1, track_number=1, title="Beifahrersitz", artist="Kraftklub"),
+            Track(disc_number=1, track_number=2, title="Beifahrersitz (Live)", artist="Kraftklub"),
+        ]
+    )
+
+    # Nur die Live-Version (exakter Titel) ist vorhanden; Studio bleibt fehlend.
+    assert widget._row_is_local == [False, True]
+    widget.deleteLater()
+
+
 def test_different_edition_ordering_not_false_matched(tmp_path):
     # Standard-Edition lokal: Track 14 = "SongB". Angezeigt wird die Deluxe-
     # Edition, deren Track 14 = "SongA" ist. Der Titel-Abgleich darf SongA NICHT

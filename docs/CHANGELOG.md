@@ -16,7 +16,10 @@
 - Der Titelvergleich ist zusätzlich **tolerant**: Klammerzusätze und
   feat.-Angaben werden ignoriert, sodass lokale Varianten wie „Fickt euch alle
   (Bonustrack)" korrekt zum Online-Titel „Fickt euch alle" passen und nicht
-  fälschlich als fehlend gelten.
+  fälschlich als fehlend gelten. Der tolerante Abgleich greift aber nur, wenn
+  der Kern-Titel **eindeutig** ist – enthält die Liste z. B. „Beifahrersitz"
+  und „Beifahrersitz (Live)", bleibt es beim exakten Titel, damit Studio- und
+  Live-Version nicht verwechselt werden.
 
 ## Klarere Statusbeschriftung
 

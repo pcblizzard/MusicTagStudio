@@ -1213,17 +1213,25 @@ class MediaLibraryWidget(QWidget):
         )
 
         if start_index < 0:
-            # Toleranter Abgleich: „… (Bonustrack)", „… [Live]", feat.-Zusätze.
+            # Toleranter Abgleich für Zusätze wie „(Bonustrack)" oder feat. –
+            # aber nur, wenn der Kern-Titel EINDEUTIG ist: sowohl unter den
+            # angezeigten Tracks als auch lokal. Enthält die Liste z. B. „X" und
+            # „X (Live)", ist der Kern mehrdeutig und wir bleiben beim exakten
+            # Titel, damit Studio- und Live-Version nicht verwechselt werden.
             wanted_fuzzy = _preview_title_key(track.title)
-            start_index = next(
-                (
+            if wanted_fuzzy:
+                online_matches = sum(
+                    1
+                    for other in self.current_tracks
+                    if _preview_title_key(other.title) == wanted_fuzzy
+                )
+                local_matches = [
                     index
                     for index, song in enumerate(songs)
-                    if wanted_fuzzy
-                    and _preview_title_key(song.title) == wanted_fuzzy
-                ),
-                -1,
-            )
+                    if _preview_title_key(song.title) == wanted_fuzzy
+                ]
+                if online_matches <= 1 and len(local_matches) == 1:
+                    start_index = local_matches[0]
 
         if start_index < 0 and _is_placeholder_title(track.title):
             start_index = next(
