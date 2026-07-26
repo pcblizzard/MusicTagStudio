@@ -1454,11 +1454,8 @@ class MainWindow(QMainWindow):
         if len(album_keys) != 1:
             QMessageBox.warning(
                 self,
-                "Mehrere Alben ausgewählt",
-                (
-                    "Bitte markiere für die Textvorlage "
-                    "nur die Titel eines Albums."
-                ),
+                tr("release_multi_album_title", self.language),
+                tr("release_multi_album_msg", self.language),
             )
             return
 
@@ -1466,7 +1463,7 @@ class MainWindow(QMainWindow):
             False
         )
         self.release_text_button.setText(
-            "Textvorlage wird erstellt …"
+            tr("creating_release_text", self.language)
         )
         settings = load_settings()
         worker = FunctionWorker(
@@ -1479,18 +1476,18 @@ class MainWindow(QMainWindow):
             result,
         ):
             self.release_text_button.setText(
-                "BBCode-Text erstellen"
+                tr("create_bbcode", self.language)
             )
             self._update_release_text_button()
             QMessageBox.information(
                 self,
-                "Textvorlage erstellt",
-                (
-                    f"Die Textdatei wurde gespeichert:\n"
-                    f"{result.path}\n\n"
-                    f"Technische Werte: "
-                    f"{result.analyzed_files} von "
-                    f"{result.total_files} Dateien ausgewertet."
+                tr("release_saved_title", self.language),
+                tr(
+                    "release_saved_msg",
+                    self.language,
+                    path=result.path,
+                    analyzed=result.analyzed_files,
+                    total=result.total_files,
                 ),
             )
 
@@ -1498,12 +1495,12 @@ class MainWindow(QMainWindow):
             message: str,
         ):
             self.release_text_button.setText(
-                "BBCode-Text erstellen"
+                tr("create_bbcode", self.language)
             )
             self._update_release_text_button()
             QMessageBox.critical(
                 self,
-                "Textvorlage fehlgeschlagen",
+                tr("release_failed_title", self.language),
                 message,
             )
 
@@ -1555,11 +1552,8 @@ class MainWindow(QMainWindow):
         self.update_history_actions()
         QMessageBox.information(
             self,
-            "Rückgängig",
-            (
-                f"„{entry.description}“ wurde "
-                "rückgängig gemacht."
-            ),
+            tr("undo", self.language),
+            tr("undo_done_msg", self.language, description=entry.description),
         )
 
     def redo_last_change(self):
@@ -1572,11 +1566,8 @@ class MainWindow(QMainWindow):
         self.update_history_actions()
         QMessageBox.information(
             self,
-            "Wiederholt",
-            (
-                f"„{entry.description}“ wurde "
-                "erneut angewendet."
-            ),
+            tr("redone_title", self.language),
+            tr("redo_done_msg", self.language, description=entry.description),
         )
 
     def show_history(self):
