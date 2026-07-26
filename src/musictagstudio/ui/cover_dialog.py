@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from ..cover_management.manager import CoverManager
 from ..cover_management.models import CoverCandidate
 from ..cover_management.comparison import compare_cover_candidates
+from ..i18n import tr
 from ..direct_references import (
     DirectAlbumReferenceError,
     parse_album_reference,
@@ -76,9 +77,12 @@ class CoverSelectionDialog(QDialog):
         manager: CoverManager,
         song: Song,
         parent=None,
+        *,
+        language: str = "automatic",
     ):
         super().__init__(parent)
 
+        self.language = language
         self.manager = manager
         self.song = song
         self.candidates: list[
@@ -100,15 +104,13 @@ class CoverSelectionDialog(QDialog):
             int
         ] = set()
 
-        self.setWindowTitle("Cover auswählen")
+        self.setWindowTitle(tr("cover_select_title", language))
         self.resize(980, 650)
 
         layout = QVBoxLayout(self)
 
         info = QLabel(
-            "Der Dialog wird sofort geöffnet. "
-            "Die Coverquellen werden parallel abgefragt und "
-            "die Originaldatei wird erst nach der Auswahl heruntergeladen."
+            tr("cover_dialog_info", language)
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -116,14 +118,13 @@ class CoverSelectionDialog(QDialog):
         direct_layout = QHBoxLayout()
         self.reference_edit = QLineEdit()
         self.reference_edit.setPlaceholderText(
-            "Optional: Apple-Music-Albumlink, Apple-ID, "
-            "MusicBrainz-Release-Link oder MBID"
+            tr("cover_ref_placeholder", language)
         )
         self.direct_button = QPushButton(
-            "Direkt laden"
+            tr("load_direct_btn", language)
         )
         self.refresh_button = QPushButton(
-            "Online neu suchen"
+            tr("search_online_again", language)
         )
         self.direct_button.clicked.connect(
             self._start_direct_search
@@ -145,7 +146,7 @@ class CoverSelectionDialog(QDialog):
         layout.addLayout(direct_layout)
 
         self.status_label = QLabel(
-            "Coverquellen werden durchsucht …"
+            tr("cover_sources_searching", language)
         )
         layout.addWidget(
             self.status_label
@@ -154,7 +155,7 @@ class CoverSelectionDialog(QDialog):
         body = QHBoxLayout()
         self.list = QListWidget()
         self.preview = QLabel(
-            "Vorschau wird nach Auswahl geladen"
+            tr("preview_after_selection", language)
         )
         self.preview.setAlignment(
             Qt.AlignmentFlag.AlignCenter
@@ -180,7 +181,7 @@ class CoverSelectionDialog(QDialog):
         right_side = QVBoxLayout()
         right_side.addWidget(self.preview)
         self.quality_label = QLabel(
-            "Noch kein Cover ausgewählt."
+            tr("no_cover_selected", language)
         )
         self.quality_label.setWordWrap(True)
         self.quality_label.setTextInteractionFlags(
@@ -191,7 +192,7 @@ class CoverSelectionDialog(QDialog):
         )
 
         self.comparison_label = QLabel(
-            "Für den Bildvergleich bitte ein Cover auswählen."
+            tr("select_cover_for_compare", language)
         )
         self.comparison_label.setWordWrap(True)
         right_side.addWidget(
@@ -205,10 +206,10 @@ class CoverSelectionDialog(QDialog):
 
         buttons = QDialogButtonBox()
         self.ok_button = QPushButton(
-            "Cover übernehmen"
+            tr("apply_cover", language)
         )
         cancel = QPushButton(
-            "Abbrechen"
+            tr("cancel", language)
         )
         buttons.addButton(
             self.ok_button,
@@ -259,7 +260,7 @@ class CoverSelectionDialog(QDialog):
         self.direct_button.setEnabled(False)
         self.refresh_button.setEnabled(False)
         self.status_label.setText(
-            "Coverquellen werden parallel durchsucht …"
+            tr("cover_sources_searching_parallel", self.language)
         )
         self.list.clear()
         self.candidates.clear()
@@ -268,7 +269,7 @@ class CoverSelectionDialog(QDialog):
         self.ok_button.setEnabled(False)
         self.preview.clear()
         self.preview.setText(
-            "Suche läuft …"
+            tr("search_running", self.language)
         )
 
         worker = FunctionWorker(
@@ -328,18 +329,20 @@ class CoverSelectionDialog(QDialog):
 
         if not self.candidates:
             self.status_label.setText(
-                "Keine passenden Cover gefunden."
+                tr("no_covers_found", self.language)
             )
             self.preview.setText(
-                "Keine Vorschau"
+                tr("no_preview", self.language)
             )
             return
 
         for candidate in self.candidates:
-            details = (
-                f"{candidate.source_label} · "
-                f"{candidate.dimensions} · "
-                f"Bewertung {candidate.score}"
+            details = tr(
+                "cover_detail_line",
+                self.language,
+                source=candidate.source_label,
+                dimensions=candidate.dimensions,
+                score=candidate.score,
             )
 
             if candidate.album:
@@ -358,9 +361,13 @@ class CoverSelectionDialog(QDialog):
             candidate.score,
         )
         self.status_label.setText(
-            f"{len(self.candidates)} Cover gefunden. "
-            f"Empfehlung: {best.source_label} "
-            f"({best.score} Punkte)."
+            tr(
+                "covers_found",
+                self.language,
+                count=len(self.candidates),
+                best=best.source_label,
+                score=best.score,
+            )
         )
         best_row = self.candidates.index(
             best
@@ -383,10 +390,10 @@ class CoverSelectionDialog(QDialog):
         self.direct_button.setEnabled(True)
         self.refresh_button.setEnabled(True)
         self.status_label.setText(
-            f"Cover-Suche fehlgeschlagen: {message}"
+            tr("cover_search_failed", self.language, message=message)
         )
         self.preview.setText(
-            "Keine Vorschau"
+            tr("no_preview", self.language)
         )
 
     def _load_preview(
@@ -422,7 +429,7 @@ class CoverSelectionDialog(QDialog):
         generation = self._preview_generation
         self.preview.clear()
         self.preview.setText(
-            "Vorschau wird im Hintergrund geladen …"
+            tr("preview_loading_bg", self.language)
         )
         self._start_preview_download(
             row,
@@ -593,8 +600,7 @@ class CoverSelectionDialog(QDialog):
             not in self._preview_cache
         ):
             self.preview.setText(
-                "Vorschau nicht verfügbar\n"
-                + message
+                tr("preview_unavailable", self.language, message=message)
             )
 
     def _show_preview_data(
@@ -606,7 +612,7 @@ class CoverSelectionDialog(QDialog):
 
         if not pixmap.loadFromData(data):
             self.preview.setText(
-                "Vorschau konnte nicht geladen werden"
+                tr("preview_load_failed", self.language)
             )
             return
 
@@ -639,39 +645,39 @@ class CoverSelectionDialog(QDialog):
         )
         original_format = (
             candidate.mime
-            or "wird beim Originaldownload ermittelt"
+            or tr("determined_on_download", self.language)
         )
         original_size = (
             candidate.file_size_text
             if candidate.file_size
-            else "wird beim Originaldownload ermittelt"
+            else tr("determined_on_download", self.language)
         )
         shape = (
-            "quadratisch"
+            tr("shape_square", self.language)
             if (
                 candidate.width
                 and candidate.width
                 == candidate.height
             )
             else (
-                "nicht quadratisch"
+                tr("shape_nonsquare", self.language)
                 if candidate.width
                 and candidate.height
-                else "noch nicht bekannt"
+                else tr("shape_unknown", self.language)
             )
         )
 
         lines = [
-            f"Quelle: {source}",
-            f"Originalauflösung: {original_dimensions}",
-            f"Originalformat: {original_format}",
-            f"Originalgröße: {original_size}",
-            f"Seitenverhältnis: {shape}",
-            f"Bewertung: {candidate.score} / 100",
+            tr("q_source", self.language, value=source),
+            tr("q_resolution", self.language, value=original_dimensions),
+            tr("q_format", self.language, value=original_format),
+            tr("q_size", self.language, value=original_size),
+            tr("q_aspect", self.language, value=shape),
+            tr("q_score", self.language, score=candidate.score),
             (
-                f"MD5: {candidate.short_hash}"
+                tr("q_md5", self.language, value=candidate.short_hash)
                 if candidate.short_hash
-                else "MD5: wird beim Originaldownload berechnet"
+                else tr("q_md5", self.language, value=tr("md5_on_download", self.language))
             ),
         ]
 
@@ -683,13 +689,16 @@ class CoverSelectionDialog(QDialog):
             lines.extend(
                 [
                     "",
-                    (
-                        "Geladene Vorschau: "
-                        f"{preview_width} × {preview_height}"
+                    tr(
+                        "q_preview_loaded",
+                        self.language,
+                        width=preview_width,
+                        height=preview_height,
                     ),
-                    (
-                        "Vorschaugröße: "
-                        f"{preview_size / 1024:.1f} KB"
+                    tr(
+                        "q_preview_size",
+                        self.language,
+                        size=f"{preview_size / 1024:.1f}",
                     ),
                 ]
             )
@@ -713,16 +722,19 @@ class CoverSelectionDialog(QDialog):
                 candidate,
             )
             self.comparison_label.setText(
-                "Vergleich mit vorhandenem Master-Cover:\n"
-                + comparison.description
+                tr(
+                    "compare_master",
+                    self.language,
+                    description=comparison.description,
+                )
             )
         elif candidate.is_local:
             self.comparison_label.setText(
-                "Vorhandenes Master-Cover."
+                tr("existing_master", self.language)
             )
         else:
             self.comparison_label.setText(
-                "Kein vorhandenes Master-Cover zum Vergleichen."
+                tr("no_master_compare", self.language)
             )
 
     def reject(self) -> None:

@@ -2430,6 +2430,7 @@ class MainWindow(QMainWindow):
             manager,
             songs[0],
             self,
+            language=self.language,
         )
 
         if (
