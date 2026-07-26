@@ -1,5 +1,15 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Diskografie: keine Feature-Alben, korrekte Vinyl-Tracknummern
+
+- Alben, auf denen der gesuchte Künstler nur als Gast/Feature auftritt
+  (Discogs-Rolle „Appearance“/„TrackAppearance“) oder nur Produktions-/Remix-
+  Credits hat, erscheinen nicht mehr in dessen Diskografie – ein Juse-Ju-Album
+  mit einem Danger-Dan-Feature landet also nicht mehr unter Danger Dan.
+- Vinyl-Seitenangaben („A1“, „B2“ …) wurden bisher nur anhand der Zahl
+  gelesen, sodass die B-Seite wieder bei Track 1 begann. Solche Positionen
+  werden jetzt fortlaufend nummeriert, damit sich keine Tracknummern doppeln.
+
 ## Track-Vorschau: richtige Zuordnung und Titelanzeige
 
 - Die 30-Sekunden-Vorschauen werden jetzt über den (normalisierten) Titel

@@ -220,11 +220,17 @@ def medium_count(formats: tuple[str, ...]) -> int:
 
 def discogs_position(value: str, fallback: int) -> tuple[int, int]:
     text = str(value or "").strip()
+    # CD-Mehrfachdiscs: "1-2", "2.05" -> (Disc, Track).
     match = re.match(r"(\d+)[-.](\d+)", text)
     if match:
         return int(match.group(1)), int(match.group(2))
-    numbers = re.findall(r"\d+", text)
-    return (1, int(numbers[-1])) if numbers else (1, fallback)
+    # Reine Tracknummer ("7") wird direkt übernommen.
+    if re.fullmatch(r"\d+", text):
+        return 1, int(text)
+    # Vinyl-Seiten ("A1", "B2") und sonstige Formate fortlaufend nummerieren.
+    # Früher wurde nur die Zahl genommen ("B1" -> Track 1), wodurch sich die
+    # Nummern je Seite doppelten; die laufende Position ist eindeutig.
+    return 1, fallback
 
 
 def duration_ms(value: str) -> int | None:

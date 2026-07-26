@@ -538,6 +538,19 @@ def _release_from_label_summary(
     )
 
 
+def _is_own_release_role(role: str) -> bool:
+    """True, wenn eine Discogs-Rolle zur *eigenen* Diskografie gehört.
+
+    Discogs listet unter einem Künstler auch Gastauftritte/Features auf fremden
+    Alben ("Appearance"/"TrackAppearance") sowie Produktions-/Remix-Credits.
+    Diese sollen nicht als eigene Veröffentlichungen erscheinen – z. B. darf ein
+    Juse-Ju-Album, auf dem der gesuchte Künstler nur featured, nicht in dessen
+    Diskografie auftauchen. Leere Rolle wird als Hauptwerk behandelt.
+    """
+    normalized = str(role or "").strip().casefold()
+    return normalized in {"", "main"}
+
+
 def fetch_artist_releases(
     artist_id: int,
     token: str,
@@ -583,10 +596,7 @@ def fetch_artist_releases(
             )
         )
 
-        if role and role.casefold() not in {
-            "main",
-            "appearance",
-        }:
+        if not _is_own_release_role(role):
             continue
 
         detail = _fetch_summary_detail(
