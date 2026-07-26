@@ -1,5 +1,16 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Track-Vorschau: richtige Zuordnung und Titelanzeige
+
+- Die 30-Sekunden-Vorschauen werden jetzt über den (normalisierten) Titel
+  zugeordnet statt über (Disc, Tracknummer). Bei Discogs-Releases mit
+  mehreren Medien/Seiten liefen die Tracknummern doppelt („01“ mehrfach),
+  wodurch die falsche Vorschau abgespielt wurde – das ist behoben.
+- Der Titelabgleich ignoriert feat.-Angaben und Klammerzusätze
+  („7Eleven (feat. …)“ passt zu „7Eleven“).
+- Die Wiedergabe-Leiste zeigt beim Wechsel auf eine andere Vorschau sofort
+  den neuen Titel an (vorher blieb der zuvor gespielte Titel stehen).
+
 ## Aufgeräumte Oberfläche: Nav-Icons, gruppiertes Detail-Panel, Status-Chips
 
 - Die Navigationsleiste links bekommt einheitliche SVG-Icons

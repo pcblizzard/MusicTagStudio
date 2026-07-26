@@ -199,10 +199,10 @@ def _resolve_deezer_previews(
     album: str,
     artist: str,
     expected_track_count: int,
-) -> dict[tuple[int, int], str]:
+) -> dict[str, str]:
     """Löst 30-Sekunden-Vorschauen über Deezer auf und ordnet sie nach
-    (Disc, Track) zu. Läuft im Worker-Thread; Fehler ergeben leere Zuordnung,
-    damit die Trackliste nie blockiert wird."""
+    normalisiertem Titel zu. Läuft im Worker-Thread; Fehler ergeben leere
+    Zuordnung, damit die Trackliste nie blockiert wird."""
     from ..providers import deezer
 
     try:
@@ -235,7 +235,7 @@ def _resolve_apple_previews(
     artist: str,
     expected_track_count: int,
     country: str,
-) -> dict[tuple[int, int], str]:
+) -> dict[str, str]:
     """Löst Vorschauen über Apple Music auf (Album finden → Lookup-Trackliste)."""
     from ..direct_album_lookup import (
         DirectAlbumLookupError,
@@ -280,19 +280,37 @@ def _resolve_apple_previews(
     return _preview_map_from_tracks(result.tracks)
 
 
-def _preview_map_from_tracks(tracks) -> dict[tuple[int, int], str]:
-    mapping: dict[tuple[int, int], str] = {}
+def _preview_title_key(title: str) -> str:
+    """Normalisiert einen Titel für den Vorschau-Abgleich.
+
+    Klammerzusätze und feat.-Angaben werden entfernt (Streaming-Titel wie
+    "7Eleven (feat. Fatoni)" sollen zum lokalen "7Eleven" passen), danach
+    bleiben nur Buchstaben/Ziffern. So bleibt die Zuordnung stabil, auch wenn
+    Discogs-Positionen doppelte Tracknummern liefern.
+    """
+    text = str(title or "").lower()
+    text = re.sub(r"[\(\[].*?[\)\]]", " ", text)
+    text = re.sub(r"\b(feat|ft|featuring)\.?.*$", " ", text)
+    return re.sub(r"[^a-z0-9]", "", text)
+
+
+def _preview_map_from_tracks(tracks) -> dict[str, str]:
+    """Ordnet Vorschau-URLs anhand des normalisierten Titels zu.
+
+    Früher wurde nach (Disc, Tracknummer) zugeordnet; bei Discogs-Releases mit
+    mehreren Medien/Seiten kollidieren diese Nummern jedoch (mehrfach „01“),
+    wodurch die falsche Vorschau abgespielt wurde. Der Titel ist eindeutig.
+    """
+    mapping: dict[str, str] = {}
 
     for track in tracks:
         if not track.preview_url:
             continue
 
-        try:
-            key = (int(track.disc or 1), int(track.track))
-        except (TypeError, ValueError):
-            continue
+        key = _preview_title_key(getattr(track, "title", ""))
 
-        mapping[key] = track.preview_url
+        if key and key not in mapping:
+            mapping[key] = track.preview_url
 
     return mapping
 
@@ -2716,7 +2734,7 @@ class MediaLibraryWidget(QWidget):
             if row >= len(self.track_preview_urls):
                 break
 
-            key = (track.disc_number, track.track_number)
+            key = _preview_title_key(_track_title(track))
             self.track_preview_urls[row] = mapping.get(key, "")
 
         self._refresh_track_preview_buttons()

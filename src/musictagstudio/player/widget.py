@@ -248,13 +248,7 @@ class PlayerBar(QWidget):
             ):
                 self.engine.media_player.pause()
 
-            title = (
-                self.preview_player.current_title
-                if self.preview_player is not None
-                else ""
-            ) or "Vorschau"
-            self.title_label.setText(f"{title} (Vorschau)")
-            self.title_label.setToolTip("30-Sekunden-Vorschau")
+            self._apply_preview_title()
             self.album_label.setText("30-Sekunden-Vorschau")
             self.cover_label.setPixmap(QPixmap())
             self.cover_label.setText("♪")
@@ -289,9 +283,23 @@ class PlayerBar(QWidget):
         self._duration_changed(self.engine.media_player.duration())
         self._position_changed(self.engine.media_player.position())
 
+    def _apply_preview_title(self) -> None:
+        title = (
+            self.preview_player.current_title
+            if self.preview_player is not None
+            else ""
+        ) or "Vorschau"
+        self.title_label.setText(f"{title} (Vorschau)")
+        self.title_label.setToolTip("30-Sekunden-Vorschau")
+
     def _preview_state_changed(self, _url: str, playing: bool) -> None:
         if self._preview_mode:
             self._set_play_icon(playing)
+            # Beim Wechsel auf eine andere Vorschau bleibt die Sitzung aktiv,
+            # daher wird der Titel hier (nicht nur bei Sitzungsbeginn)
+            # aktualisiert, sobald die neue Vorschau spielt.
+            if playing:
+                self._apply_preview_title()
 
     def _preview_position_changed(self, position: int) -> None:
         if self._preview_mode:

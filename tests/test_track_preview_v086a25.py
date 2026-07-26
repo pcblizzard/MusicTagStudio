@@ -165,7 +165,7 @@ def test_dialog_preview_click_toggles_player(monkeypatch):
     dialog.done(0)
 
 
-def test_resolve_deezer_previews_maps_by_disc_and_track(monkeypatch):
+def test_resolve_deezer_previews_maps_by_title(monkeypatch):
     from musictagstudio.direct_album_lookup import DirectAlbumResult
     from musictagstudio.providers import deezer
     from musictagstudio.ui import media_library_widget as mlw
@@ -194,7 +194,7 @@ def test_resolve_deezer_previews_maps_by_disc_and_track(monkeypatch):
 
     mapping = mlw._resolve_deezer_previews("X", "A", 2)
 
-    assert mapping == {(1, 1): "http://p/1.mp3"}
+    assert mapping == {"a": "http://p/1.mp3"}
 
 
 def test_resolve_deezer_previews_empty_when_no_confident_match(monkeypatch):
@@ -226,13 +226,13 @@ def test_media_library_preview_buttons_enable_on_resolution():
     assert widget.track_preview_buttons[0].isEnabled() is False
 
     widget._preview_token = 7
-    widget._previews_resolved(7, {(1, 1): "http://p/1.mp3"})
+    widget._previews_resolved(7, {"a": "http://p/1.mp3"})
 
     assert widget.track_preview_buttons[0].isEnabled() is True
     assert widget.track_preview_buttons[1].isEnabled() is False
 
     # Veraltetes Token wird ignoriert.
-    widget._previews_resolved(99, {(1, 2): "http://x"})
+    widget._previews_resolved(99, {"b": "http://x"})
     assert widget.track_preview_urls[1] == ""
     widget.deleteLater()
 
@@ -273,6 +273,13 @@ def test_player_bar_preview_mode(monkeypatch):
     )
     bar._toggle_play()
     assert calls == {"preview": 1, "engine": 0}
+
+    # Wechsel auf eine andere Vorschau (Sitzung bleibt aktiv): der Titel in
+    # der Leiste aktualisiert sich, sobald die neue Vorschau spielt.
+    preview._current_title = "Bordertown"
+    preview.state_changed.emit("http://x/border.mp3", True)
+    assert "Bordertown" in bar.title_label.text()
+    assert "Traumtänzer" not in bar.title_label.text()
 
     # Sitzungsende stellt die Engine-Anzeige wieder her.
     preview.session_changed.emit(False)
@@ -406,7 +413,47 @@ def test_resolve_apple_previews_maps_tracks(monkeypatch):
     )
 
     mapping = mlw._resolve_apple_previews("X", "A", 1, "DE")
-    assert mapping == {(1, 1): "http://itunes/1.m4a"}
+    assert mapping == {"a": "http://itunes/1.m4a"}
+
+
+def test_preview_title_key_strips_feat_and_brackets():
+    from musictagstudio.ui.media_library_widget import _preview_title_key
+
+    assert _preview_title_key("7Eleven (feat. Fatoni & Edgar Wasser)") == "7eleven"
+    assert _preview_title_key("Propaganda (feat. Danger Dan)") == "propaganda"
+    assert _preview_title_key("Bordertown") == "bordertown"
+    # Gleicher Kern trotz feat. -> gleicher Schlüssel (Abgleich klappt).
+    assert _preview_title_key("Lovesongs") == _preview_title_key("Lovesongs (Live)")
+
+
+def test_previews_resolved_matches_by_title_despite_duplicate_track_numbers():
+    _app()
+    from musictagstudio.media_library.service import Track
+    from musictagstudio.ui.media_library_widget import MediaLibraryWidget
+
+    widget = MediaLibraryWidget()
+    widget.current_group = None
+    # Discogs-artige Doppelnummerierung: zwei Zeilen mit Tracknummer 1.
+    widget._tracks_loaded(
+        [
+            Track(disc_number=1, track_number=1, title="Kirchheim Horizont"),
+            Track(disc_number=1, track_number=1, title="Bordertown"),
+        ]
+    )
+
+    widget._preview_token = 3
+    widget._previews_resolved(
+        3,
+        {
+            "kirchheimhorizont": "http://p/kirchheim.mp3",
+            "bordertown": "http://p/bordertown.mp3",
+        },
+    )
+
+    # Jede Zeile bekommt trotz identischer Tracknummer die richtige Vorschau.
+    assert widget.track_preview_urls[0] == "http://p/kirchheim.mp3"
+    assert widget.track_preview_urls[1] == "http://p/bordertown.mp3"
+    widget.deleteLater()
 
 
 def test_media_library_only_playing_row_highlighted(monkeypatch):
