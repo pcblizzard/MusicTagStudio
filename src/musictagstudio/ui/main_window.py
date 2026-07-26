@@ -1552,7 +1552,11 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             tr("undo", self.language),
-            tr("undo_done_msg", self.language, description=entry.description),
+            tr(
+                "undo_done_msg",
+                self.language,
+                description=tr(entry.description, self.language),
+            ),
         )
 
     def redo_last_change(self):
@@ -1566,13 +1570,18 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             tr("redone_title", self.language),
-            tr("redo_done_msg", self.language, description=entry.description),
+            tr(
+                "redo_done_msg",
+                self.language,
+                description=tr(entry.description, self.language),
+            ),
         )
 
     def show_history(self):
         HistoryDialog(
             self.history.entries(),
             self,
+            language=self.language,
         ).exec()
 
     def _preview_changes(
@@ -1659,7 +1668,7 @@ class MainWindow(QMainWindow):
 
     def _write_song_updates(
         self,
-        description: str,
+        description_key: str,
         items: list[
             tuple[int, Song]
         ],
@@ -1672,8 +1681,10 @@ class MainWindow(QMainWindow):
         ):
             return 0, []
 
+        # Der Verlauf speichert den i18n-Key (nicht den uebersetzten Text),
+        # damit ein Sprachwechsel auch alte Eintraege korrekt anzeigt.
         entry = self.history.begin(
-            description,
+            description_key,
             [
                 updated.path
                 for _row, updated
@@ -2425,7 +2436,7 @@ class MainWindow(QMainWindow):
             return
 
         entry = self.history.begin(
-            "Cover geändert",
+            "hist_cover_changed",
             [
                 song.path
                 for song in songs
@@ -2551,7 +2562,7 @@ class MainWindow(QMainWindow):
         ]
         saved, failed = (
             self._write_song_updates(
-                "Direkte Albumabfrage",
+                "hist_direct_album",
                 update_items,
             )
         )
@@ -2843,7 +2854,7 @@ class MainWindow(QMainWindow):
         ]
         saved, failed = (
             self._write_song_updates(
-                "Metadatenvorschläge übernommen",
+                "hist_batch_suggestions",
                 update_items,
             )
         )
@@ -2941,7 +2952,7 @@ class MainWindow(QMainWindow):
 
         saved, failed = (
             self._write_song_updates(
-                "Metadaten eines Titels geändert",
+                "hist_single_edit",
                 [
                     (
                         row,
@@ -3020,7 +3031,7 @@ class MainWindow(QMainWindow):
 
         saved_count, failed = (
             self._write_song_updates(
-                "Mehrfachbearbeitung",
+                "hist_batch_edit",
                 update_items,
             )
         )

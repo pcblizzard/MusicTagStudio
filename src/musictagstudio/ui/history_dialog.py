@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..history import HistoryEntry
+from ..i18n import tr, tr_plural
 
 
 class HistoryDialog(QDialog):
@@ -17,12 +18,14 @@ class HistoryDialog(QDialog):
             HistoryEntry
         ],
         parent=None,
+        *,
+        language: str = "automatic",
     ) -> None:
         super().__init__(
             parent
         )
         self.setWindowTitle(
-            "Änderungsverlauf"
+            tr("history", language)
         )
         self.resize(
             650,
@@ -36,14 +39,16 @@ class HistoryDialog(QDialog):
 
         if not entries:
             items.addItem(
-                "In dieser Sitzung wurden noch keine Änderungen geschrieben."
+                tr("history_empty", language)
             )
         else:
             for entry in entries:
+                # entry.description ist ein i18n-Key; alte Roh-Texte geben ihren
+                # Wert unveraendert zurueck (tr faellt auf den Key zurueck).
                 items.addItem(
                     f"{entry.created_at} · "
-                    f"{entry.description} · "
-                    f"{len(entry.files)} Datei(en)"
+                    f"{tr(entry.description, language)} · "
+                    f"{tr_plural('history_files', len(entry.files), language)}"
                 )
 
         layout.addWidget(
