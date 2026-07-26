@@ -1,5 +1,19 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## i18n-Fundament (Phase 0): Kataloge, Plural, Übersetzungswerkzeug
+
+- Die Übersetzungen liegen jetzt in `src/musictagstudio/locales/*.json` (statt
+  im Python-Code) und werden dort maschinell gepflegt. Eine neue Sprache = eine
+  neue JSON-Datei.
+- `tr()` bleibt kompatibel (Platzhalter via `{name}`); neu ist `tr_plural()` für
+  Singular/Plural (z. B. „1 Änderung" / „5 Änderungen").
+- Dev-Werkzeug `scripts/translate_i18n.py` übersetzt fehlende Keys mit **DeepL
+  (primär) und Google (Zweitmeinung)**; Abweichungen landen zur Auswahl in einer
+  Review-Datei. Harte **Budgetgrenzen** (Google-Monatszähler, DeepL-Live-Usage),
+  ein `--estimate`-Trockenlauf und `--google-languages` schützen die Kontingente.
+  API-Schlüssel kommen nur aus Umgebungsvariablen; die App ruft zur Laufzeit
+  **keine** Übersetzungsdienste auf.
+
 ## Python 3.14 unterstützt
 
 - Das Projekt läuft jetzt auch unter **Python 3.14** (getestet: alle

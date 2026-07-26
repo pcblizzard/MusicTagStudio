@@ -41,6 +41,9 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+musictagstudio = ["locales/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
@@ -59,6 +62,7 @@ python_version = "3.12"
 files = [
     "src/musictagstudio/database.py",
     "src/musictagstudio/history.py",
+    "src/musictagstudio/i18n.py",
     "src/musictagstudio/icons.py",
     "src/musictagstudio/direct_references.py",
     "src/musictagstudio/local_track.py",
