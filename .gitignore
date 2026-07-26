@@ -18,6 +18,11 @@ venv/
 src/musictagstudio/locales/_review_*.json
 src/musictagstudio/locales/.translation_usage.json
 
+# Lokale Übersetzungs-API-Keys – NIE committen (nur .env.example ist im Repo)
+.env
+.env.local
+scripts/set_translation_keys.ps1
+
 # Local application data
 cache/
 logs/

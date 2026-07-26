@@ -117,9 +117,24 @@ def _deepl_endpoint(key: str) -> str:
     return f"https://{host}/v2/translate"
 
 
-def _http_json(request: Request) -> dict:
-    with urlopen(request, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
+def _http_json(request: Request, *, retries: int = 5) -> dict:
+    """POST/GET mit JSON-Antwort. Bei 429/5xx wird mit exponentiellem Backoff
+    (und ``Retry-After``, falls gesetzt) wiederholt – DeepL Free hat ein
+    striktes Rate-Limit."""
+    delay = 1.0
+    for attempt in range(retries + 1):
+        try:
+            with urlopen(request, timeout=30) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError as error:
+            if error.code not in (429, 500, 502, 503, 529) or attempt == retries:
+                raise
+            retry_after = error.headers.get("Retry-After") if error.headers else None
+            wait = float(retry_after) if (retry_after or "").isdigit() else delay
+            print(f"  Rate-Limit/Serverfehler HTTP {error.code} – warte {wait:.0f}s …")
+            time.sleep(wait)
+            delay = min(delay * 2, 30.0)
+    raise RuntimeError("unreachable")
 
 
 def deepl_translate(text: str, deepl_code: str, key: str, source: str) -> str:
@@ -433,7 +448,7 @@ def run_translate(args) -> int:
                     except (HTTPError, URLError, KeyError, ValueError) as error:
                         print(f"  {lang}/{key}: Google-Fehler ({error}).")
 
-            time.sleep(0.1)
+            time.sleep(0.5)
 
             if google_out is not None and _norm(deepl_out) != _norm(google_out):
                 review[key] = {"deepl": deepl_out, "google": google_out, "chosen": "deepl"}

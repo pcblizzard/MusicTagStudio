@@ -30,7 +30,7 @@ def test_tr_placeholder_formatting():
 
 
 def test_tr_falls_back_to_english_then_key():
-    # Spanisch hat 'welcome' (noch) nicht -> Fallback Englisch.
-    assert tr("welcome", "es") == tr("welcome", "en")
+    # Unbekannter Sprachcode -> Englisch-Fallback (resolve_language -> "en").
+    assert tr("welcome", "xx_unbekannt") == tr("welcome", "en")
     # Voellig unbekannter Key -> Key selbst.
     assert tr("gibt_es_nicht_xyz", "de") == "gibt_es_nicht_xyz"
