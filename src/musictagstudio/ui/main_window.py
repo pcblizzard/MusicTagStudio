@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import (
     QSettings,
+    QSize,
     QThreadPool,
     QTimer,
     Qt,
@@ -14,6 +15,7 @@ from PySide6.QtGui import (
     QAction,
     QCloseEvent,
     QKeySequence,
+    QPalette,
     QPixmap,
     QShortcut,
 )
@@ -99,6 +101,7 @@ from .media_library_widget import MediaLibraryWidget
 from .lyrics_dialog import LyricsDialog
 from .lyrics_search_dialog import LyricsSearchDialog
 from .dashboard_widget import DashboardWidget
+from ..icons import make_icon
 from ..player import (
     PlayerBar,
     WindowsMediaKeyController,
@@ -719,17 +722,23 @@ class MainWindow(QMainWindow):
             True
         )
         workspace_pages = (
-            ("Startseite", 5),
-            ("Tagger", 0),
-            ("Medienbibliothek", 1),
-            ("Audio-Analyse", 2),
-            ("Bibliotheksprüfung", 3),
+            ("Startseite", 5, "nav_home"),
+            ("Tagger", 0, "nav_tagger"),
+            ("Medienbibliothek", 1, "nav_library"),
+            ("Audio-Analyse", 2, "nav_analysis"),
+            ("Bibliotheksprüfung", 3, "nav_audit"),
         )
 
-        for name, index in workspace_pages:
+        nav_color = self.palette().color(
+            QPalette.ColorRole.ButtonText
+        ).name()
+        for name, index, icon_name in workspace_pages:
             button = QPushButton(
                 name
             )
+            button.setIcon(make_icon(icon_name, nav_color))
+            button.setIconSize(QSize(18, 18))
+            button.setStyleSheet("text-align: left; padding-left: 8px;")
             button.setCheckable(
                 True
             )
@@ -752,6 +761,11 @@ class MainWindow(QMainWindow):
 
         # Aktions-Knopf (kein Workspace) unter der Navigation.
         self.lyrics_search_button.setMinimumHeight(34)
+        self.lyrics_search_button.setIcon(make_icon("nav_lyrics", nav_color))
+        self.lyrics_search_button.setIconSize(QSize(18, 18))
+        self.lyrics_search_button.setStyleSheet(
+            "text-align: left; padding-left: 8px;"
+        )
         sidebar_layout.addWidget(
             self.lyrics_search_button
         )

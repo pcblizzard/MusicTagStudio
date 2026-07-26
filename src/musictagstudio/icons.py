@@ -48,6 +48,42 @@ _ICONS: dict[str, str] = {
         '<path d="M7 22l-4-4 4-4"/><path d="M21 12v2a4 4 0 0 1-4 4H3"/></g>'
         '<circle cx="12" cy="12" r="1.8" fill="{color}" stroke="none"/>'
     ),
+    # Navigations-Icons (Seitenleiste).
+    "nav_home": (
+        '<g fill="none" stroke="{color}" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M4 11 12 4l8 7"/><path d="M6 10v9h12v-9"/>'
+        '<path d="M10 19v-5h4v5"/></g>'
+    ),
+    "nav_tagger": (
+        '<g fill="none" stroke="{color}" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M4 4h7l9 9-7 7-9-9z"/></g>'
+        '<circle cx="8.5" cy="8.5" r="1.4" fill="{color}" stroke="none"/>'
+    ),
+    "nav_library": (
+        '<g fill="none" stroke="{color}" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M9 18V5l11-2v13"/>'
+        '<circle cx="6" cy="18" r="2.5"/><circle cx="17" cy="16" r="2.5"/></g>'
+    ),
+    "nav_analysis": (
+        '<g fill="none" stroke="{color}" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M4 12h3l2-6 3 12 3-9 2 3h3"/></g>'
+    ),
+    "nav_audit": (
+        '<g fill="none" stroke="{color}" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/>'
+        '<path d="m9 12 2 2 4-4"/></g>'
+    ),
+    "nav_lyrics": (
+        '<g fill="none" stroke="{color}" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M5 5h11M5 9h11M5 13h7"/>'
+        '<circle cx="17" cy="17" r="3"/><path d="m19.5 19.5 2 2"/></g>'
+    ),
     "queue": (
         '<g fill="none" stroke="{color}" stroke-width="1.8" '
         'stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></g>'
