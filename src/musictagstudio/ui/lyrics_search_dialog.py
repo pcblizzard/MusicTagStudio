@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..i18n import tr
 from ..lyrics.search import LyricsSearchResult, search_lyrics
 from ..models.song import Song
 from ..secret_store import GENIUS_ACCESS_TOKEN, get_secret
@@ -31,20 +32,21 @@ class LyricsSearchDialog(QDialog):
         parent=None,
         *,
         player_bar=None,
+        language: str = "automatic",
     ) -> None:
         super().__init__(parent)
+        self.language = language
         self.songs = songs
         self.player_bar = player_bar
         self.thread_pool = QThreadPool(self)
         self.worker: FunctionWorker | None = None
         self.results: list[LyricsSearchResult] = []
 
-        self.setWindowTitle("Song über Text finden")
+        self.setWindowTitle(tr("lyrics_search", language))
         self.resize(980, 560)
         layout = QVBoxLayout(self)
         intro = QLabel(
-            "Gib eine möglichst markante Textstelle ein. Zuerst werden lokal "
-            "gespeicherte Lyrics durchsucht, anschließend optional Genius."
+            tr("lyrics_search_intro", language)
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
@@ -52,9 +54,9 @@ class LyricsSearchDialog(QDialog):
         search_row = QHBoxLayout()
         self.query_edit = QLineEdit()
         self.query_edit.setPlaceholderText(
-            "Zum Beispiel: Willkommen am Ende, am Ende vom Weg"
+            tr("lyrics_search_placeholder", language)
         )
-        self.search_button = QPushButton("Suchen")
+        self.search_button = QPushButton(tr("search", language))
         search_row.addWidget(self.query_edit, 1)
         search_row.addWidget(self.search_button)
         layout.addLayout(search_row)
@@ -65,13 +67,18 @@ class LyricsSearchDialog(QDialog):
 
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(
-            ["Quelle", "Titel", "Künstler", "Album", "Gefundene Textstelle"]
+            [
+                tr("col_source", language),
+                tr("col_title", language),
+                tr("col_artist", language),
+                tr("col_album", language),
+                tr("col_excerpt", language),
+            ]
         )
         excerpt_header = self.table.horizontalHeaderItem(4)
         if excerpt_header is not None:
             excerpt_header.setToolTip(
-                "Zeigt den passenden Ausschnitt nur bei lokal gespeicherten "
-                "Lyrics. Die Genius-API liefert keine konkrete Textpassage."
+                tr("excerpt_tip", language)
             )
         self.table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -89,8 +96,8 @@ class LyricsSearchDialog(QDialog):
         layout.addWidget(self.table, 1)
 
         action_row = QHBoxLayout()
-        self.play_button = QPushButton("Lokalen Titel abspielen")
-        self.open_button = QPushButton("Auf Genius öffnen")
+        self.play_button = QPushButton(tr("play_local", language))
+        self.open_button = QPushButton(tr("open_genius", language))
         self.play_button.setEnabled(False)
         self.open_button.setEnabled(False)
         action_row.addWidget(self.play_button)
@@ -110,22 +117,20 @@ class LyricsSearchDialog(QDialog):
 
         if not get_secret(GENIUS_ACCESS_TOKEN):
             self.status_label.setText(
-                "Noch kein Genius-Token hinterlegt. Die lokale Suche "
-                "funktioniert trotzdem; den Token kannst du unter "
-                "Einstellungen > Online-Kataloge ergänzen."
+                tr("no_genius_token", language)
             )
 
     def _start_search(self) -> None:
         query = self.query_edit.text().strip()
         if len(query) < 3:
             self.status_label.setText(
-                "Bitte mindestens drei Zeichen des Liedtexts eingeben."
+                tr("min_chars", self.language)
             )
             return
         self.search_button.setEnabled(False)
         self.table.setRowCount(0)
         self.results.clear()
-        self.status_label.setText("Lokale Lyrics und Genius werden durchsucht …")
+        self.status_label.setText(tr("lyrics_searching", self.language))
         self.worker = FunctionWorker(
             search_lyrics,
             query,
@@ -156,24 +161,24 @@ class LyricsSearchDialog(QDialog):
             self.table.selectRow(0)
             local_count = sum(bool(item.local_path) for item in self.results)
             genius_count = sum(item.source == "Genius" for item in self.results)
-            status = (
-                f"{len(self.results)} Treffer: {local_count} lokal, "
-                f"{genius_count} von Genius."
+            status = tr(
+                "lyrics_hits",
+                self.language,
+                count=len(self.results),
+                local=local_count,
+                genius=genius_count,
             )
             if local_count == 0 and genius_count:
-                status += (
-                    " Hinweis: Die Audiodatei ist zwar lokal vorhanden, "
-                    "enthält aber keine passende eingebettete Lyrics und es "
-                    "wurde auch keine passende .lrc-Datei bzw. kein "
-                    "Lyrics-Cache-Eintrag gefunden."
-                )
+                status += tr("lyrics_no_embedded", self.language)
             self.status_label.setText(status)
         else:
-            self.status_label.setText("Keine passenden Songs gefunden.")
+            self.status_label.setText(tr("no_songs_found", self.language))
 
     def _show_error(self, message: str) -> None:
         self.search_button.setEnabled(True)
-        self.status_label.setText(f"Suche fehlgeschlagen: {message}")
+        self.status_label.setText(
+            tr("lyrics_search_failed", self.language, message=message)
+        )
 
     def _selected_result(self) -> LyricsSearchResult | None:
         row = self.table.currentRow()
@@ -203,8 +208,8 @@ class LyricsSearchDialog(QDialog):
                 return
         QMessageBox.information(
             self,
-            "Titel nicht verfügbar",
-            "Der lokale Titel ist nicht mehr in der aktuellen Bibliothek.",
+            tr("title_unavailable_title", self.language),
+            tr("title_unavailable_msg", self.language),
         )
 
     def _open_selected(self) -> None:

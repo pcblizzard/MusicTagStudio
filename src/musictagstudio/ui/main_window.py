@@ -1433,6 +1433,7 @@ class MainWindow(QMainWindow):
             tuple(self.songs),
             self,
             player_bar=self.player_bar,
+            language=self.language,
         )
         dialog.exec()
 
