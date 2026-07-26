@@ -34,7 +34,9 @@ Ohne feste Termine.
   Tokenablage und automatischer Erneuerung.
 - **alpha12 ✅:** offizielle TIDAL- und Spotify-Katalogabfragen mit sicher
   gespeicherten Zugangsdaten und gemeinsamem Streaming-Cache
-- **beta:** gespeicherte Warteschlangen, Fehlerfälle und UI-Polishing
+- **beta ✅:** persistente Warteschlange über Neustarts, einheitlicher
+  Fehlerkanal (Statusleiste), SVG-Icons für Vorschau-/Undo-/Redo-Knöpfe und
+  Status-Punkte, Logging bisher stiller Fehlerpfade
 
 ## v0.8.5 — Player
 
