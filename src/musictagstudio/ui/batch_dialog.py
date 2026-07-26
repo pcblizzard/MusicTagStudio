@@ -42,7 +42,7 @@ from ..direct_references import (
     DirectAlbumReferenceError,
     parse_album_reference,
 )
-from ..models.metadata import FIELD_LABELS
+from ..i18n import tr
 from ..settings import load_settings
 
 
@@ -54,11 +54,11 @@ _STATUS_COLUMN = len(SOURCE_ORDER) + 2
 _COLUMN_COUNT = len(SOURCE_ORDER) + 3
 
 
-def _header_labels() -> list[str]:
+def _header_labels(language: str = "automatic") -> list[str]:
     return (
-        ["Feld"]
+        [tr("col_field", language)]
         + [SOURCE_LABELS[source] for source in SOURCE_ORDER]
-        + ["Auswahl", "Hinweis"]
+        + [tr("col_selection", language), tr("col_hint", language)]
     )
 
 
@@ -87,24 +87,18 @@ def apple_link_hint_needed(
     return False
 
 
-APPLE_LINK_HINT_TEXT = (
-    "Apple Music hat dieses Album nicht sicher erkannt. Füge unten "
-    "den Apple-Music-Link (oder die Album-ID) ein, um die korrekte, "
-    "positionsrichtige Trackliste direkt zu laden."
-)
-
-
 class _AppleAlbumSignals(QObject):
     finished = Signal(str, object)
     failed = Signal(str)
 
 
 class _AppleAlbumTask(QRunnable):
-    def __init__(self, reference_text: str, country: str):
+    def __init__(self, reference_text: str, country: str, language: str = "automatic"):
         super().__init__()
         self.signals = _AppleAlbumSignals()
         self._text = reference_text
         self._country = country
+        self._language = language
 
     @Slot()
     def run(self):
@@ -116,8 +110,7 @@ class _AppleAlbumTask(QRunnable):
 
         if reference.provider != "apple_music":
             self.signals.failed.emit(
-                "Bitte einen Apple-Music-Link oder eine Apple-Album-ID "
-                "einfügen."
+                tr("apple_link_provider", self._language)
             )
             return
 
@@ -141,9 +134,11 @@ class BatchComparisonDialog(QDialog):
         primary_source: str,
         feature_handling: str,
         parent=None,
+        language: str = "automatic",
     ):
         super().__init__(parent)
 
+        self.language = language
         self.proposals = proposals
         self.primary_source = primary_source
         self.feature_handling = feature_handling
@@ -161,7 +156,7 @@ class BatchComparisonDialog(QDialog):
         ] = []
 
         self.setWindowTitle(
-            "Batch-Metadaten vergleichen"
+            tr("batch_compare_title", language)
         )
         self.resize(1380, 780)
 
@@ -173,20 +168,18 @@ class BatchComparisonDialog(QDialog):
         )
 
         info = QLabel(
-            f"{len(proposals)} Titel ausgewählt. "
-            f"Bevorzugte Quelle: {preferred_name}. "
-            "Gemeinsame Albumwerte und individuelle Trackwerte "
-            "können getrennt geprüft werden. "
-            "Die ausgewählten Werte werden nach der Bestätigung "
-            "direkt in die ausgewählten Audiodateien geschrieben."
+            tr(
+                "batch_info",
+                language,
+                count=len(proposals),
+                source=preferred_name,
+            )
         )
         info.setWordWrap(True)
         layout.addWidget(info)
 
         legend = QLabel(
-            "Grün: bevorzugte Quelle · "
-            "Blau: ergänzter Wert · "
-            "Orange: Konflikt zwischen Quellen"
+            tr("batch_legend", language)
         )
         legend.setWordWrap(True)
         layout.addWidget(legend)
@@ -199,8 +192,11 @@ class BatchComparisonDialog(QDialog):
 
         if warnings:
             warning_label = QLabel(
-                "Hinweise: "
-                + " | ".join(dict.fromkeys(warnings))
+                tr(
+                    "comp_warnings",
+                    language,
+                    warnings=" | ".join(dict.fromkeys(warnings)),
+                )
             )
             warning_label.setWordWrap(True)
             layout.addWidget(warning_label)
@@ -216,10 +212,10 @@ class BatchComparisonDialog(QDialog):
         buttons = QDialogButtonBox()
 
         self.save_button = QPushButton(
-            "Ausgewählte Werte speichern"
+            tr("save_selected_values", language)
         )
         cancel_button = QPushButton(
-            "Abbrechen"
+            tr("cancel", language)
         )
 
         buttons.addButton(
@@ -269,7 +265,7 @@ class BatchComparisonDialog(QDialog):
         box = QVBoxLayout(container)
         box.setContentsMargins(0, 0, 0, 0)
 
-        hint = QLabel(APPLE_LINK_HINT_TEXT)
+        hint = QLabel(tr("apple_link_hint", self.language))
         hint.setWordWrap(True)
         hint.setStyleSheet("color: #f0b060; font-weight: bold;")
         box.addWidget(hint)
@@ -282,7 +278,7 @@ class BatchComparisonDialog(QDialog):
         self._apple_link_edit.returnPressed.connect(
             self._load_apple_album_from_link
         )
-        self._apple_link_button = QPushButton("Apple-Album laden")
+        self._apple_link_button = QPushButton(tr("apple_link_load", self.language))
         self._apple_link_button.clicked.connect(
             self._load_apple_album_from_link
         )
@@ -307,11 +303,11 @@ class BatchComparisonDialog(QDialog):
 
         self.tabs.addTab(
             self._create_common_tab(),
-            "Gemeinsame Albumwerte",
+            tr("tab_common_album", self.language),
         )
         self.tabs.addTab(
             self._create_track_tab(),
-            "Individuelle Trackwerte",
+            tr("tab_individual_track", self.language),
         )
 
     def _load_apple_album_from_link(self) -> None:
@@ -319,15 +315,15 @@ class BatchComparisonDialog(QDialog):
 
         if not text:
             self._apple_link_status.setText(
-                "Bitte einen Apple-Music-Link oder eine Album-ID einfügen."
+                tr("apple_link_required", self.language)
             )
             return
 
         self._apple_link_button.setEnabled(False)
-        self._apple_link_status.setText("Apple-Album wird geladen …")
+        self._apple_link_status.setText(tr("apple_album_loading", self.language))
 
         settings = load_settings()
-        task = _AppleAlbumTask(text, settings.apple_country)
+        task = _AppleAlbumTask(text, settings.apple_country, self.language)
         task.signals.finished.connect(self._on_apple_album_loaded)
         task.signals.failed.connect(self._on_apple_album_failed)
         self._apple_pool.start(task)
@@ -363,15 +359,19 @@ class BatchComparisonDialog(QDialog):
         self._populate_tabs()
         self._apple_link_button.setEnabled(True)
         self._apple_link_status.setText(
-            f"Apple-Album geladen: {injected} von {len(self.proposals)} "
-            "Titeln zugeordnet."
+            tr(
+                "apple_album_loaded",
+                self.language,
+                injected=injected,
+                total=len(self.proposals),
+            )
         )
 
     @Slot(str)
     def _on_apple_album_failed(self, message: str) -> None:
         self._apple_link_button.setEnabled(True)
         self._apple_link_status.setText(
-            f"Apple-Album konnte nicht geladen werden: {message}"
+            tr("apple_album_failed", self.language, message=message)
         )
 
     def _create_common_tab(self) -> QWidget:
@@ -392,7 +392,7 @@ class BatchComparisonDialog(QDialog):
             _COLUMN_COUNT,
         )
         table.setHorizontalHeaderLabels(
-            _header_labels()
+            _header_labels(self.language)
         )
         table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
@@ -406,9 +406,7 @@ class BatchComparisonDialog(QDialog):
                 row,
                 0,
                 QTableWidgetItem(
-                    FIELD_LABELS[
-                        comparison.field_name
-                    ]
+                    tr(f"field_{comparison.field_name}", self.language)
                 ),
             )
 
@@ -436,9 +434,11 @@ class BatchComparisonDialog(QDialog):
                     and display_value
                 ):
                     item.setToolTip(
-                        "Unterschiedliche Werte innerhalb "
-                        "der ausgewählten Titel:\n"
-                        + display_value
+                        tr(
+                            "different_values_tip",
+                            self.language,
+                            values=display_value,
+                        )
                     )
 
                 if (
@@ -475,6 +475,7 @@ class BatchComparisonDialog(QDialog):
                 comparison.has_conflict,
                 comparison.is_supplemented,
                 comparison.default_source,
+                self.language,
             )
             status_item = QTableWidgetItem(
                 status
@@ -494,6 +495,7 @@ class BatchComparisonDialog(QDialog):
         self._highlight_header(
             table,
             self.primary_source,
+            self.language,
         )
 
         layout.addWidget(table)
@@ -506,9 +508,9 @@ class BatchComparisonDialog(QDialog):
         tree = QTreeWidget()
         tree.setColumnCount(_COLUMN_COUNT)
         tree.setHeaderLabels(
-            ["Titel / Feld"]
+            [tr("col_track_field", self.language)]
             + [SOURCE_LABELS[source] for source in SOURCE_ORDER]
-            + ["Auswahl", "Hinweis"]
+            + [tr("col_selection", self.language), tr("col_hint", self.language)]
         )
         tree.setAlternatingRowColors(True)
 
@@ -547,9 +549,7 @@ class BatchComparisonDialog(QDialog):
             for comparison in comparisons:
                 child = QTreeWidgetItem(
                     [
-                        FIELD_LABELS[
-                            comparison.field_name
-                        ]
+                        tr(f"field_{comparison.field_name}", self.language)
                     ]
                     + [
                         comparison.values.get(source, "")
@@ -561,6 +561,7 @@ class BatchComparisonDialog(QDialog):
                             comparison.has_conflict,
                             comparison.is_supplemented,
                             comparison.default_source,
+                            self.language,
                         ),
                     ]
                 )
@@ -766,9 +767,8 @@ class BatchComparisonDialog(QDialog):
         if not self.selected_updates:
             QMessageBox.information(
                 self,
-                "Keine Änderungen",
-                "Es gibt keine Änderungen zu speichern. Die ausgewählten "
-                "Werte entsprechen bereits den vorhandenen Dateien.",
+                tr("no_changes_title", self.language),
+                tr("no_changes_msg", self.language),
             )
             return
 
@@ -779,14 +779,15 @@ class BatchComparisonDialog(QDialog):
         has_conflict: bool,
         is_supplemented: bool,
         default_source: str,
+        language: str = "automatic",
     ) -> str:
         messages: list[str] = []
 
         if has_conflict:
-            messages.append("Konflikt")
+            messages.append(tr("comp_conflict", language))
 
         if is_supplemented:
-            messages.append("Ergänzt")
+            messages.append(tr("comp_supplemented", language))
 
         if (
             default_source not in {
@@ -795,7 +796,7 @@ class BatchComparisonDialog(QDialog):
             and not has_conflict
             and not is_supplemented
         ):
-            messages.append("Empfohlen")
+            messages.append(tr("comp_recommended", language))
 
         return ", ".join(messages)
 
@@ -840,6 +841,7 @@ class BatchComparisonDialog(QDialog):
     def _highlight_header(
         table: QTableWidget,
         primary_source: str,
+        language: str = "automatic",
     ):
         column = {
             source: index + 1
@@ -860,5 +862,5 @@ class BatchComparisonDialog(QDialog):
         font.setBold(True)
         item.setFont(font)
         item.setToolTip(
-            "Bevorzugte Metadatenquelle"
+            tr("preferred_source_tip", language)
         )

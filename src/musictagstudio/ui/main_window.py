@@ -2546,6 +2546,7 @@ class MainWindow(QMainWindow):
                 settings.feature_handling
             ),
             parent=self,
+            language=self.language,
         )
 
         if (
@@ -2843,6 +2844,7 @@ class MainWindow(QMainWindow):
             primary_source=settings.selected_provider,
             feature_handling=settings.feature_handling,
             parent=self,
+            language=self.language,
         )
 
         if dialog.exec() != dialog.DialogCode.Accepted:
