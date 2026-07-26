@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
+from datetime import date
 from pathlib import Path
 
 from dataclasses import dataclass
@@ -59,6 +60,10 @@ class DirectAlbumTrack:
     # 30-Sekunden-Vorschau-URL (Apple/Deezer). Reine Wiedergabe-Information,
     # kein Tag-Feld – wird daher nicht in MetadataCandidate übernommen.
     preview_url: str = ""
+    # Ist der Titel beim Anbieter bereits abspielbar? Bei Vorabveröffentlichungen
+    # sind noch nicht erschienene Tracks nicht streambar (Apple: isStreamable),
+    # ihre Titel sind dann Platzhalter wie „Track 2". Standard True (regulär).
+    is_streamable: bool = True
 
     def as_candidate(
         self,
@@ -92,10 +97,32 @@ class DirectAlbumResult:
     album: str
     album_artist: str
     tracks: tuple[DirectAlbumTrack, ...]
+    # Tagesgenaues Veröffentlichungsdatum des Albums (ISO, wenn vom Anbieter
+    # geliefert). Dient der Vorab-Erkennung; leer, wenn unbekannt.
+    release_date: str = ""
 
 
 class DirectAlbumLookupError(RuntimeError):
     """Ein Album konnte über die direkte Anbieter-ID nicht geladen werden."""
+
+
+def is_prerelease_date(iso_date: str, today: date | None = None) -> bool:
+    """True, wenn *iso_date* ein tagesgenaues Datum in der Zukunft ist.
+
+    Reine Jahresangaben ("2026") gelten bewusst NICHT als Vorabveröffentlichung
+    – sie sind oft nur Platzhalter und die Falsch-Positiv-Rate wäre zu hoch.
+    Nur ein vollständiges Datum (YYYY-MM-DD) nach heute zählt.
+    """
+    match = re.match(r"(\d{4})-(\d{2})-(\d{2})", str(iso_date or "").strip())
+    if not match:
+        return False
+    try:
+        released = date(
+            int(match.group(1)), int(match.group(2)), int(match.group(3))
+        )
+    except ValueError:
+        return False
+    return released > (today or date.today())
 
 
 def lookup_album(
@@ -713,6 +740,7 @@ def _lookup_apple_song(
             )
         ),
         preview_url=str(item.get("previewUrl") or ""),
+        is_streamable=bool(item.get("isStreamable", True)),
     )
 
     return DirectAlbumResult(
@@ -720,6 +748,7 @@ def _lookup_apple_song(
         album=track.album,
         album_artist=(track.album_artist),
         tracks=(track,),
+        release_date=str(item.get("releaseDate", "")),
     )
 
 
@@ -1044,6 +1073,7 @@ def _lookup_apple_album(
                 )
             ),
             preview_url=str(item.get("previewUrl") or ""),
+            is_streamable=bool(item.get("isStreamable", True)),
         )
         for item in track_items
     )
@@ -1065,6 +1095,7 @@ def _lookup_apple_album(
         album=album_name,
         album_artist=album_artist,
         tracks=tracks,
+        release_date=str(collection.get("releaseDate", "")),
     )
 
 

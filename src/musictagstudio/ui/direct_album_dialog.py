@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 from ..direct_album_lookup import (
     AlbumMatchingResult,
     build_album_matching_result,
+    is_prerelease_date,
     lookup_album,
 )
 from ..direct_references import (
@@ -333,7 +334,7 @@ class DirectAlbumDialog(QDialog):
                     (
                         f"Disc {track.disc or '1'} · "
                         f"Track {track.track}: "
-                        f"{track.title}"
+                        f"{self._track_display(track)}"
                     ),
                     track_index,
                 )
@@ -394,7 +395,7 @@ class DirectAlbumDialog(QDialog):
                 row,
                 4,
                 QTableWidgetItem(
-                    match.track.title
+                    self._track_display(match.track)
                 ),
             )
             self.table.setItem(
@@ -432,7 +433,32 @@ class DirectAlbumDialog(QDialog):
                 "Dateien automatisch zugeordnet. "
                 f"{ambiguous_count} Zuordnung(en) sollten "
                 "kontrolliert werden."
+                f"{self._prerelease_note(result)}"
             )
+        )
+
+    @staticmethod
+    def _track_display(track) -> str:
+        """Titel plus Hinweis, wenn der Track noch nicht veröffentlicht ist.
+
+        Bei Vorabveröffentlichungen liefert Apple für noch nicht erschienene
+        Titel Platzhalter wie „Track 2"; diese werden hier gekennzeichnet.
+        """
+        if not getattr(track, "is_streamable", True):
+            return f"{track.title} · noch nicht veröffentlicht"
+        return str(track.title)
+
+    @staticmethod
+    def _prerelease_note(result) -> str:
+        """Zusatzhinweis für Vorabveröffentlichungen (tagesgenaues Zukunftsdatum)."""
+        release_date = getattr(result, "release_date", "")
+        if not is_prerelease_date(release_date):
+            return ""
+        day = str(release_date)[:10]
+        return (
+            f" · Vorabveröffentlichung (Release: {day}). Noch nicht "
+            "veröffentlichte Titel sind bei Apple als Platzhalter (Track N) "
+            "gelistet und aktualisieren sich beim erneuten Laden nach Erscheinen."
         )
 
     def _manual_mapping_changed(self):
@@ -474,7 +500,7 @@ class DirectAlbumDialog(QDialog):
                 row,
                 4,
                 QTableWidgetItem(
-                    track.title
+                    self._track_display(track)
                 ),
             )
             self.table.setItem(
