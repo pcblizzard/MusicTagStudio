@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QSettings, QSize, Qt, Signal
@@ -27,6 +28,8 @@ from .model import (
 from .queue_dialog import QueueDialog
 from ..services.cover import load_cover
 
+
+logger = logging.getLogger(__name__)
 
 # Anzeigedauer transienter Player-Fehlermeldungen in der App-Statusleiste.
 PLAYER_ERROR_TIMEOUT_MS = 6000
@@ -480,6 +483,9 @@ class PlayerBar(QWidget):
             try:
                 data = load_cover(song.path)
             except Exception:
+                # Nicht kritisch: Es wird der Platzhalter gezeigt. Trotzdem
+                # protokollieren, damit reale Coverfehler eine Spur hinterlassen.
+                logger.debug("Cover konnte nicht geladen werden: %s", song.path, exc_info=True)
                 data = None
         pixmap = QPixmap()
         if not data or not pixmap.loadFromData(data):

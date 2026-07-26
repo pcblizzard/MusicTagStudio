@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import logging
 import threading
+
+logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import QSettings, Signal, Qt
 from PySide6.QtWidgets import (
@@ -929,6 +932,7 @@ class SettingsDialog(QDialog):
                 self.tidal_login_finished.emit(False, str(error))
                 return
             except Exception:
+                logger.warning("Unerwarteter TIDAL-Anmeldefehler", exc_info=True)
                 self.tidal_login_finished.emit(
                     False,
                     "Die TIDAL-Anmeldung ist unerwartet fehlgeschlagen.",

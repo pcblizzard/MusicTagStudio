@@ -56,6 +56,10 @@ def test_toolbar_buttons_have_unique_non_empty_labels():
         window.history_button,
     )
 
+    # Undo/Redo tragen jetzt SVG-Icons statt Text-Pfeile.
+    assert not window.undo_button.icon().isNull()
+    assert not window.redo_button.icon().isNull()
+
     labels = [button.text().strip() for button in buttons]
     tooltips = [button.toolTip().strip() for button in buttons if button.toolTip().strip()]
 

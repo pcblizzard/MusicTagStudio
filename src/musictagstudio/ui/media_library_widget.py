@@ -3,8 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from datetime import datetime
 import html
+import logging
 import re
 import webbrowser
+
+logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import (
     QObject,
@@ -182,6 +185,14 @@ _STATUS_CHIP_STYLES: dict[str, tuple[str, str, str]] = {
     "Nicht vorhanden": ("Nicht vorhanden", "#ffffff", "#5f6368"),
     "Nein": ("Nicht vorhanden", "#ffffff", "#5f6368"),
 }
+
+
+def _status_dot_icon(status: str) -> QIcon:
+    """Farbiger Statuspunkt (Ampel-Ersatz) passend zum Chip-Farbschema."""
+    _text, _fg, background = _STATUS_CHIP_STYLES.get(
+        str(status or ""), _STATUS_CHIP_STYLES["Nicht vorhanden"]
+    )
+    return make_icon("dot", background, size=12)
 
 
 def _status_chip(status: str) -> tuple[str, str]:
@@ -2074,8 +2085,11 @@ class MediaLibraryWidget(QWidget):
     def _load_release_thumbnail(self, row: int, group: ReleaseGroup) -> None:
         local_file=self.local_album_files.get(_normalized(group.title),"")
         if local_file:
-            try: data=load_cover(local_file)
-            except Exception: data=None
+            try:
+                data=load_cover(local_file)
+            except Exception:
+                logger.debug("Thumbnail-Cover nicht ladbar: %s", local_file, exc_info=True)
+                data=None
             if data:
                 self._apply_release_thumbnail(
                     row, data, group.release_group_id
@@ -2384,6 +2398,10 @@ class MediaLibraryWidget(QWidget):
                     == "discogs"
                     else "MusicBrainz"
                 )
+                raw_status = self.local_album_status.get(
+                    local_key,
+                    "Nicht vorhanden",
+                )
                 item = QTreeWidgetItem(
                     [
                         group.title,
@@ -2394,14 +2412,11 @@ class MediaLibraryWidget(QWidget):
                             group
                         ),
                         source_text,
-                        _local_status_display(
-                            self.local_album_status.get(
-                                local_key,
-                                "Nicht vorhanden",
-                            )
-                        ),
+                        raw_status,
                     ]
                 )
+                # Ampel als farbiger Punkt (statt Emoji) in der Status-Spalte.
+                item.setIcon(4, _status_dot_icon(raw_status))
                 item.setData(
                     0,
                     Qt.ItemDataRole.UserRole,
@@ -2964,6 +2979,9 @@ class MediaLibraryWidget(QWidget):
                     local_file
                 )
             except Exception:
+                logger.debug(
+                    "Detail-Cover nicht ladbar: %s", local_file, exc_info=True
+                )
                 data = None
 
             if data:
@@ -3493,15 +3511,12 @@ class MediaLibraryWidget(QWidget):
                 key = _normalized(
                     group.title
                 )
-                item.setText(
-                    4,
-                    _local_status_display(
-                        self.local_album_status.get(
-                            key,
-                            "Nicht vorhanden",
-                        )
-                    ),
+                raw_status = self.local_album_status.get(
+                    key,
+                    "Nicht vorhanden",
                 )
+                item.setText(4, raw_status)
+                item.setIcon(4, _status_dot_icon(raw_status))
 
         self._render_alternative_views()
 

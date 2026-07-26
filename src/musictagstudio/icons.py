@@ -84,6 +84,21 @@ _ICONS: dict[str, str] = {
         '<path d="M5 5h11M5 9h11M5 13h7"/>'
         '<circle cx="17" cy="17" r="3"/><path d="m19.5 19.5 2 2"/></g>'
     ),
+    # Rückgängig/Wiederholen (gebogener Pfeil, gespiegelt).
+    "undo": (
+        '<g fill="none" stroke="{color}" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M3 7v6h6"/>'
+        '<path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></g>'
+    ),
+    "redo": (
+        '<g fill="none" stroke="{color}" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M21 7v6h-6"/>'
+        '<path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></g>'
+    ),
+    # Gefüllter Statuspunkt (Ampel-Ersatz) – Farbe kommt über {color}.
+    "dot": '<circle cx="12" cy="12" r="6" fill="{color}"/>',
     "queue": (
         '<g fill="none" stroke="{color}" stroke-width="1.8" '
         'stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></g>'

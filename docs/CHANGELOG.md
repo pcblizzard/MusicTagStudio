@@ -1,5 +1,15 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Weiterer UI-Feinschliff und nachvollziehbare Fehler
+
+- **Rückgängig/Wiederholen** nutzen jetzt SVG-Icons statt der Text-Pfeile
+  „↶"/„↷".
+- Die Status-Ampel in der Veröffentlichungs-Liste erscheint als farbiger
+  Punkt-Icon (grün/orange/grau) statt als Emoji-Zeichen.
+- Bisher stumm verschluckte Fehler (Cover-Laden, WavPack-Tags,
+  TIDAL-Anmeldung) hinterlassen jetzt eine Log-Spur, ohne den Nutzer mit
+  zusätzlichen Meldungen zu stören.
+
 ## Einheitliche Play/Pause-Icons in den Vorschau-Knöpfen
 
 - Die Vorschau-Knöpfe in der Medienbibliothek und im Direkt-Album-Dialog nutzen

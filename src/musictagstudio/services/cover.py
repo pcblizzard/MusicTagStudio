@@ -108,8 +108,15 @@ def remove_cover(filepath: str | Path) -> None:
     if suffix==".flac":
         audio=FLAC(path); audio.clear_pictures(); audio.save(); return
     if suffix==".wv":
-        try: tags=APEv2(path)
-        except Exception: return
+        try:
+            tags=APEv2(path)
+        except Exception:
+            # Keine APEv2-Tags -> kein Cover zu entfernen. Für reale Fehler
+            # (z. B. Zugriffsrechte) trotzdem eine Spur hinterlassen.
+            get_diagnostic_logger("wavpack").debug(
+                "APEv2 für remove_cover nicht lesbar: %s", path, exc_info=True
+            )
+            return
         for key in list(tags.keys()):
             if str(key).casefold() in {"cover art (front)","cover art (front cover)","cover art (frontcover)"}:
                 del tags[key]

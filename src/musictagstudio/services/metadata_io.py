@@ -665,6 +665,13 @@ def _write_ape_file(
     try:
         tags = APEv2(path)
     except Exception:
+        # Keine bestehenden APEv2-Tags -> neue anlegen. Für reale Fehler eine
+        # Spur hinterlassen.
+        get_diagnostic_logger("wavpack").debug(
+            "Bestehende APEv2-Tags nicht lesbar, lege neue an: %s",
+            path,
+            exc_info=True,
+        )
         tags = APEv2()
 
     _write_apev2(

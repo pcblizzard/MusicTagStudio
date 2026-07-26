@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication
 from musictagstudio.ui.media_library_widget import (
     MediaLibraryWidget,
     _local_status_display,
+    _status_dot_icon,
 )
 
 
@@ -16,6 +17,20 @@ def test_local_statuses_have_beta_symbols():
         "🟡 Externe Quelle nicht erreichbar"
     )
     assert _local_status_display("Nicht vorhanden") == "⚪ Nicht vorhanden"
+
+
+def test_status_dot_icons_differ_per_status():
+    _ = QApplication.instance() or QApplication([])
+    available = _status_dot_icon("Lokal verfügbar")
+    missing = _status_dot_icon("Nicht vorhanden")
+
+    assert not available.isNull()
+    assert not missing.isNull()
+    # Unterschiedliche Statusfarben -> unterschiedliche Punkt-Icons.
+    assert (
+        available.pixmap(12, 12).toImage()
+        != missing.pixmap(12, 12).toImage()
+    )
 
 
 def test_breadcrumb_path_and_artist_navigation():

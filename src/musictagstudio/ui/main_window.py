@@ -397,15 +397,20 @@ class MainWindow(QMainWindow):
         )
 
         history_buttons = QHBoxLayout()
+        history_icon_color = self.palette().color(
+            QPalette.ColorRole.ButtonText
+        ).name()
         self.undo_button = QPushButton(
-            "↶ Rückgängig"
+            "Rückgängig"
         )
+        self.undo_button.setIcon(make_icon("undo", history_icon_color))
         self.undo_button.clicked.connect(
             self.undo_last_change
         )
         self.redo_button = QPushButton(
-            "↷ Wiederholen"
+            "Wiederholen"
         )
+        self.redo_button.setIcon(make_icon("redo", history_icon_color))
         self.redo_button.clicked.connect(
             self.redo_last_change
         )
