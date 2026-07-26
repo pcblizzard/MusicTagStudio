@@ -62,6 +62,7 @@ def test_identity_relations_have_distinct_categories():
     )
     alias = ArtistRelation("alias", "alias", "same-id", "Name Variant")
 
-    assert MediaLibraryWidget._relation_category(identity) == "Künstleridentitäten"
-    assert MediaLibraryWidget._relation_category(person) == "Person"
-    assert MediaLibraryWidget._relation_category(alias) == "Namensvarianten"
+    # _relation_category liefert jetzt stabile i18n-Keys (Anzeige uebersetzt).
+    assert MediaLibraryWidget._relation_category(identity) == "rel_cat_identities"
+    assert MediaLibraryWidget._relation_category(person) == "rel_cat_person"
+    assert MediaLibraryWidget._relation_category(alias) == "rel_cat_aliases"

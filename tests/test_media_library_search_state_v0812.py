@@ -13,6 +13,7 @@ def test_search_has_visible_suggestion_and_error_states():
     )
 
     assert "self.suggestion_label" in text
-    assert "Kein exakter Treffer." in text
-    assert "Keine Treffer gefunden" in text
+    # Vorschlags-/Fehlerzustaende sind i18n-basiert (tr-Keys).
+    assert '"fuzzy_suggestion"' in text
+    assert '"no_hits_title"' in text
     assert "Suche fehlgeschlagen" in text

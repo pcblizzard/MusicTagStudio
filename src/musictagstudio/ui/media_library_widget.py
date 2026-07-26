@@ -82,7 +82,7 @@ from ..media_library import (
 )
 from ..diagnostics import project_root
 from ..settings import load_settings
-from ..i18n import tr
+from ..i18n import tr, tr_plural
 from ..library_sources import IndexedAlbum
 from ..models.song import Song
 from ..icons import make_icon
@@ -1291,15 +1291,13 @@ class MediaLibraryWidget(QWidget):
 
         if not songs:
             self._set_status(
-                "Die lokalen Albumdateien sind noch nicht eingelesen. "
-                "Bitte zuerst die Bibliotheksdaten aktualisieren."
+                tr("ml_local_not_indexed", self.language)
             )
             return
 
         if start_index < 0:
             self._set_status(
-                "Der ausgewählte Titel konnte keiner lokalen Datei "
-                "zugeordnet werden."
+                tr("ml_track_no_local", self.language)
             )
             return
 
@@ -1338,7 +1336,7 @@ class MediaLibraryWidget(QWidget):
         songs = self._current_local_album_songs()
         if not songs:
             self._set_status(
-                "Für dieses Album wurden keine erreichbaren lokalen Titel gefunden."
+                tr("ml_no_local_tracks", self.language)
             )
             return
         self.enqueue_local_tracks.emit(songs)
@@ -1578,12 +1576,11 @@ class MediaLibraryWidget(QWidget):
             self.suggestion_label.hide()
             settings = load_settings()
             if settings.discogs_token.strip():
-                self.group_title.setText("Discogs wird durchsucht …")
+                self.group_title.setText(tr("discogs_searching", self.language))
                 self.group_meta.setText(
-                    "MusicBrainz lieferte keinen Künstler. Suche nach "
-                    "exakten Künstlern, Labels und Veröffentlichungen bei Discogs."
+                    tr("discogs_no_mb_artist", self.language)
                 )
-                self._set_status("Exakte Discogs-Katalogsuche läuft …")
+                self._set_status(tr("discogs_exact_running", self.language))
                 self._run(
                     _search_exact_discogs_catalog,
                     self.search_edit.text().strip(),
@@ -1617,13 +1614,10 @@ class MediaLibraryWidget(QWidget):
                     )
                 )
             self.suggestion_label.setText(
-                (
-                    "Kein exakter Treffer. "
-                    "Meintest du vielleicht: "
-                    + ", ".join(
-                        links
-                    )
-                    + "?"
+                tr(
+                    "fuzzy_suggestion",
+                    self.language,
+                    links=", ".join(links),
                 )
             )
             self.suggestion_label.show()
@@ -1635,12 +1629,11 @@ class MediaLibraryWidget(QWidget):
         )
 
     def _show_no_catalog_results(self) -> None:
-        self.group_title.setText("Keine Treffer gefunden")
+        self.group_title.setText(tr("no_hits_title", self.language))
         self.group_meta.setText(
-            "Weder MusicBrainz noch der aktivierte Katalog lieferten "
-            "einen exakten Treffer."
+            tr("no_hits_meta", self.language)
         )
-        self._set_status("Keine Künstler, Labels oder Veröffentlichungen gefunden.")
+        self._set_status(tr("no_hits_status", self.language))
 
     def _exact_catalog_loaded(self, hits) -> None:
         if hits:
@@ -1711,10 +1704,10 @@ class MediaLibraryWidget(QWidget):
         self.result_items = []
         self.artist_list.clear()
         kind_labels = {
-            "artist": "Künstler",
-            "release": "Veröffentlichung",
-            "master": "Veröffentlichung",
-            "label": "Label",
+            "artist": tr("field_artist", self.language),
+            "release": tr("col_release", self.language),
+            "master": tr("col_release", self.language),
+            "label": tr("col_label", self.language),
         }
 
         for hit in self.catalog_hits:
@@ -1747,7 +1740,7 @@ class MediaLibraryWidget(QWidget):
             True
         )
         self._set_status(
-            f"{len(self.catalog_hits)} Katalogtreffer gefunden."
+            tr("catalog_hits_found", self.language, count=len(self.catalog_hits))
         )
 
         if self.catalog_hits:
@@ -1805,7 +1798,7 @@ class MediaLibraryWidget(QWidget):
         self._show_cover(
             None
         )
-        self.cover_label.setText("Künstlerbild wird geladen …")
+        self.cover_label.setText(tr("artist_image_loading", self.language))
         settings = load_settings()
         self._run(
             fetch_artist_artwork,
@@ -1827,7 +1820,7 @@ class MediaLibraryWidget(QWidget):
             artist.name
         )
         self.group_meta.setText(
-            "MusicBrainz-Künstler"
+            tr("mb_artist", self.language)
         )
         self._request_editorial(
             f"artist:{artist.artist_id}",
@@ -1837,7 +1830,7 @@ class MediaLibraryWidget(QWidget):
             self.language,
         )
         self.relations_tree.clear()
-        loading_item = QTreeWidgetItem(["Verknüpfungen werden geladen …"])
+        loading_item = QTreeWidgetItem([tr("relations_loading", self.language)])
         self.relations_tree.addTopLevelItem(loading_item)
         self._run(
             self.catalog_controller.load_artist_relations,
@@ -1845,7 +1838,7 @@ class MediaLibraryWidget(QWidget):
             finished=self._relations_loaded,
         )
         self._set_status(
-            f"Veröffentlichungen von {artist.name} werden geladen …"
+            tr("releases_loading", self.language, artist=artist.name)
         )
         self.search_debug_lines.append(
             f"Veröffentlichungen laden: {artist.name}"
@@ -1862,7 +1855,7 @@ class MediaLibraryWidget(QWidget):
         )
         if settings.discogs_token.strip():
             self._set_status(
-                f"Veröffentlichungen von {artist.name} werden aus MusicBrainz und Discogs geladen …"
+                tr("releases_loading_mb_discogs", self.language, artist=artist.name)
             )
             self._run(
                 _fetch_discogs_catalog,
@@ -1895,11 +1888,13 @@ class MediaLibraryWidget(QWidget):
         self._show_cover(None)
         self.group_title.setText(hit.title)
         self.group_meta.setText(
-            "Discogs-Label" if hit.kind == "label" else "Discogs-Katalogtreffer"
+            tr("discogs_label", self.language)
+            if hit.kind == "label"
+            else tr("discogs_catalog_hit", self.language)
         )
         self._push_breadcrumb(hit.kind, hit.title, str(hit.entity_id))
         self.discogs_refresh_button.setEnabled(hit.kind in {"artist", "label"})
-        self._set_status(f"{hit.title} wird aus Discogs geladen …")
+        self._set_status(tr("discogs_loading", self.language, title=hit.title))
         if hit.kind in {"artist", "label"}:
             self._run(
                 _fetch_discogs_hit_catalog,
@@ -1934,7 +1929,7 @@ class MediaLibraryWidget(QWidget):
 
         if not self.artist_relations:
             self.relations_tree.addTopLevelItem(
-                QTreeWidgetItem(["Keine Verknüpfungen gefunden"])
+                QTreeWidgetItem([tr("relations_none", self.language)])
             )
             return
 
@@ -1942,24 +1937,35 @@ class MediaLibraryWidget(QWidget):
         for relation in self.artist_relations:
             groups.setdefault(self._relation_category(relation), []).append(relation)
 
+        # Reihenfolge als i18n-Keys – dieselben Keys liefert _relation_category.
         order = (
-            "Künstleridentitäten", "Person", "Mitglieder", "Gruppen",
-            "Kollaborationen", "Namensvarianten",
-            "Produzenten / Mitwirkende", "Labels", "Weitere",
+            "rel_cat_identities", "rel_cat_person", "rel_cat_members",
+            "rel_cat_groups", "rel_cat_collaborations", "rel_cat_aliases",
+            "rel_cat_contributors", "rel_cat_labels", "rel_cat_other",
         )
         for category in order:
             entries = groups.get(category, [])
             if not entries:
                 continue
-            parent = QTreeWidgetItem([f"{category} ({len(entries)})"])
+            parent = QTreeWidgetItem(
+                [f"{tr(category, self.language)} ({len(entries)})"]
+            )
             font = parent.font(0)
             font.setBold(True)
             parent.setFont(0, font)
             self.relations_tree.addTopLevelItem(parent)
             for relation in entries:
-                suffix = " (ehemalig)" if relation.ended else ""
+                suffix = (
+                    " " + tr("rel_former", self.language)
+                    if relation.ended
+                    else ""
+                )
                 role = self._relation_role_text(relation)
-                role_suffix = f" · {role}" if role else ""
+                # role ist entweder ein i18n-Key (uebersetzt) oder rohe
+                # Attribut-Daten (tr faellt auf den Wert zurueck).
+                role_suffix = (
+                    f" · {tr(role, self.language)}" if role else ""
+                )
                 child = QTreeWidgetItem(
                     [f"{relation.name}{role_suffix}{suffix}"]
                 )
@@ -1979,26 +1985,26 @@ class MediaLibraryWidget(QWidget):
     def _relation_category(relation) -> str:
         relation_type = relation.relation_type.casefold()
         if relation.target_type == "label":
-            return "Labels"
+            return "rel_cat_labels"
         if relation_type in {"member of band", "founder"}:
-            return "Gruppen" if relation.direction == "forward" else "Mitglieder"
+            return "rel_cat_groups" if relation.direction == "forward" else "rel_cat_members"
         if relation_type in {"is person", "performance name"}:
-            return "Künstleridentitäten" if relation.direction == "forward" else "Person"
+            return "rel_cat_identities" if relation.direction == "forward" else "rel_cat_person"
         if "alias" in relation_type:
-            return "Namensvarianten"
+            return "rel_cat_aliases"
         if any(word in relation_type for word in ("producer", "mix", "master", "engineer", "instrument", "vocal")):
-            return "Produzenten / Mitwirkende"
+            return "rel_cat_contributors"
         if any(word in relation_type for word in ("collaboration", "collaborated", "supporting musician")):
-            return "Kollaborationen"
-        return "Weitere"
+            return "rel_cat_collaborations"
+        return "rel_cat_other"
 
     @staticmethod
     def _relation_role_text(relation) -> str:
         relation_type = relation.relation_type.casefold()
         if relation_type == "is person":
-            return "Künstleridentität" if relation.direction == "forward" else "bürgerliche Person"
+            return "rel_role_identity" if relation.direction == "forward" else "rel_role_legal_person"
         if relation_type == "performance name":
-            return "Künstlername"
+            return "rel_role_stage_name"
         if relation_type in {"member of band", "founder"} and relation.attributes:
             return ", ".join(relation.attributes)
         return ""
@@ -2021,7 +2027,7 @@ class MediaLibraryWidget(QWidget):
             self._open_related_artist(relation)
         elif relation.target_type == "label":
             self._set_status(
-                f"MusicBrainz-Label „{relation.name}“ wird geöffnet …"
+                tr("mb_label_opening", self.language, name=relation.name)
             )
             webbrowser.open(
                 f"https://musicbrainz.org/label/{relation.target_id}"
@@ -2051,16 +2057,16 @@ class MediaLibraryWidget(QWidget):
         if not statistics:
             self.relations_tree.addTopLevelItem(
                 QTreeWidgetItem(
-                    ["Keine Künstlerzuordnungen aus Releases ableitbar"]
+                    [tr("rel_none_from_releases", self.language)]
                 )
             )
             return
         parent = QTreeWidgetItem(
-            [f"Auf Label-Veröffentlichungen vertreten ({len(statistics)})"]
+            [tr("label_represented", self.language, count=len(statistics))]
         )
         parent.setToolTip(
             0,
-            "Quelle: Discogs-Labelveröffentlichungen. Keine bestätigten Vertragsverhältnisse.",
+            tr("label_represented_tip", self.language),
         )
         font = parent.font(0)
         font.setBold(True)
@@ -2068,16 +2074,12 @@ class MediaLibraryWidget(QWidget):
         self.relations_tree.addTopLevelItem(parent)
         for name, count, first_year, last_year in statistics:
             if not first_year and not last_year:
-                period = "Zeitraum unbekannt"
+                period = tr("period_unknown", self.language)
             elif first_year == last_year:
                 period = first_year
             else:
                 period = f"{first_year or '?'}–{last_year or '?'}"
-            count_text = (
-                "1 Veröffentlichung"
-                if count == 1
-                else f"{count} Veröffentlichungen"
-            )
+            count_text = tr_plural("releases_count", count, self.language)
             child = QTreeWidgetItem(
                 [f"{name} · {count_text} · {period}"]
             )
@@ -2088,7 +2090,7 @@ class MediaLibraryWidget(QWidget):
             )
             child.setToolTip(
                 0,
-                "Aus den Hauptkünstler-Angaben der Discogs-Releases abgeleitet.",
+                tr("label_artist_derived_tip", self.language),
             )
             parent.addChild(child)
         self.relations_tree.expandAll()
@@ -2110,9 +2112,9 @@ class MediaLibraryWidget(QWidget):
         if isinstance(result, DiscogsCatalogSnapshot):
             releases = list(result.releases)
             cache_note = (
-                "lokale Discogs-Datenbank"
+                tr("cache_local_db", self.language)
                 if result.from_cache
-                else "Discogs live"
+                else tr("cache_discogs_live", self.language)
             )
         else:
             releases = list(result)
@@ -2137,8 +2139,12 @@ class MediaLibraryWidget(QWidget):
         self._render_release_groups()
         self._render_alternative_views()
         self._set_status(
-            f"{len(self.release_groups)} zusammengeführte Veröffentlichungen "
-            f"geladen ({cache_note})."
+            tr(
+                "merged_releases_loaded",
+                self.language,
+                count=len(self.release_groups),
+                note=cache_note,
+            )
         )
         self.discogs_refresh_button.setEnabled(True)
 
@@ -2246,7 +2252,7 @@ class MediaLibraryWidget(QWidget):
             source = "Discogs" if group.source == "discogs" else "MusicBrainz"
             display_artist = (
                 _streaming_artist(group.artist, self.current_artist_name)
-                or "Unbekannter Künstler"
+                or tr("unknown_artist", self.language)
             )
             local = _local_status_display(
                 self.local_album_status.get(
@@ -2260,7 +2266,7 @@ class MediaLibraryWidget(QWidget):
                 item=QTableWidgetItem(str(value or "")); item.setData(Qt.ItemDataRole.UserRole,row); self.release_table.setItem(row,col,item)
             grid=QStandardItem(QIcon(placeholder), f"{group.title}\n{display_artist}\n{group.first_release_date[:4]} · {local}")
             grid.setData(row,Qt.ItemDataRole.UserRole); grid.setEditable(False); self.cover_model.appendRow(grid)
-            li=QListWidgetItem(QIcon(placeholder), f"{group.title}\n{display_artist} · {group.first_release_date[:4] or 'Jahr unbekannt'} · {_category(group)}\n{extra or source} · {local}")
+            li=QListWidgetItem(QIcon(placeholder), f"{group.title}\n{display_artist} · {group.first_release_date[:4] or tr('year_unknown', self.language)} · {_category(group)}\n{extra or source} · {local}")
             list_cover = self.cover_list.iconSize().height()
             li.setData(Qt.ItemDataRole.UserRole,row); li.setSizeHint(QSize(300,max(64,list_cover+10))); self.cover_list.addItem(li)
             self._load_release_thumbnail(row,group)
@@ -2396,9 +2402,9 @@ class MediaLibraryWidget(QWidget):
             bool(local_path) and local_online
         )
         self.open_local_button.setToolTip(
-            "Lokales Album im Tagger öffnen"
+            tr("open_local_tagger", self.language)
             if local_online
-            else "Das Album ist indiziert, die Musikquelle ist momentan nicht erreichbar."
+            else tr("source_unreachable_tip", self.language)
         )
         self.streaming_button.setEnabled(True)
         self.quality_button.setEnabled(True)
@@ -2482,10 +2488,7 @@ class MediaLibraryWidget(QWidget):
         self._render_release_groups()
         self._render_alternative_views()
         self._set_status(
-            (
-                f"{len(self.release_groups)} "
-                "Veröffentlichungen geladen."
-            )
+            tr("releases_loaded", self.language, count=len(self.release_groups))
         )
 
     def _render_release_groups(
@@ -2655,8 +2658,12 @@ class MediaLibraryWidget(QWidget):
             )
         )
         self._set_status(
-            f"{len(self.release_groups)} Veröffentlichungen "
-            f"in {categories} Kategorien geladen."
+            tr(
+                "releases_in_categories",
+                self.language,
+                count=len(self.release_groups),
+                categories=categories,
+            )
         )
 
     def _group_selected(self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None) -> None:
@@ -2690,15 +2697,11 @@ class MediaLibraryWidget(QWidget):
         for edition in self.editions:
             details = [
                 edition.date
-                or "ohne Datum",
+                or tr("edition_no_date", self.language),
                 edition.country
-                or "ohne Land",
-                (
-                    f"{edition.medium_count} CD(s)"
-                ),
-                (
-                    f"{edition.track_count} Titel"
-                ),
+                or tr("edition_no_country", self.language),
+                tr("edition_cds", self.language, count=edition.medium_count),
+                tr("edition_tracks", self.language, count=edition.track_count),
             ]
 
             if edition.format:
@@ -2726,7 +2729,7 @@ class MediaLibraryWidget(QWidget):
             )
         else:
             self.edition_details.setText(
-                "Keine konkreten Editionen gefunden."
+                tr("no_editions", self.language)
             )
 
     def _edition_selected(
@@ -2748,12 +2751,8 @@ class MediaLibraryWidget(QWidget):
             " · ".join(
                 value
                 for value in (
-                    (
-                        f"{edition.medium_count} CD(s)"
-                    ),
-                    (
-                        f"{edition.track_count} Titel"
-                    ),
+                    tr("edition_cds", self.language, count=edition.medium_count),
+                    tr("edition_tracks", self.language, count=edition.track_count),
                     edition.date,
                     edition.country,
                     edition.status,

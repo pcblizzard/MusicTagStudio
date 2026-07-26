@@ -26,8 +26,9 @@ def media_tasks_source() -> str:
 def test_category_arrow_is_in_release_column():
     text = media_source()
 
-    assert '"Veröffentlichung"' in text
-    assert 'f"{category} ({len(entries)})"' in text
+    # Spaltenkopf/Kategorie sind i18n-basiert (tr).
+    assert 'tr("col_release"' in text
+    assert 'f"{tr(category, self.language)} ({len(entries)})"' in text
     assert "parent.setIcon" in text
 
 

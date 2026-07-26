@@ -15,7 +15,8 @@ def test_media_library_distinguishes_online_and_offline():
     assert "def set_library_index" in text
     assert '"Externe Quelle nicht erreichbar"' in text
     assert "local_online" in text
-    assert "momentan nicht erreichbar" in text
+    # Offline-Hinweis ist jetzt i18n-basiert (tr).
+    assert 'tr("source_unreachable_tip"' in text
 
 
 def test_more_from_artist_does_not_depend_on_source_status():
