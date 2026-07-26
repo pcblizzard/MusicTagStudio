@@ -17,7 +17,7 @@ def test_dashboard_workspace_and_toolbar_exist():
     assert 'tr("file", self.language)' in main
     assert 'tr("add_folder", self.language)' in main
     assert 'tr("rescan", self.language)' in main
-    assert '"Startseite"' in main
+    assert '"home"' in main  # Navigation nutzt jetzt i18n-Keys statt Fixtext
     assert "self.statusBar().showMessage" in main
 
 

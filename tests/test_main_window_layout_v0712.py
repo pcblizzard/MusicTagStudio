@@ -26,7 +26,8 @@ def test_columns_are_interactive_and_persistent():
     assert "QHeaderView.ResizeMode.Interactive" in text
     assert "QSettings(" in text
     assert "main_table/column_widths" in text
-    assert "Spaltenbreiten zurücksetzen" in text
+    # „Spaltenbreiten zurücksetzen" ist jetzt i18n-basiert (tr).
+    assert 'tr("reset_columns"' in text
 
 
 def test_editor_is_scrollable():

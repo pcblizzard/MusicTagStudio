@@ -1,5 +1,14 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## i18n Phase 1 (Batch 1): Menü und Navigation übersetzbar
+
+- Menüleiste (Datei/Bearbeiten/Info inkl. Rückgängig, Wiederholen,
+  Änderungsverlauf, Spaltenbreiten, Über …), die linke Navigation
+  (Startseite/Tagger/Medienbibliothek/Audio-Analyse/Bibliotheksprüfung),
+  der „Song über Text finden"-Knopf und die Workspace-Statusmeldungen laufen
+  jetzt über `tr()`. Deutsch und Englisch sind vollständig; weitere Sprachen
+  füllt das Übersetzungsskript.
+
 ## i18n-Fundament (Phase 0): Kataloge, Plural, Übersetzungswerkzeug
 
 - Die Übersetzungen liegen jetzt in `src/musictagstudio/locales/*.json` (statt

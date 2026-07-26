@@ -277,7 +277,7 @@ class MainWindow(QMainWindow):
         self.lyrics_button.clicked.connect(self.show_lyrics)
         self.lyrics_button.setEnabled(False)
 
-        self.lyrics_search_button = QPushButton("Song über Text finden")
+        self.lyrics_search_button = QPushButton(tr("lyrics_search", self.language))
         self.lyrics_search_button.setToolTip(
             "Lokale Lyrics und Genius nach einer Textstelle durchsuchen"
         )
@@ -726,12 +726,13 @@ class MainWindow(QMainWindow):
         self.workspace_buttons.setExclusive(
             True
         )
+        # (i18n-Key, Workspace-Index, Icon-Name)
         workspace_pages = (
-            ("Startseite", 5, "nav_home"),
-            ("Tagger", 0, "nav_tagger"),
-            ("Medienbibliothek", 1, "nav_library"),
-            ("Audio-Analyse", 2, "nav_analysis"),
-            ("Bibliotheksprüfung", 3, "nav_audit"),
+            ("home", 5, "nav_home"),
+            ("tagger", 0, "nav_tagger"),
+            ("media_library", 1, "nav_library"),
+            ("audio_analysis", 2, "nav_analysis"),
+            ("library_audit", 3, "nav_audit"),
         )
 
         nav_color = self.palette().color(
@@ -739,7 +740,7 @@ class MainWindow(QMainWindow):
         ).name()
         for name, index, icon_name in workspace_pages:
             button = QPushButton(
-                name
+                tr(name, self.language)
             )
             button.setIcon(make_icon(icon_name, nav_color))
             button.setIconSize(QSize(18, 18))
@@ -888,18 +889,15 @@ class MainWindow(QMainWindow):
                 settings.music_sources,
             )
         names = {
-            0: "Tagger",
-            1: "Medienbibliothek",
-            2: "Audio-Analyse",
-            3: "Bibliotheksprüfung",
-            4: "Einstellungen",
-            5: "Startseite",
+            0: "tagger",
+            1: "media_library",
+            2: "audio_analysis",
+            3: "library_audit",
+            4: "settings_page",
+            5: "home",
         }
         self.statusBar().showMessage(
-            names.get(
-                index,
-                "Bereit",
-            )
+            tr(names.get(index, "ready"), self.language)
         )
         button = self.workspace_buttons.button(
             index
@@ -1076,9 +1074,7 @@ class MainWindow(QMainWindow):
             )
         )
         add_folder_action.setStatusTip(
-            "Tastenkürzel: Strg+O"
-            if self.language in {"automatic", "de"}
-            else "Shortcut: Ctrl+O"
+            tr("shortcut_add_folder", self.language)
         )
         add_folder_action.triggered.connect(
             self.select_folder
@@ -1115,9 +1111,7 @@ class MainWindow(QMainWindow):
             )
         )
         settings_action.setStatusTip(
-            "Tastenkürzel: Strg+,"
-            if self.language in {"automatic", "de"}
-            else "Shortcut: Ctrl+,"
+            tr("shortcut_settings", self.language)
         )
         settings_action.triggered.connect(
             lambda: self.switch_workspace(
@@ -1148,7 +1142,7 @@ class MainWindow(QMainWindow):
             tr("edit", self.language)
         )
         self.undo_action = QAction(
-            "Rückgängig",
+            tr("undo", self.language),
             self,
         )
         self.undo_action.setShortcut(
@@ -1162,7 +1156,7 @@ class MainWindow(QMainWindow):
         )
 
         self.redo_action = QAction(
-            "Wiederholen",
+            tr("redo", self.language),
             self,
         )
         self.redo_action.setShortcuts(
@@ -1181,7 +1175,7 @@ class MainWindow(QMainWindow):
         )
 
         history_action = edit_menu.addAction(
-            "Änderungsverlauf …"
+            tr("history", self.language)
         )
         history_action.triggered.connect(
             self.show_history
@@ -1189,14 +1183,14 @@ class MainWindow(QMainWindow):
 
         edit_menu.addSeparator()
         reset_columns_action = edit_menu.addAction(
-            "Spaltenbreiten zurücksetzen"
+            tr("reset_columns", self.language)
         )
         reset_columns_action.triggered.connect(
             self.reset_table_column_widths
         )
 
-        info_menu = self.menuBar().addMenu("Info")
-        about_action = info_menu.addAction("Über MusicTagStudio …")
+        info_menu = self.menuBar().addMenu(tr("info", self.language))
+        about_action = info_menu.addAction(tr("about", self.language))
         about_action.triggered.connect(self.show_about_dialog)
 
     def show_about_dialog(self) -> None:

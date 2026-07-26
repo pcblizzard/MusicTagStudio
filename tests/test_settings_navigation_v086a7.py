@@ -7,6 +7,7 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication
 
+from musictagstudio.i18n import tr
 from musictagstudio.ui.main_window import MainWindow
 
 
@@ -27,7 +28,8 @@ def test_settings_workspace_clears_sidebar_selection_and_updates_status():
 
     assert window.workspace_stack.currentIndex() == 4
     assert window.workspace_buttons.checkedButton() is None
-    assert window.statusBar().currentMessage() == "Einstellungen"
+    # Statusmeldung ist i18n-basiert (sprachabhängig).
+    assert window.statusBar().currentMessage() == tr("settings_page", window.language)
 
     window.close()
     app.processEvents()
@@ -39,7 +41,7 @@ def test_initial_dashboard_selection_matches_visible_workspace():
 
     assert window.workspace_stack.currentIndex() == 5
     assert window.workspace_buttons.button(5).isChecked()
-    assert window.statusBar().currentMessage() == "Startseite"
+    assert window.statusBar().currentMessage() == tr("home", window.language)
 
     window.close()
     app.processEvents()

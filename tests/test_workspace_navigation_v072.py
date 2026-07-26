@@ -14,6 +14,8 @@ def test_main_window_contains_workspace_navigation():
     )
 
     assert "QStackedWidget" in text
-    assert '"Medienbibliothek"' in text
+    # Navigation ist i18n-basiert: der Medienbibliotheks-Key statt Fixtext.
+    assert '"media_library"' in text
+    assert "workspace_pages" in text
     assert "MediaLibraryWidget" in text
     assert "def switch_workspace" in text
