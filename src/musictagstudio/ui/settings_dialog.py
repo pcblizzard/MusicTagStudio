@@ -88,9 +88,11 @@ class SettingsDialog(QDialog):
             self._on_provider_diagnostics_finished
         )
         self.ui_settings = QSettings("MusicTagStudio", "MusicTagStudio")
+        language = settings.language
+        self.language = language
 
         if not self.embedded:
-            self.setWindowTitle("Einstellungen")
+            self.setWindowTitle(tr("settings_page", language))
             self.resize(740, 860)
 
         outer_layout = QVBoxLayout(self)
@@ -100,18 +102,15 @@ class SettingsDialog(QDialog):
         content = QWidget()
         layout = QVBoxLayout(content)
 
-        appearance = QGroupBox("Darstellung")
+        appearance = QGroupBox(tr("appearance", language))
         appearance_form = QFormLayout(appearance)
 
         self.theme_combo = QComboBox()
 
         for label, data in (
-            (
-                "Automatisch (Windows-Einstellung)",
-                "automatic",
-            ),
-            ("Hell", "light"),
-            ("Dunkel", "dark"),
+            (tr("theme_auto", language), "automatic"),
+            (tr("theme_light", language), "light"),
+            (tr("theme_dark", language), "dark"),
         ):
             self.theme_combo.addItem(
                 label,
@@ -123,14 +122,14 @@ class SettingsDialog(QDialog):
             settings.theme,
         )
         appearance_form.addRow(
-            "Theme:",
+            tr("theme", language),
             self.theme_combo,
         )
 
         self.theme_style_combo = QComboBox()
         for label, data in (
             ("MusicTagStudio", "standard"),
-            ("Apple Music-inspiriert", "apple"),
+            (tr("theme_apple", language), "apple"),
         ):
             self.theme_style_combo.addItem(
                 label,
@@ -141,7 +140,7 @@ class SettingsDialog(QDialog):
             settings.theme_style,
         )
         appearance_form.addRow(
-            "Design:",
+            tr("design_label", language),
             self.theme_style_combo,
         )
 
@@ -156,17 +155,15 @@ class SettingsDialog(QDialog):
             settings.language,
         )
         appearance_form.addRow(
-            "Sprache:",
+            tr("language", language),
             self.language_combo,
         )
         layout.addWidget(appearance)
 
-        library = QGroupBox("Musikquellen")
+        library = QGroupBox(tr("music_sources", language))
         library_layout = QVBoxLayout(library)
         library_info = QLabel(
-            "Mehrere lokale Laufwerke, externe Festplatten und "
-            "Netzwerkpfade können gemeinsam indiziert werden. "
-            "Nicht erreichbare Quellen bleiben im Index sichtbar."
+            tr("library_sources_info", language)
         )
         library_info.setWordWrap(True)
         library_layout.addWidget(library_info)
@@ -177,19 +174,19 @@ class SettingsDialog(QDialog):
         )
         self.source_table.setHorizontalHeaderLabels(
             [
-                "Aktiv",
-                "Name",
-                "Pfad",
-                "Status",
+                tr("col_active", language),
+                tr("col_name", language),
+                tr("col_path", language),
+                tr("col_status", language),
             ]
         )
         self.source_table.horizontalHeader().setStretchLastSection(True)
         library_layout.addWidget(self.source_table)
 
         source_buttons = QHBoxLayout()
-        self.add_source_button = QPushButton("Quelle hinzufügen")
+        self.add_source_button = QPushButton(tr("add_source", language))
         self.add_source_button.clicked.connect(self._add_source)
-        self.remove_source_button = QPushButton("Quelle entfernen")
+        self.remove_source_button = QPushButton(tr("remove_source", language))
         self.remove_source_button.clicked.connect(self._remove_source)
         source_buttons.addWidget(self.add_source_button)
         source_buttons.addWidget(self.remove_source_button)
@@ -197,13 +194,13 @@ class SettingsDialog(QDialog):
         library_layout.addLayout(source_buttons)
 
         self.load_sources_checkbox = QCheckBox(
-            "Hinterlegte Quellen beim Programmstart automatisch laden"
+            tr("load_sources_startup", language)
         )
         self.load_sources_checkbox.setChecked(settings.load_sources_on_startup)
         library_layout.addWidget(self.load_sources_checkbox)
 
         self.scan_sources_checkbox = QCheckBox(
-            "Beim Programmstart nach neuen oder geänderten Audiodateien suchen"
+            tr("scan_sources_startup", language)
         )
         self.scan_sources_checkbox.setChecked(settings.scan_sources_on_startup)
         library_layout.addWidget(self.scan_sources_checkbox)
@@ -211,12 +208,10 @@ class SettingsDialog(QDialog):
         self._populate_sources(settings.music_sources)
         layout.addWidget(library)
 
-        providers = QGroupBox("Metadatenquelle")
+        providers = QGroupBox(tr("metadata_source", language))
         provider_layout = QVBoxLayout(providers)
         provider_info = QLabel(
-            "Die ausgewählte Quelle besitzt Priorität. "
-            "Andere unterstützte Quellen können nur fehlende "
-            "Felder ergänzen."
+            tr("provider_priority_info", language)
         )
         provider_info.setWordWrap(True)
         provider_layout.addWidget(provider_info)
@@ -243,22 +238,27 @@ class SettingsDialog(QDialog):
         ).setChecked(True)
 
         self.enrich_checkbox = QCheckBox(
-            "Fehlende Felder durch andere unterstützte Quellen ergänzen"
+            tr("enrich_missing", language)
         )
         self.enrich_checkbox.setChecked(settings.enrich_missing_fields)
         provider_layout.addWidget(self.enrich_checkbox)
 
         self.country_combo = QComboBox()
 
-        for code, name in (
-            ("DE", "Deutschland"),
-            ("AT", "Österreich"),
-            ("CH", "Schweiz"),
-            ("US", "USA"),
-            ("GB", "Großbritannien"),
+        for code, name_key in (
+            ("DE", "country_de"),
+            ("AT", "country_at"),
+            ("CH", "country_ch"),
+            ("US", "country_us"),
+            ("GB", "country_gb"),
         ):
             self.country_combo.addItem(
-                f"{name} ({code})",
+                tr(
+                    "country_line",
+                    language,
+                    name=tr(name_key, language),
+                    code=code,
+                ),
                 code,
             )
 
@@ -268,18 +268,16 @@ class SettingsDialog(QDialog):
         )
         country_form = QFormLayout()
         country_form.addRow(
-            "Apple-Store:",
+            tr("apple_store", language),
             self.country_combo,
         )
         provider_layout.addLayout(country_form)
         layout.addWidget(providers)
 
-        covers = QGroupBox("Coverquellen")
+        covers = QGroupBox(tr("cover_sources", language))
         cover_layout = QVBoxLayout(covers)
         cover_info = QLabel(
-            "Metadaten- und Coverquelle sind unabhängig. "
-            "Rot bedeutet, dass die Quelle in MusicTagStudio "
-            "aktuell nicht nutzbar ist."
+            tr("cover_sources_info", language)
         )
         cover_info.setWordWrap(True)
         cover_layout.addWidget(cover_info)
@@ -306,8 +304,7 @@ class SettingsDialog(QDialog):
         ).setChecked(True)
 
         self.cover_fallback_checkbox = QCheckBox(
-            "Andere unterstützte Quelle verwenden, "
-            "wenn kein geeignetes Cover gefunden wird"
+            tr("cover_fallback", language)
         )
         self.cover_fallback_checkbox.setChecked(settings.cover_fallback_enabled)
         cover_layout.addWidget(self.cover_fallback_checkbox)
@@ -322,7 +319,7 @@ class SettingsDialog(QDialog):
         self.minimum_cover_size_spin.setValue(settings.minimum_cover_size)
         self.minimum_cover_size_spin.setSuffix(" px")
         cover_form.addRow(
-            "Mindestauflösung:",
+            tr("min_resolution", language),
             self.minimum_cover_size_spin,
         )
 
@@ -333,24 +330,22 @@ class SettingsDialog(QDialog):
         )
         self.artist_levels_spin.setValue(settings.artist_folder_levels_up)
         self.artist_levels_spin.setToolTip(
-            "Anzahl der Ordnerebenen, die vom Albumordner "
-            "zum Zielordner des 400-px-Covers nach oben "
-            "gegangen wird."
+            tr("artist_levels_tip", language)
         )
         cover_form.addRow(
-            "Künstlerordner liegt:",
+            tr("artist_folder_at", language),
             self.artist_levels_spin,
         )
 
         cover_layout.addLayout(cover_form)
         layout.addWidget(covers)
 
-        audio_analysis = QGroupBox("Audioanalyse")
+        audio_analysis = QGroupBox(tr("audio_analysis_group", language))
         audio_form = QFormLayout(audio_analysis)
 
         self.parallel_jobs_combo = QComboBox()
         self.parallel_jobs_combo.addItem(
-            "Automatisch",
+            tr("auto_option", language),
             0,
         )
 
@@ -370,34 +365,28 @@ class SettingsDialog(QDialog):
             settings.audio_analysis_parallel_jobs,
         )
         self.parallel_jobs_combo.setToolTip(
-            "Automatisch verwendet auf typischen Systemen bis "
-            "zu vier parallele FFmpeg-Prozesse. Eine höhere Zahl "
-            "kann die Analyse beschleunigen, belastet den Rechner "
-            "aber stärker."
+            tr("parallel_jobs_tip", language)
         )
         audio_form.addRow(
-            "Parallele Analysen:",
+            tr("parallel_analyses", language),
             self.parallel_jobs_combo,
         )
         layout.addWidget(audio_analysis)
 
-        online_catalogs = QGroupBox("Online-Kataloge")
+        online_catalogs = QGroupBox(tr("online_catalogs", language))
         online_catalogs_form = QFormLayout(online_catalogs)
         self.discogs_token_edit = QLineEdit(settings.discogs_token)
         self.discogs_token_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.discogs_token_edit.setPlaceholderText("Persönliches Discogs-Token")
+        self.discogs_token_edit.setPlaceholderText(tr("discogs_token_placeholder", language))
         self.discogs_token_edit.setToolTip(
-            "Das Token wird nur lokal in config.toml gespeichert und "
-            "für Anfragen an api.discogs.com verwendet."
+            tr("discogs_token_tip", language)
         )
         online_catalogs_form.addRow(
-            "Discogs-Token:",
+            tr("discogs_token_label", language),
             self.discogs_token_edit,
         )
         discogs_info = QLabel(
-            "Ohne Token verwendet die Medienbibliothek ausschließlich "
-            "MusicBrainz. Mit Token ergänzt Discogs Labels, Formate, "
-            "Cover und fehlende Veröffentlichungen."
+            tr("discogs_info", language)
         )
         discogs_info.setWordWrap(True)
         online_catalogs_form.addRow(discogs_info)
@@ -405,25 +394,24 @@ class SettingsDialog(QDialog):
         self.acoustid_key_edit = QLineEdit(settings.acoustid_api_key)
         self.acoustid_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.acoustid_key_edit.setPlaceholderText(
-            "Eigener AcoustID-API-Key (optional)"
+            tr("acoustid_placeholder", language)
         )
         self.acoustid_key_edit.setToolTip(
-            "Für die Identifikation per akustischem Fingerabdruck. Leer "
-            "lassen, um den mitgelieferten App-Key zu verwenden."
+            tr("acoustid_tip", language)
         )
         online_catalogs_form.addRow(
-            "AcoustID-Key:",
+            tr("acoustid_label", language),
             self.acoustid_key_edit,
         )
         self.fpcalc_path_edit = QLineEdit(settings.fpcalc_path)
         self.fpcalc_path_edit.setPlaceholderText(
-            "Pfad zu fpcalc (optional – sonst mitgeliefert/PATH)"
+            tr("fpcalc_placeholder", language)
         )
         self.fpcalc_path_edit.setToolTip(
-            "Optionaler Pfad zur Chromaprint-Binärdatei fpcalc."
+            tr("fpcalc_tip", language)
         )
         online_catalogs_form.addRow(
-            "fpcalc-Pfad:",
+            tr("fpcalc_label", language),
             self.fpcalc_path_edit,
         )
 
@@ -437,22 +425,21 @@ class SettingsDialog(QDialog):
         self.tidal_client_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.tidal_client_secret_edit.setPlaceholderText("TIDAL Client Secret")
         self.tidal_client_secret_edit.setToolTip(
-            "Wird über die Windows-Anmeldeinformationsverwaltung gespeichert "
-            "und nicht in config.toml geschrieben."
+            tr("windows_credential_tip", language)
         )
         online_catalogs_form.addRow(
             "TIDAL Client Secret:",
             self.tidal_client_secret_edit,
         )
         tidal_connection_layout = QHBoxLayout()
-        self.tidal_connect_button = QPushButton("Mit TIDAL verbinden")
-        self.tidal_disconnect_button = QPushButton("Verbindung trennen")
+        self.tidal_connect_button = QPushButton(tr("tidal_connect", language))
+        self.tidal_disconnect_button = QPushButton(tr("tidal_disconnect", language))
         self.tidal_connection_status = QLabel()
         tidal_connection_layout.addWidget(self.tidal_connect_button)
         tidal_connection_layout.addWidget(self.tidal_disconnect_button)
         tidal_connection_layout.addWidget(self.tidal_connection_status, 1)
         online_catalogs_form.addRow(
-            "TIDAL-Konto:",
+            tr("tidal_account", language),
             tidal_connection_layout,
         )
         self.tidal_connect_button.clicked.connect(self._connect_tidal)
@@ -469,8 +456,7 @@ class SettingsDialog(QDialog):
         self.spotify_client_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.spotify_client_secret_edit.setPlaceholderText("Spotify Client Secret")
         self.spotify_client_secret_edit.setToolTip(
-            "Wird über die Windows-Anmeldeinformationsverwaltung gespeichert "
-            "und nicht in config.toml geschrieben."
+            tr("windows_credential_tip", language)
         )
         online_catalogs_form.addRow(
             "Spotify Client Secret:",
@@ -480,18 +466,14 @@ class SettingsDialog(QDialog):
         self.genius_access_token_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.genius_access_token_edit.setPlaceholderText("Genius Client Access Token")
         self.genius_access_token_edit.setToolTip(
-            "Wird über die Windows-Anmeldeinformationsverwaltung gespeichert "
-            "und nicht in config.toml geschrieben."
+            tr("windows_credential_tip", language)
         )
         online_catalogs_form.addRow(
             "Genius Access Token:",
             self.genius_access_token_edit,
         )
         streaming_info = QLabel(
-            "TIDAL und Spotify werden für den Katalogabgleich verwendet. "
-            "Genius ergänzt die Suche nach einem Song über erinnerte "
-            "Textstellen. Vollständige Liedtexte werden nicht von Genius "
-            "übernommen."
+            tr("streaming_info", language)
         )
         streaming_info.setWordWrap(True)
         online_catalogs_form.addRow(streaming_info)
@@ -512,19 +494,16 @@ class SettingsDialog(QDialog):
         pacing_layout.addWidget(QLabel("Genius:"))
         pacing_layout.addWidget(self.genius_interval_spin)
         pacing_layout.addStretch(1)
-        online_catalogs_form.addRow("Anfrageabstand:", pacing_layout)
+        online_catalogs_form.addRow(tr("request_interval", language), pacing_layout)
 
         self.apple_web_search_checkbox = QCheckBox(
-            "Apple-Music-Websuche als Fallback nutzen"
+            tr("apple_web_fallback", language)
         )
         self.apple_web_search_checkbox.setChecked(
             settings.apple_web_search_enabled
         )
         self.apple_web_search_checkbox.setToolTip(
-            "Findet die iTunes-Such-API ein Album nicht, wird zusätzlich die "
-            "öffentliche Apple-Music-Website durchsucht. Das findet auch "
-            "Alben, die die Such-API nicht indexiert (nur Metadaten, kein "
-            "Login)."
+            tr("apple_web_fallback_tip", language)
         )
         online_catalogs_form.addRow(self.apple_web_search_checkbox)
 
@@ -538,21 +517,20 @@ class SettingsDialog(QDialog):
             preview_index if preview_index >= 0 else 0
         )
         self.preview_source_combo.setToolTip(
-            "Quelle für die 30-Sekunden-Track-Vorschau in der Medienbibliothek."
+            tr("preview_source_setting_tip", language)
         )
         online_catalogs_form.addRow(
-            "Vorschau-Quelle:",
+            tr("preview_source_label", language),
             self.preview_source_combo,
         )
 
-        self.provider_check_button = QPushButton("Zugänge jetzt prüfen")
+        self.provider_check_button = QPushButton(tr("check_access", language))
         self.provider_check_button.clicked.connect(self._check_provider_connections)
         online_catalogs_form.addRow(self.provider_check_button)
 
-        self.clear_cache_button = QPushButton("Provider-Cache leeren")
+        self.clear_cache_button = QPushButton(tr("clear_provider_cache", language))
         self.clear_cache_button.setToolTip(
-            "Verwirft zwischengespeicherte Apple- und MusicBrainz-Antworten. "
-            "Beim nächsten Taggen werden Alben neu abgefragt."
+            tr("clear_cache_tip", language)
         )
         self.clear_cache_button.clicked.connect(self._clear_provider_cache)
         online_catalogs_form.addRow(self.clear_cache_button)
@@ -561,30 +539,23 @@ class SettingsDialog(QDialog):
             label = QLabel(self._stored_provider_status(provider))
             label.setWordWrap(True)
             self.provider_status_labels[provider] = label
-            online_catalogs_form.addRow(f"{provider}-Status:", label)
+            online_catalogs_form.addRow(
+                tr("provider_status_row", language, provider=provider), label
+            )
         layout.addWidget(online_catalogs)
 
-        normalization = QGroupBox("Normalisierung")
+        normalization = QGroupBox(tr("normalization", language))
         normalization_form = QFormLayout(normalization)
 
         self.feature_combo = QComboBox()
 
-        for label, data in (
-            (
-                "Gast nur im Künstlerfeld",
-                "artist_only",
-            ),
-            (
-                "Gast im Titel und Künstlerfeld",
-                "title_and_artist",
-            ),
-            (
-                "Schreibweise der Quelle beibehalten",
-                "source",
-            ),
+        for label_key, data in (
+            ("feature_artist_only", "artist_only"),
+            ("feature_title_artist", "title_and_artist"),
+            ("feature_source_style", "source"),
         ):
             self.feature_combo.addItem(
-                label,
+                tr(label_key, language),
                 data,
             )
 
@@ -593,14 +564,14 @@ class SettingsDialog(QDialog):
             settings.feature_handling,
         )
         normalization_form.addRow(
-            "Feature-Künstler:",
+            tr("feature_artist_label", language),
             self.feature_combo,
         )
         self.feature_preview = QLabel()
         self.feature_preview.setObjectName("featureHandlingPreview")
         self.feature_preview.setWordWrap(True)
         normalization_form.addRow(
-            "Beispiel:",
+            tr("example_label", language),
             self.feature_preview,
         )
         self.feature_combo.currentIndexChanged.connect(self._update_feature_preview)
@@ -679,7 +650,11 @@ class SettingsDialog(QDialog):
             2,
             QTableWidgetItem(source.path),
         )
-        status = "Erreichbar" if Path(source.path).is_dir() else "Pfad nicht gefunden"
+        status = (
+            tr("source_reachable", self.language)
+            if Path(source.path).is_dir()
+            else tr("source_path_missing", self.language)
+        )
         status_item = QTableWidgetItem(status)
         status_item.setFlags(status_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         self.source_table.setItem(
@@ -693,7 +668,7 @@ class SettingsDialog(QDialog):
     ) -> None:
         folder = QFileDialog.getExistingDirectory(
             self,
-            "Musikquelle auswählen",
+            tr("select_music_source", self.language),
             "",
         )
 
@@ -769,9 +744,12 @@ class SettingsDialog(QDialog):
             feature_handling=str(self.feature_combo.currentData()),
         )
         self.feature_preview.setText(
-            "Ausgang: 2Pac feat. Dr. Dre - California Love\n"
-            f"Titel: {result.title}\n"
-            f"Künstler: {result.artist}"
+            tr(
+                "feature_preview_text",
+                self.language,
+                title=result.title,
+                artist=result.artist,
+            )
         )
         self.feature_preview.setStyleSheet(
             "padding: 8px 10px;"
@@ -922,7 +900,7 @@ class SettingsDialog(QDialog):
         self._save_streaming_secrets()
         self.tidal_connect_button.setEnabled(False)
         self.tidal_disconnect_button.setEnabled(False)
-        self.tidal_connection_status.setText("Browser-Anmeldung läuft …")
+        self.tidal_connection_status.setText(tr("tidal_login_running", self.language))
         self.tidal_connection_status.setStyleSheet(STATUS_STYLES["setup_required"])
 
         def authorize() -> None:
@@ -935,7 +913,7 @@ class SettingsDialog(QDialog):
                 logger.warning("Unerwarteter TIDAL-Anmeldefehler", exc_info=True)
                 self.tidal_login_finished.emit(
                     False,
-                    "Die TIDAL-Anmeldung ist unerwartet fehlgeschlagen.",
+                    tr("tidal_login_failed", self.language),
                 )
                 return
             self.tidal_login_finished.emit(True, "")
@@ -967,13 +945,17 @@ class SettingsDialog(QDialog):
                 get_secret(TIDAL_GRANTED_SCOPE).strip(),
             )
         self.tidal_connection_status.setText(
-            "Verbunden · search.read" if connected else "Nicht verbunden"
+            tr("tidal_connected", self.language)
+            if connected
+            else tr("tidal_not_connected", self.language)
         )
         self.tidal_connection_status.setStyleSheet(
             STATUS_STYLES["supported" if connected else "setup_required"]
         )
         self.tidal_connect_button.setText(
-            "Erneut verbinden" if connected else "Mit TIDAL verbinden"
+            tr("tidal_reconnect", self.language)
+            if connected
+            else tr("tidal_connect", self.language)
         )
         self.tidal_connect_button.setEnabled(True)
         self.tidal_disconnect_button.setEnabled(connected)
@@ -982,17 +964,16 @@ class SettingsDialog(QDialog):
         http_cache.clear()
         QMessageBox.information(
             self,
-            "Provider-Cache geleert",
-            "Zwischengespeicherte Apple- und MusicBrainz-Antworten wurden "
-            "entfernt. Alben werden beim nächsten Taggen neu abgefragt.",
+            tr("cache_cleared_title", self.language),
+            tr("cache_cleared_msg", self.language),
         )
 
     def _check_provider_connections(self) -> None:
         self._save_streaming_secrets()
         self.provider_check_button.setEnabled(False)
-        self.provider_check_button.setText("Zugänge werden geprüft …")
+        self.provider_check_button.setText(tr("checking_access", self.language))
         for label in self.provider_status_labels.values():
-            label.setText("Prüfung läuft …")
+            label.setText(tr("checking_running", self.language))
             label.setStyleSheet(STATUS_STYLES["setup_required"])
 
         arguments = {
@@ -1016,7 +997,7 @@ class SettingsDialog(QDialog):
 
     def _on_provider_diagnostics_finished(self, results: object) -> None:
         self.provider_check_button.setEnabled(True)
-        self.provider_check_button.setText("Zugänge jetzt prüfen")
+        self.provider_check_button.setText(tr("check_access", self.language))
         for result in results:
             label = self.provider_status_labels.get(result.provider)
             if label is None:
@@ -1030,7 +1011,11 @@ class SettingsDialog(QDialog):
                 f"provider_diagnostics/{result.provider}/last_success",
                 "",
             )
-            suffix = f" · zuletzt erfolgreich: {last_success}" if last_success else ""
+            suffix = (
+                tr("last_success_suffix", self.language, when=last_success)
+                if last_success
+                else ""
+            )
             label.setText(f"{result.message}{suffix}")
             style = (
                 "supported"
@@ -1049,8 +1034,8 @@ class SettingsDialog(QDialog):
             "",
         )
         if last_success:
-            return f"Zuletzt erfolgreich geprüft: {last_success}"
-        return "Noch nicht geprüft"
+            return tr("last_checked_success", self.language, when=last_success)
+        return tr("not_checked_yet", self.language)
 
     @staticmethod
     def _set_combo_value(

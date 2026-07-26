@@ -24,5 +24,6 @@ def test_discogs_token_field_is_available_in_settings_ui():
         / "settings_dialog.py"
     ).read_text(encoding="utf-8")
 
-    assert '"Discogs-Token:"' in text
+    # Discogs-Token-Label ist jetzt i18n-basiert (tr("discogs_token_label")).
+    assert '"discogs_token_label"' in text
     assert "self.discogs_token_edit" in text
