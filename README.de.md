@@ -141,9 +141,9 @@ betroffenen Werte und mögliche Einschränkungen an.
 
 ## Installation und Start unter Windows
 
-Vorausgesetzt werden Windows und Python 3.12 oder neuer. Empfohlen wird aktuell
-**Python 3.13**, da Vorabversionen neuerer Python-Ausgaben möglicherweise noch
-nicht von PySide6 unterstützt werden.
+Vorausgesetzt werden Windows und Python 3.12–3.14 (empfohlen **Python 3.13 oder
+3.14**; 3.12 und 3.14 werden von der CI geprüft). Vorabversionen (z. B. 3.15-Betas)
+sollten vermieden werden, da PySide6 dafür noch keine Wheels bereitstellt.
 
 ```powershell
 git clone https://github.com/pcblizzard/MusicTagStudio.git

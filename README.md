@@ -127,9 +127,9 @@ MusicTagStudio shows affected values and limitations before writing.
 
 ## Installation on Windows
 
-Windows and Python 3.12 or newer are required. **Python 3.13** is currently
-recommended because preview releases of newer Python versions may not yet be
-supported by PySide6.
+Windows and Python 3.12–3.14 are required (**Python 3.13 or 3.14** recommended;
+3.12 and 3.14 are covered by CI). Avoid pre-release Python builds (e.g. 3.15
+betas), as PySide6 does not yet provide wheels for them.
 
 ```powershell
 git clone https://github.com/pcblizzard/MusicTagStudio.git
