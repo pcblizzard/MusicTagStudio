@@ -13,7 +13,8 @@ def test_lyrics_dialog_requires_preview_before_embedding():
     # Einbetten-Button ist jetzt i18n-basiert (tr("embed_in_audio")).
     assert 'tr("embed_in_audio", language)' in source
     assert "LyricsEmbedPreviewDialog" in source
-    assert "Bestehende eingebettete Lyrics werden ersetzt" in source
+    # Ersetzungs-Hinweis ist jetzt i18n-basiert (tr("embed_note")).
+    assert 'tr("embed_note", language)' in source
     assert "confirmed=True" in source
     assert '"Ctrl+L"' in source
     assert '"Ctrl+S"' in source
