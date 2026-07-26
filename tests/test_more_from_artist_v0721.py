@@ -12,7 +12,7 @@ def test_tagger_has_bidirectional_artist_navigation():
         encoding="utf-8"
     )
 
-    assert '"Mehr vom Künstler"' in text
+    assert 'tr("more_artist"' in text  # i18n statt Fixtext
     assert "def show_more_from_artist" in text
     assert "self.media_library.search_artist" in text
     assert 'addMenu(\n            "Audio-Analyse"' not in text

@@ -1,5 +1,13 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## i18n Phase 1 (Batch 2): Werkzeugleisten-Knöpfe übersetzbar
+
+- Die Aktions-Knöpfe der Tagger-Werkzeugleiste samt Tooltips (Metadaten suchen,
+  Nach Klang identifizieren, Cover verwalten, Lyrics, Titel abspielen,
+  Album/Song über Link laden, BBCode, Mehr vom Künstler …) sowie
+  Rückgängig/Wiederholen/Änderungsverlauf laufen jetzt über `tr()` (de+en
+  vollständig).
+
 ## i18n Phase 1 (Batch 1): Menü und Navigation übersetzbar
 
 - Menüleiste (Datei/Bearbeiten/Info inkl. Rückgängig, Wiederholen,

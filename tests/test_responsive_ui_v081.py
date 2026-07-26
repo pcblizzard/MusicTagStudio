@@ -6,9 +6,9 @@ def test_tagger_buttons_have_clear_action_labels():
         Path(__file__).parents[1]
         / "src" / "musictagstudio" / "ui" / "main_window.py"
     ).read_text(encoding="utf-8")
-    assert '"Metadaten für Titel suchen"' in text
-    assert '"Metadaten für Auswahl suchen"' in text
-    assert '"Album/Song über Link oder ID laden"' in text
+    assert 'tr("search_metadata_title"' in text  # i18n-Keys statt Fixtext
+    assert 'tr("search_metadata_selection"' in text
+    assert 'tr("load_direct"' in text
     assert "def resizeEvent" in text
     assert "def _layout_provider_buttons" in text
 

@@ -29,5 +29,5 @@ def test_file_and_edit_commands_are_in_menus():
     assert 'tr("add_folder", self.language)' in text
     assert 'tr("rescan", self.language)' in text
     assert 'tr("edit", self.language)' in text
-    assert '"Rückgängig"' in text
-    assert '"Wiederholen"' in text
+    assert 'tr("undo", self.language)' in text  # i18n statt Fixtext
+    assert 'tr("redo", self.language)' in text

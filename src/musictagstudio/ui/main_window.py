@@ -220,32 +220,31 @@ class MainWindow(QMainWindow):
         self.folder_label = QLabel(f"Ordner: {self.folder}")
 
         self.select_button = QPushButton(
-            "Musikordner auswählen"
+            tr("music_folder", self.language)
         )
         self.select_button.clicked.connect(self.select_folder)
 
         self.scan_button = QPushButton(
-            "Bibliothek neu einlesen"
+            tr("library_rescan", self.language)
         )
         self.scan_button.clicked.connect(self.rescan_library)
 
         self.provider_buttons_layout = QGridLayout()
 
         self.proposal_button = QPushButton(
-            "Metadaten für Titel suchen"
+            tr("search_metadata_title", self.language)
         )
-        self.proposal_button.setToolTip("Metadaten für Titel suchen")
+        self.proposal_button.setToolTip(tr("search_metadata_title", self.language))
         self.proposal_button.clicked.connect(
             self.create_single_proposal
         )
         self.proposal_button.setEnabled(False)
 
         self.identify_button = QPushButton(
-            "Nach Klang identifizieren"
+            tr("identify_by_sound", self.language)
         )
         self.identify_button.setToolTip(
-            "Erkennt den ausgewählten Titel per akustischem Fingerabdruck "
-            "(AcoustID) und schlägt die passenden MusicBrainz-Metadaten vor."
+            tr("identify_by_sound_tip", self.language)
         )
         self.identify_button.clicked.connect(
             self.identify_by_sound
@@ -253,46 +252,46 @@ class MainWindow(QMainWindow):
         self.identify_button.setEnabled(False)
 
         self.batch_button = QPushButton(
-            "Metadaten für Auswahl suchen"
+            tr("search_metadata_selection", self.language)
         )
-        self.batch_button.setToolTip("Metadaten für Auswahl suchen")
+        self.batch_button.setToolTip(tr("search_metadata_selection", self.language))
         self.batch_button.clicked.connect(
             self.create_batch_proposals
         )
         self.batch_button.setEnabled(False)
 
         self.cover_button = QPushButton(
-            "Cover für Auswahl verwalten"
+            tr("manage_cover_selection", self.language)
         )
-        self.cover_button.setToolTip("Cover für Auswahl verwalten")
+        self.cover_button.setToolTip(tr("manage_cover_selection", self.language))
         self.cover_button.clicked.connect(
             self.manage_cover
         )
         self.cover_button.setEnabled(False)
 
-        self.lyrics_button = QPushButton("Lyrics anzeigen")
+        self.lyrics_button = QPushButton(tr("show_lyrics", self.language))
         self.lyrics_button.setToolTip(
-            "Lyrics aus LRC, Audiodatei oder LRCLIB anzeigen"
+            tr("show_lyrics_tip", self.language)
         )
         self.lyrics_button.clicked.connect(self.show_lyrics)
         self.lyrics_button.setEnabled(False)
 
         self.lyrics_search_button = QPushButton(tr("lyrics_search", self.language))
         self.lyrics_search_button.setToolTip(
-            "Lokale Lyrics und Genius nach einer Textstelle durchsuchen"
+            tr("lyrics_search_tip", self.language)
         )
         self.lyrics_search_button.clicked.connect(self.search_song_by_lyrics)
 
-        self.player_button = QPushButton("Titel abspielen")
-        self.player_button.setToolTip("Ausgewählten lokalen Titel abspielen")
+        self.player_button = QPushButton(tr("play_track", self.language))
+        self.player_button.setToolTip(tr("play_track_tip", self.language))
         self.player_button.clicked.connect(self.play_selected_song)
         self.player_button.setEnabled(False)
 
         self.direct_album_button = QPushButton(
-            "Album/Song über Link oder ID laden"
+            tr("load_direct", self.language)
         )
         self.direct_album_button.setToolTip(
-            "Album oder Song über eine URL beziehungsweise ID laden"
+            tr("load_direct_tip", self.language)
         )
         self.direct_album_button.clicked.connect(
             self.load_direct_album
@@ -300,19 +299,19 @@ class MainWindow(QMainWindow):
         self.direct_album_button.setEnabled(False)
 
         self.release_text_button = QPushButton(
-            "BBCode-Text erstellen"
+            tr("create_bbcode", self.language)
         )
-        self.release_text_button.setToolTip("BBCode-Text erstellen")
+        self.release_text_button.setToolTip(tr("create_bbcode", self.language))
         self.release_text_button.clicked.connect(
             self.create_release_text_file
         )
         self.release_text_button.setEnabled(False)
 
         self.more_artist_button = QPushButton(
-            "Mehr vom Künstler"
+            tr("more_artist", self.language)
         )
         self.more_artist_button.setToolTip(
-            "Diskografie des Künstlers in der Medienbibliothek öffnen"
+            tr("more_artist_tip", self.language)
         )
         self.more_artist_button.clicked.connect(
             self.show_more_from_artist
@@ -401,21 +400,21 @@ class MainWindow(QMainWindow):
             QPalette.ColorRole.ButtonText
         ).name()
         self.undo_button = QPushButton(
-            "Rückgängig"
+            tr("undo", self.language)
         )
         self.undo_button.setIcon(make_icon("undo", history_icon_color))
         self.undo_button.clicked.connect(
             self.undo_last_change
         )
         self.redo_button = QPushButton(
-            "Wiederholen"
+            tr("redo", self.language)
         )
         self.redo_button.setIcon(make_icon("redo", history_icon_color))
         self.redo_button.clicked.connect(
             self.redo_last_change
         )
         self.history_button = QPushButton(
-            "Änderungsverlauf"
+            tr("history", self.language)
         )
         self.history_button.clicked.connect(
             self.show_history
