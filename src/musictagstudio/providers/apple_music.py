@@ -61,6 +61,9 @@ class AppleAlbumCandidate:
     year: str
     country: str
     confidence: int
+    # Tagesgenaues Veröffentlichungsdatum (ISO), sofern von der API geliefert –
+    # für die Vorab-Erkennung. Leer bei Web-Fallback/unbekannt.
+    release_date: str = ""
 
 
 def search_album(
@@ -219,6 +222,7 @@ def search_album(
                 year=actual_year,
                 country=country.upper(),
                 confidence=confidence,
+                release_date=str(item.get("releaseDate", "")),
             )
         )
 

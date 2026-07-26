@@ -35,10 +35,23 @@ class StreamingAvailabilityCache:
                     confidence INTEGER NOT NULL,
                     checked_at TEXT NOT NULL,
                     expires_at TEXT NOT NULL,
+                    release_date TEXT NOT NULL DEFAULT '',
                     PRIMARY KEY(provider, release_key, country)
                 )
                 """
             )
+            # Migration für ältere Caches ohne release_date-Spalte.
+            columns = {
+                row[1]
+                for row in connection.execute(
+                    "PRAGMA table_info(streaming_availability)"
+                ).fetchall()
+            }
+            if "release_date" not in columns:
+                connection.execute(
+                    "ALTER TABLE streaming_availability "
+                    "ADD COLUMN release_date TEXT NOT NULL DEFAULT ''"
+                )
 
     def get(
         self, provider: str, release_key: str, country: str
@@ -46,7 +59,8 @@ class StreamingAvailabilityCache:
         with connect_database(self.path) as connection:
             row = connection.execute(
                 """SELECT status, external_id, external_url, album, artist,
-                          year, track_count, confidence, checked_at, expires_at
+                          year, track_count, confidence, checked_at, expires_at,
+                          release_date
                    FROM streaming_availability
                    WHERE provider = ? AND release_key = ? AND country = ?""",
                 (provider, release_key, country.upper()),
@@ -60,6 +74,7 @@ class StreamingAvailabilityCache:
                     external_id=row[1], external_url=row[2], album=row[3],
                     artist=row[4], year=row[5], track_count=int(row[6]),
                     confidence=int(row[7]), checked_at=row[8], expires_at=row[9],
+                    release_date=row[10] or "",
                 )
             except (TypeError, ValueError):
                 connection.execute(
@@ -83,16 +98,18 @@ class StreamingAvailabilityCache:
                 """INSERT INTO streaming_availability
                    (provider, release_key, country, status, external_id,
                     external_url, album, artist, year, track_count, confidence,
-                    checked_at, expires_at)
+                    checked_at, expires_at, release_date)
                    VALUES (:provider, :release_key, :country, :status,
                     :external_id, :external_url, :album, :artist, :year,
-                    :track_count, :confidence, :checked_at, :expires_at)
+                    :track_count, :confidence, :checked_at, :expires_at,
+                    :release_date)
                    ON CONFLICT(provider, release_key, country) DO UPDATE SET
                     status=excluded.status, external_id=excluded.external_id,
                     external_url=excluded.external_url, album=excluded.album,
                     artist=excluded.artist, year=excluded.year,
                     track_count=excluded.track_count,
                     confidence=excluded.confidence,
-                    checked_at=excluded.checked_at, expires_at=excluded.expires_at""",
+                    checked_at=excluded.checked_at, expires_at=excluded.expires_at,
+                    release_date=excluded.release_date""",
                 values,
             )

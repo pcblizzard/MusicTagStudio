@@ -84,6 +84,7 @@ from ..i18n import tr
 from ..library_sources import IndexedAlbum
 from ..models.song import Song
 from ..icons import make_icon
+from ..direct_album_lookup import is_prerelease_date
 from ..player.preview import PreviewPlayer
 from ..services.cover import load_cover
 from ..providers.apple_music import (
@@ -725,9 +726,15 @@ class MediaLibraryWidget(QWidget):
         # Status-Chip (Pille) statt Fließtext für die lokale Verfügbarkeit.
         self.local_status_chip = QLabel("")
         self.local_status_chip.setObjectName("localStatusChip")
+        # Chip für Vorabveröffentlichungen (nur bei tagesgenauem Zukunftsdatum
+        # aus der Apple-Streaming-Prüfung).
+        self.prerelease_chip = QLabel("")
+        self.prerelease_chip.setObjectName("prereleaseChip")
+        self.prerelease_chip.hide()
         chip_row = QHBoxLayout()
         chip_row.setContentsMargins(0, 0, 0, 0)
         chip_row.addWidget(self.local_status_chip)
+        chip_row.addWidget(self.prerelease_chip)
         chip_row.addStretch()
         detail_text.addLayout(chip_row)
 
@@ -1298,6 +1305,8 @@ class MediaLibraryWidget(QWidget):
         self.enqueue_local_button.setEnabled(False)
         self.local_status_chip.clear()
         self.local_status_chip.setStyleSheet("")
+        self.prerelease_chip.hide()
+        self.prerelease_chip.clear()
         self._show_cover(None)
         self.group_title.setText(
             tr("search_running", self.language)
@@ -2228,6 +2237,7 @@ class MediaLibraryWidget(QWidget):
         self.current_group=group; self.current_tracks=[]; self.editions=[]; self.edition_combo.clear(); self.track_table.setRowCount(0)
         self.preview_player.stop(); self._preview_token += 1; self._playing_preview_row = -1; self.track_preview_buttons = []; self.track_preview_urls = []; self._row_is_local = []
         self._cover_generation += 1; self._show_cover(None); self.group_title.setText(group.title)
+        self.prerelease_chip.hide(); self.prerelease_chip.clear()
         key=_normalized(group.title); local_path=self.local_albums.get(key); status=self.local_album_status.get(key,"Nicht vorhanden"); local_online=status == "Lokal verfügbar"
         self._push_breadcrumb(
             "release",
@@ -3247,6 +3257,7 @@ class MediaLibraryWidget(QWidget):
             year=apple_result.year,
             country=apple_result.country,
             confidence=apple_result.confidence,
+            release_date=apple_result.release_date,
         )
         self._streaming_results[group_id] = best
         self._streaming_checked_at[group_id] = datetime.fromisoformat(
@@ -3303,9 +3314,29 @@ class MediaLibraryWidget(QWidget):
         )
         status = self.local_album_status.get(_normalized(group.title), "Nicht vorhanden")
         self._render_source_details(group, status, apple_music_status="found")
+        self._update_prerelease_chip(getattr(best, "release_date", ""))
+
+    def _update_prerelease_chip(self, release_date: str) -> None:
+        """Zeigt den Vorab-Chip nur bei tagesgenauem Zukunftsdatum."""
+        if not is_prerelease_date(release_date):
+            self.prerelease_chip.hide()
+            self.prerelease_chip.clear()
+            return
+        self.prerelease_chip.setText(f"Vorabveröffentlichung · {str(release_date)[:10]}")
+        self.prerelease_chip.setStyleSheet(
+            "QLabel#prereleaseChip { color: #ffffff; background: #6f42c1;"
+            " border-radius: 8px; padding: 2px 10px; font-size: 11px;"
+            " font-weight: 600; }"
+        )
+        self.prerelease_chip.setToolTip(
+            "Bei Apple als Vorabveröffentlichung gelistet; einige Titel sind "
+            "möglicherweise noch nicht erschienen."
+        )
+        self.prerelease_chip.show()
 
     def _show_no_streaming_result(self, group: ReleaseGroup) -> None:
         self.apple_button.setEnabled(False)
+        self.prerelease_chip.hide()
         self.streaming_status.setText(
             "Apple Music: keine eindeutige Ausgabe gefunden. "
             + self._streaming_checked_hint(group.release_group_id)
@@ -3432,6 +3463,7 @@ class MediaLibraryWidget(QWidget):
             year=cached.year,
             country=cached.country,
             confidence=cached.confidence,
+            release_date=cached.release_date,
         )
 
     def _render_source_details(

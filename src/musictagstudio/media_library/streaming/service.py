@@ -176,6 +176,7 @@ def _check_apple(
         track_count=best.track_count,
         confidence=best.confidence,
         country=country,
+        release_date=best.release_date,
     )
 
 

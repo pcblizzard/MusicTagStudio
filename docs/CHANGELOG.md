@@ -1,5 +1,17 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Vorabveröffentlichungen erkennen
+
+- Liegt bei Apple Music ein **tagesgenaues Veröffentlichungsdatum in der
+  Zukunft** vor, zeigt das Detail-Panel der Medienbibliothek nach der
+  Streaming-Prüfung einen Chip **„Vorabveröffentlichung · <Datum>"**. Ein
+  reines Jahr (z. B. „2026") gilt bewusst **nicht** als Vorab – es ist oft nur
+  ein Platzhalter, die Falsch-Positiv-Rate wäre zu hoch.
+- Im Direkt-Album-Dialog werden noch nicht erschienene Titel gekennzeichnet
+  („Track N · noch nicht veröffentlicht"), erkennbar am Apple-Flag
+  `isStreamable`. Da alles live abgefragt wird, aktualisiert sich das beim
+  erneuten Laden nach dem Erscheinungstag automatisch.
+
 ## Korrekte lokale Wiedergabe aus der Trackliste
 
 - Beim Klick auf einen Titel wird die lokale Datei jetzt zuerst über den

@@ -60,6 +60,39 @@ def test_expired_result_is_removed(tmp_path) -> None:
     assert cache.get("apple_music", result.release_key, "DE") is None
 
 
+def test_cache_roundtrips_release_date(tmp_path) -> None:
+    cache = StreamingAvailabilityCache(tmp_path / "streaming.sqlite3")
+    expected = replace(availability(), release_date="2026-10-01T07:00:00Z")
+    cache.put(expected)
+    loaded = cache.get("apple_music", expected.release_key, "DE")
+    assert loaded == expected
+    assert loaded.release_date == "2026-10-01T07:00:00Z"
+
+
+def test_cache_migrates_old_schema_without_release_date(tmp_path) -> None:
+    from musictagstudio.database import connect_database
+
+    db = tmp_path / "streaming.sqlite3"
+    # Alte Tabelle ohne release_date-Spalte anlegen.
+    with connect_database(db) as connection:
+        connection.execute(
+            """CREATE TABLE streaming_availability (
+                provider TEXT NOT NULL, release_key TEXT NOT NULL,
+                country TEXT NOT NULL, status TEXT NOT NULL,
+                external_id TEXT NOT NULL, external_url TEXT NOT NULL,
+                album TEXT NOT NULL, artist TEXT NOT NULL, year TEXT NOT NULL,
+                track_count INTEGER NOT NULL, confidence INTEGER NOT NULL,
+                checked_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+                PRIMARY KEY(provider, release_key, country))"""
+        )
+
+    # Konstruktor migriert die Spalte; put/get funktionieren danach.
+    cache = StreamingAvailabilityCache(db)
+    record = replace(availability(), release_date="2027-01-01")
+    cache.put(record)
+    assert cache.get("apple_music", record.release_key, "DE") == record
+
+
 def test_release_key_normalizes_accents_and_punctuation() -> None:
     assert streaming_release_key("Clüeso", "Deja Vu 1/2", "2026-02-27") == (
         "clueso|dejavu12|2026"

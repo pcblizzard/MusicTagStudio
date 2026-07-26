@@ -31,12 +31,15 @@ class StreamingAvailability:
     country: str = ""
     checked_at: str = ""
     expires_at: str = ""
+    # Tagesgenaues Veröffentlichungsdatum (ISO) für die Vorab-Erkennung.
+    release_date: str = ""
 
     @classmethod
     def available(
         cls, *, provider: str, release_key: str, external_id: str,
         external_url: str, album: str, artist: str, year: str,
         track_count: int, confidence: int, country: str,
+        release_date: str = "",
         ttl_days: int = 7,
     ) -> "StreamingAvailability":
         checked = datetime.now().astimezone()
@@ -46,6 +49,7 @@ class StreamingAvailability:
             external_id=external_id, external_url=external_url,
             album=album, artist=artist, year=year,
             track_count=track_count, confidence=confidence, country=country,
+            release_date=release_date,
             checked_at=checked.isoformat(timespec="seconds"),
             expires_at=(checked + timedelta(days=ttl_days)).isoformat(timespec="seconds"),
         )
