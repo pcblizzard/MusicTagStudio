@@ -38,6 +38,7 @@ from ..direct_references import (
 from ..models.song import Song
 from ..icons import make_icon
 from ..player.preview import PreviewPlayer
+from .formatting import localized_date
 
 
 class WorkerSignals(QObject):
@@ -454,7 +455,7 @@ class DirectAlbumDialog(QDialog):
         release_date = getattr(result, "release_date", "")
         if not is_prerelease_date(release_date):
             return ""
-        day = str(release_date)[:10]
+        day = localized_date(release_date)
         return (
             f" · Vorabveröffentlichung (Release: {day}). Noch nicht "
             "veröffentlichte Titel sind bei Apple als Platzhalter (Track N) "

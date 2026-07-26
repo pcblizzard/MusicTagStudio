@@ -417,6 +417,39 @@ def test_single_track_matches_by_title_not_colliding_number(tmp_path):
     widget.deleteLater()
 
 
+def test_placeholder_track_shows_local_title(tmp_path):
+    # Vorab-Album: Anbieter liefert Platzhalter „Track 11", die Datei liegt
+    # aber lokal als „Keine Angst" vor -> Trackliste zeigt den lokalen Titel.
+    _app()
+    from types import SimpleNamespace
+
+    from musictagstudio.media_library.service import Track
+    from musictagstudio.models.song import Song
+    from musictagstudio.ui.media_library_widget import MediaLibraryWidget
+
+    local_file = tmp_path / "11.flac"
+    local_file.write_bytes(b"")
+
+    widget = MediaLibraryWidget()
+    widget.current_artist_name = "Danger Dan"
+    widget.set_local_songs(
+        [
+            Song(title="Keine Angst", artist="Danger Dan",
+                 album_artist="Danger Dan", album="Keine Angst",
+                 disc="1", track="11", path=str(local_file)),
+        ]
+    )
+    widget.current_group = SimpleNamespace(
+        title="Keine Angst", artist="Danger Dan", release_group_id="s"
+    )
+    widget._tracks_loaded(
+        [Track(disc_number=1, track_number=11, title="Track 11", artist="Danger Dan")]
+    )
+
+    assert widget.track_table.item(0, 2).text() == "Keine Angst - Danger Dan"
+    widget.deleteLater()
+
+
 def test_apple_and_deezer_tracks_carry_preview_url():
     # Sicherstellen, dass das Feld existiert und optional bleibt.
     track = DirectAlbumTrack(

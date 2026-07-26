@@ -85,6 +85,13 @@ from ..library_sources import IndexedAlbum
 from ..models.song import Song
 from ..icons import make_icon
 from ..direct_album_lookup import is_prerelease_date
+from ..local_track import local_duration_ms
+from .formatting import localized_date
+
+
+def _is_placeholder_title(title: str) -> bool:
+    """True für Anbieter-Platzhalter wie „Track 2" (Vorabveröffentlichungen)."""
+    return bool(re.fullmatch(r"track\s*\d+", str(title or "").strip().casefold()))
 from ..player.preview import PreviewPlayer
 from ..services.cover import load_cover
 from ..providers.apple_music import (
@@ -2664,15 +2671,17 @@ class MediaLibraryWidget(QWidget):
         self.track_preview_urls = [""] * len(tracks)
 
         # Lokale Verfügbarkeit pro Zeile bestimmen (für vollen Song statt
-        # Vorschau). Ist nichts lokal, bleiben alle Werte False.
+        # Vorschau). Ist nichts lokal, bleiben alle Werte None/False.
         local_songs = self._current_local_album_songs()
-        self._row_is_local = [
-            bool(
-                local_songs
-                and self._match_local_index(track, local_songs) >= 0
-            )
-            for track in tracks
-        ]
+        matched_local: list[Song | None] = []
+        for track in tracks:
+            song = None
+            if local_songs:
+                index = self._match_local_index(track, local_songs)
+                if index >= 0:
+                    song = local_songs[index]
+            matched_local.append(song)
+        self._row_is_local = [song is not None for song in matched_local]
         self.track_table.setRowCount(
             len(tracks)
         )
@@ -2680,17 +2689,26 @@ class MediaLibraryWidget(QWidget):
         for row, track in enumerate(
             tracks
         ):
+            title_text = _track_title(track)
+            duration_text = _duration(track.length_ms)
+            # Liefert der Anbieter einen Platzhalter („Track 11") und liegt die
+            # Datei lokal vor, den echten lokalen Titel + Dauer anzeigen.
+            local_song = matched_local[row]
+            if local_song is not None and _is_placeholder_title(track.title):
+                title_text = (
+                    f"{local_song.title} - {local_song.artist}"
+                    if local_song.artist
+                    else local_song.title
+                )
+                if not duration_text:
+                    duration_text = _duration(local_duration_ms(local_song.path))
             values = (
                 str(
                     track.disc_number
                 ),
                 f"{track.track_number:02d}",
-                _track_title(
-                    track
-                ),
-                _duration(
-                    track.length_ms
-                ),
+                title_text,
+                duration_text,
             )
 
             for column, value in enumerate(
@@ -3322,7 +3340,9 @@ class MediaLibraryWidget(QWidget):
             self.prerelease_chip.hide()
             self.prerelease_chip.clear()
             return
-        self.prerelease_chip.setText(f"Vorabveröffentlichung · {str(release_date)[:10]}")
+        self.prerelease_chip.setText(
+            f"Vorabveröffentlichung · {localized_date(release_date)}"
+        )
         self.prerelease_chip.setStyleSheet(
             "QLabel#prereleaseChip { color: #ffffff; background: #6f42c1;"
             " border-radius: 8px; padding: 2px 10px; font-size: 11px;"

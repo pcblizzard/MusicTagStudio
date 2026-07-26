@@ -1,5 +1,14 @@
 # MusicTagStudio 0.8.6-alpha25
 
+## Vorab-Feinschliff: lokale Titel und lokalisiertes Datum
+
+- Liefert der Anbieter für eine Vorabveröffentlichung einen Platzhalter
+  („Track 11") und liegt die Datei **lokal** vor, zeigt die Trackliste jetzt
+  den echten lokalen Titel und die Dauer statt des Platzhalters.
+- Das Datum im „Vorabveröffentlichung"-Chip und im Direkt-Album-Dialog wird
+  gemäß **Systemsprache** formatiert (deutsch z. B. „01.10.2026" statt
+  „2026-10-01").
+
 ## Vorabveröffentlichungen erkennen
 
 - Liegt bei Apple Music ein **tagesgenaues Veröffentlichungsdatum in der
