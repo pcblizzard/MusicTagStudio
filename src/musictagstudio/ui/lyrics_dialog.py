@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..i18n import tr
 from ..lyrics import (
     LyricsDocument,
     LyricsRequest,
@@ -65,8 +66,10 @@ class LyricsDialog(QDialog):
         *,
         resolver: LyricsResolver | None = None,
         player_engine=None,
+        language: str = "automatic",
     ) -> None:
         super().__init__(parent)
+        self.language = language
         self.song = song
         self.resolver = resolver or LyricsResolver()
         self.player_engine = player_engine
@@ -90,35 +93,43 @@ class LyricsDialog(QDialog):
             and self.request.duration > 0
         )
 
-        self.setWindowTitle(f"Lyrics · {song.title or 'Unbekannter Titel'}")
+        unknown_title = tr("unknown_title", language)
+        self.setWindowTitle(
+            tr("lyrics_dialog_title", language, title=song.title or unknown_title)
+        )
         self.resize(780, 680)
         layout = QVBoxLayout(self)
 
-        title = QLabel(song.title or "Unbekannter Titel")
+        title = QLabel(song.title or unknown_title)
         title.setObjectName("lyricsTitle")
         title.setStyleSheet("font-size: 19px; font-weight: 600;")
         layout.addWidget(title)
-        layout.addWidget(QLabel(f"{song.artist or 'Unbekannter Künstler'} · {song.album or 'Ohne Album'}"))
+        layout.addWidget(QLabel(tr(
+            "song_meta_line",
+            language,
+            artist=song.artist or tr("unknown_artist", language),
+            album=song.album or tr("no_album", language),
+        )))
 
         source_row = QHBoxLayout()
-        source_row.addWidget(QLabel("Quelle:"))
+        source_row.addWidget(QLabel(tr("source_colon", language)))
         self.source_combo = QComboBox()
-        self.source_combo.setAccessibleName("Lyrics-Quelle")
+        self.source_combo.setAccessibleName(tr("lyrics_source_acc", language))
         self.source_combo.currentIndexChanged.connect(self._source_changed)
         source_row.addWidget(self.source_combo, stretch=1)
-        self.timestamps_checkbox = QCheckBox("Zeitmarken anzeigen")
+        self.timestamps_checkbox = QCheckBox(tr("show_timestamps", language))
         self.timestamps_checkbox.setToolTip(
-            "Zeigt bei synchronisierten Lyrics die LRC-Zeitmarken an."
+            tr("show_timestamps_tip", language)
         )
         self.timestamps_checkbox.toggled.connect(self._refresh_display)
         self.timestamps_checkbox.setEnabled(False)
         source_row.addWidget(self.timestamps_checkbox)
-        source_row.addWidget(QLabel("Ansicht:"))
+        source_row.addWidget(QLabel(tr("view", language)))
         self.view_combo = QComboBox()
-        self.view_combo.addItems(["Textansicht", "Karaoke"])
-        self.view_combo.setAccessibleName("Lyrics-Ansicht")
+        self.view_combo.addItems([tr("view_text", language), tr("view_karaoke", language)])
+        self.view_combo.setAccessibleName(tr("lyrics_view_acc", language))
         self.view_combo.setToolTip(
-            "Karaoke hebt synchronisierte Zeilen passend zur Wiedergabe hervor."
+            tr("karaoke_tip", language)
         )
         self.view_combo.currentIndexChanged.connect(self._view_changed)
         source_row.addWidget(self.view_combo)
@@ -141,29 +152,29 @@ class LyricsDialog(QDialog):
         self.lyrics_text = QPlainTextEdit()
         self.lyrics_text.setObjectName("lyricsDisplay")
         self.lyrics_text.setReadOnly(True)
-        self.lyrics_text.setAccessibleName("Liedtext")
-        self.lyrics_text.setPlaceholderText("Keine Lyrics aus lokalen Quellen gefunden.")
+        self.lyrics_text.setAccessibleName(tr("lyrics_display_acc", language))
+        self.lyrics_text.setPlaceholderText(tr("no_local_lyrics", language))
         layout.addWidget(self.lyrics_text, stretch=1)
 
         actions = QHBoxLayout()
-        self.cached_button = QPushButton("LRCLIB prüfen")
+        self.cached_button = QPushButton(tr("check_lrclib", language))
         self.cached_button.setToolTip(
-            "Fragt nur bereits bei LRCLIB gespeicherte Lyrics ab."
+            tr("check_lrclib_tip", language)
         )
         self.cached_button.clicked.connect(lambda: self._load_online(live=False))
         actions.addWidget(self.cached_button)
-        self.live_button = QPushButton("LRCLIB live suchen")
+        self.live_button = QPushButton(tr("lrclib_live_search", language))
         self.live_button.setToolTip(
-            "Bewusste Live-Abfrage; LRCLIB kann dafür weitere externe Quellen prüfen."
+            tr("lrclib_live_tip", language)
         )
         self.live_button.clicked.connect(lambda: self._load_online(live=True))
         actions.addWidget(self.live_button)
         actions.addStretch()
-        self.save_button = QPushButton("Als LRC speichern")
+        self.save_button = QPushButton(tr("save_as_lrc", language))
         self.save_button.clicked.connect(self._save_selected)
         self.save_button.setEnabled(False)
         actions.addWidget(self.save_button)
-        self.embed_button = QPushButton("In Audiodatei einbetten …")
+        self.embed_button = QPushButton(tr("embed_in_audio", language))
         self.embed_button.clicked.connect(self._preview_embedding)
         self.embed_button.setEnabled(False)
         actions.addWidget(self.embed_button)
@@ -175,8 +186,7 @@ class LyricsDialog(QDialog):
         layout.addWidget(self.status_label)
         if not self._lrclib_ready:
             self._set_status(
-                "LRCLIB benötigt Titel, Künstler, Album und eine lesbare Titeldauer. "
-                "Lokale Lyrics können weiterhin verwendet werden.",
+                tr("lrclib_incomplete", language),
                 "incomplete",
             )
             self.cached_button.setEnabled(False)
@@ -199,7 +209,7 @@ class LyricsDialog(QDialog):
         self._apply_resolution(self.resolver.local(self.request))
         if not self.documents and self._lrclib_ready:
             self._set_status(
-                "Keine lokalen Lyrics gefunden. LRCLIB wurde noch nicht abgefragt.",
+                tr("no_local_lyrics_hint", self.language),
                 "info",
             )
 
@@ -208,11 +218,15 @@ class LyricsDialog(QDialog):
         self.source_combo.blockSignals(True)
         self.source_combo.clear()
         for document in self.documents:
-            kind = "synchronisiert" if document.is_synced else "unsynchronisiert"
+            kind = (
+                tr("kind_synced", self.language)
+                if document.is_synced
+                else tr("kind_unsynced", self.language)
+            )
             if document.instrumental:
-                kind = "Instrumental"
+                kind = tr("kind_instrumental", self.language)
             self.source_combo.addItem(
-                f"{_source_display_name(document)} · {kind}"
+                f"{_source_display_name(document, self.language)} · {kind}"
             )
         self.source_combo.blockSignals(False)
         if resolution.selected in self.documents:
@@ -245,7 +259,7 @@ class LyricsDialog(QDialog):
     ) -> None:
         if document is None:
             self.lyrics_text.clear()
-            self.source_details.setText("Keine lokale Quelle vorhanden")
+            self.source_details.setText(tr("no_local_source", self.language))
             self.timestamps_checkbox.setChecked(False)
             self.timestamps_checkbox.setEnabled(False)
             self.save_button.setEnabled(False)
@@ -269,11 +283,15 @@ class LyricsDialog(QDialog):
             self.view_combo.setCurrentIndex(1 if wanted_karaoke else 0)
             self.view_combo.blockSignals(False)
             self._render_document(document)
-            details = [_source_display_name(document)]
+            details = [_source_display_name(document, self.language)]
             if document.provider_id:
-                details.append(f"ID {document.provider_id}")
+                details.append(tr("source_id", self.language, id=document.provider_id))
             if document.fetched_at:
-                details.append(f"abgerufen {_format_fetched_at(document.fetched_at)}")
+                details.append(tr(
+                    "fetched_at",
+                    self.language,
+                    when=_format_fetched_at(document.fetched_at),
+                ))
             self.source_details.setText(" · ".join(details))
             self.save_button.setEnabled(not document.is_empty)
             plan = build_embedding_plan(self.song.path, document)
@@ -283,7 +301,7 @@ class LyricsDialog(QDialog):
                 and Path(self.song.path).is_file()
             )
             self.embed_button.setToolTip(
-                f"Unterstütztes Zielformat: {plan.format_name}"
+                tr("target_format", self.language, format=plan.format_name)
                 if plan.supported
                 else plan.warning
             )
@@ -390,9 +408,9 @@ class LyricsDialog(QDialog):
             return
         self._set_loading(True)
         self._set_status(
-            "LRCLIB wird live durchsucht …"
+            tr("lrclib_live_running", self.language)
             if live
-            else "LRCLIB-Cache wird geprüft …",
+            else tr("lrclib_cache_checking", self.language),
             "loading",
         )
         worker = LyricsWorker(self.resolver.online, self.request, live=live)
@@ -408,7 +426,7 @@ class LyricsDialog(QDialog):
             return
         self._set_loading(False)
         self._set_status(
-            "Lyrics wurden geladen und lokal zwischengespeichert.",
+            tr("lyrics_loaded_cached", self.language),
             "success",
         )
         self._apply_resolution(resolution)
@@ -426,10 +444,10 @@ class LyricsDialog(QDialog):
                 "keinen liedtext",
             )
         ):
-            text = "Bei LRCLIB wurden für diesen Titel keine passenden Lyrics gefunden."
+            text = tr("lrclib_no_match", self.language)
             kind = "not_found"
         elif "nicht erreichbar" in lowered or "timeout" in lowered:
-            text = "LRCLIB ist momentan nicht erreichbar. Lokale Lyrics bleiben verfügbar."
+            text = tr("lrclib_offline", self.language)
             kind = "offline"
         else:
             text = message
@@ -451,9 +469,11 @@ class LyricsDialog(QDialog):
         try:
             destination = save_sidecar(self.song.path, document)
         except (OSError, ValueError) as error:
-            QMessageBox.warning(self, "Lyrics speichern", str(error))
+            QMessageBox.warning(self, tr("save_lyrics_title", self.language), str(error))
             return
-        self._set_status(f"LRC-Datei gespeichert: {destination}", "success")
+        self._set_status(
+            tr("lrc_saved", self.language, path=destination), "success"
+        )
         self._apply_resolution(self.resolver.local(self.request))
 
     def _preview_embedding(self) -> None:
@@ -462,24 +482,28 @@ class LyricsDialog(QDialog):
             return
         if not Path(self.song.path).is_file():
             self._set_status(
-                "Die Audiodatei ist momentan nicht erreichbar und kann nicht geändert werden.",
+                tr("audio_unreachable_edit", self.language),
                 "offline",
             )
             return
         plan = build_embedding_plan(self.song.path, document)
         if not plan.supported:
-            QMessageBox.warning(self, "Lyrics einbetten", plan.warning)
+            QMessageBox.warning(
+                self, tr("embed_lyrics_title", self.language), plan.warning
+            )
             return
-        preview = LyricsEmbedPreviewDialog(plan, document, self)
+        preview = LyricsEmbedPreviewDialog(plan, document, self, language=self.language)
         if preview.exec() != QDialog.DialogCode.Accepted:
             return
         try:
             embed_lyrics(self.song.path, document, confirmed=True)
         except Exception as error:
-            QMessageBox.critical(self, "Lyrics einbetten", str(error))
+            QMessageBox.critical(
+                self, tr("embed_lyrics_title", self.language), str(error)
+            )
             return
         self._set_status(
-            f"Lyrics wurden bestätigt in {plan.format_name} eingebettet.",
+            tr("lyrics_embedded", self.language, format=plan.format_name),
             "success",
         )
         self._apply_resolution(self.resolver.local(self.request))
@@ -528,14 +552,20 @@ class LyricsEmbedPreviewDialog(QDialog):
         plan,
         document: LyricsDocument,
         parent=None,
+        *,
+        language: str = "automatic",
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Lyrics-Einbettung bestätigen")
+        self.setWindowTitle(tr("embed_confirm_title", language))
         self.resize(900, 620)
         layout = QVBoxLayout(self)
         summary = QLabel(
-            f"Format: {plan.format_name} · "
-            f"Vorhandene eingebettete Varianten: {len(plan.existing)}"
+            tr(
+                "embed_summary",
+                language,
+                format=plan.format_name,
+                count=len(plan.existing),
+            )
         )
         summary.setWordWrap(True)
         layout.addWidget(summary)
@@ -549,7 +579,7 @@ class LyricsEmbedPreviewDialog(QDialog):
 
         comparison = QHBoxLayout()
         before_layout = QVBoxLayout()
-        before_layout.addWidget(QLabel("Derzeit eingebettet"))
+        before_layout.addWidget(QLabel(tr("currently_embedded", language)))
         before = QPlainTextEdit()
         before.setReadOnly(True)
         before.setPlainText(
@@ -557,13 +587,13 @@ class LyricsEmbedPreviewDialog(QDialog):
                 f"--- {item.source} ---\n{item.display_text()}"
                 for item in plan.existing
             )
-            or "Keine eingebetteten Lyrics vorhanden."
+            or tr("no_embedded_lyrics", language)
         )
         before_layout.addWidget(before)
         comparison.addLayout(before_layout, stretch=1)
 
         after_layout = QVBoxLayout()
-        after_layout.addWidget(QLabel("Wird eingebettet"))
+        after_layout.addWidget(QLabel(tr("will_be_embedded", language)))
         after = QPlainTextEdit()
         after.setReadOnly(True)
         after.setPlainText(document.display_text())
@@ -572,8 +602,7 @@ class LyricsEmbedPreviewDialog(QDialog):
         layout.addLayout(comparison, stretch=1)
 
         note = QLabel(
-            "Bestehende eingebettete Lyrics werden ersetzt. Andere Metadaten "
-            "und eine vorhandene LRC-Datei bleiben unverändert."
+            tr("embed_note", language)
         )
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -582,22 +611,22 @@ class LyricsEmbedPreviewDialog(QDialog):
             | QDialogButtonBox.StandardButton.Save
         )
         buttons.button(QDialogButtonBox.StandardButton.Save).setText(
-            "Bestätigt einbetten"
+            tr("embed_confirmed_btn", language)
         )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
 
-def _source_display_name(document: LyricsDocument) -> str:
+def _source_display_name(document: LyricsDocument, language: str = "automatic") -> str:
     source = document.source
     if source == "LRC-Datei":
-        return "📄 Lokale LRC-Datei"
+        return tr("lrc_local_file", language)
     if source.startswith("Eingebettete Lyrics"):
         return "🎵 " + source
     if source == "LRCLIB":
-        return "☁ LRCLIB · lokal zwischengespeichert"
-    return source or "Unbekannte Quelle"
+        return tr("lrclib_cached_source", language)
+    return source or tr("unknown_source", language)
 
 
 def _format_fetched_at(value: str) -> str:

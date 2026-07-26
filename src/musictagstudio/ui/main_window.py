@@ -1425,6 +1425,7 @@ class MainWindow(QMainWindow):
             self.songs[rows[0]],
             self,
             player_engine=self.player_bar.engine,
+            language=self.language,
         )
         dialog.exec()
 

@@ -10,7 +10,8 @@ def test_lyrics_dialog_requires_preview_before_embedding():
         / "lyrics_dialog.py"
     ).read_text(encoding="utf-8")
 
-    assert 'QPushButton("In Audiodatei einbetten …")' in source
+    # Einbetten-Button ist jetzt i18n-basiert (tr("embed_in_audio")).
+    assert 'tr("embed_in_audio", language)' in source
     assert "LyricsEmbedPreviewDialog" in source
     assert "Bestehende eingebettete Lyrics werden ersetzt" in source
     assert "confirmed=True" in source
