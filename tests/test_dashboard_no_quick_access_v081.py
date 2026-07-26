@@ -7,4 +7,5 @@ def test_dashboard_has_no_duplicate_quick_access():
         / "src" / "musictagstudio" / "ui" / "dashboard_widget.py"
     ).read_text(encoding="utf-8")
     assert '"Schnellzugriff"' not in text
-    assert '"Musikquelle hinzufügen …"' in text
+    # "Musikquelle hinzufuegen" ist jetzt i18n-basiert (tr("add_music_source")).
+    assert 'tr("add_music_source"' in text

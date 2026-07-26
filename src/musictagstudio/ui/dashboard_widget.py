@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
 from ..library_sources import IndexedAlbum, MusicSource
 
 
@@ -21,10 +22,13 @@ class DashboardWidget(QWidget):
     def __init__(
         self,
         parent=None,
+        *,
+        language: str = "automatic",
     ) -> None:
         super().__init__(
             parent
         )
+        self.language = language
         self._build_ui()
 
     def _build_ui(
@@ -44,7 +48,7 @@ class DashboardWidget(QWidget):
         )
 
         title = QLabel(
-            "Willkommen bei MusicTagStudio"
+            tr("welcome", self.language)
         )
         title.setStyleSheet(
             "font-size: 25px; font-weight: 700;"
@@ -54,8 +58,7 @@ class DashboardWidget(QWidget):
         )
 
         subtitle = QLabel(
-            "Bibliothek verwalten, Metadaten bearbeiten "
-            "und die Sammlung prüfen."
+            tr("dashboard_subtitle", self.language)
         )
         subtitle.setStyleSheet(
             "font-size: 11pt; color: palette(mid);"
@@ -74,25 +77,25 @@ class DashboardWidget(QWidget):
         self.album_value = self._add_card(
             0,
             0,
-            "Alben",
+            tr("albums", self.language),
             "0",
         )
         self.artist_value = self._add_card(
             0,
             1,
-            "Künstler",
+            tr("artists", self.language),
             "0",
         )
         self.track_value = self._add_card(
             0,
             2,
-            "Indizierte Titel",
+            tr("indexed_tracks", self.language),
             "0",
         )
         self.source_value = self._add_card(
             0,
             3,
-            "Musikquellen",
+            tr("music_sources", self.language),
             "0",
         )
         root.addLayout(
@@ -116,7 +119,7 @@ class DashboardWidget(QWidget):
             status_box
         )
         status_title = QLabel(
-            "Quellenstatus"
+            tr("source_status", self.language)
         )
         status_title.setStyleSheet(
             "font-size: 13pt; font-weight: 650;"
@@ -125,7 +128,7 @@ class DashboardWidget(QWidget):
             status_title
         )
         self.source_status = QLabel(
-            "Noch keine Musikquellen eingerichtet."
+            tr("no_sources_configured", self.language)
         )
         self.source_status.setWordWrap(
             True
@@ -138,7 +141,7 @@ class DashboardWidget(QWidget):
         )
 
         self.add_source_button = QPushButton(
-            "Musikquelle hinzufügen …"
+            tr("add_music_source", self.language)
         )
         self.add_source_button.clicked.connect(
             lambda: self.open_workspace.emit(4)
@@ -149,7 +152,7 @@ class DashboardWidget(QWidget):
         )
 
         self.refresh_button = QPushButton(
-            "Bibliotheksdaten aktualisieren"
+            tr("refresh_library", self.language)
         )
         self.refresh_button.clicked.connect(
             self.refresh_requested.emit
@@ -261,25 +264,27 @@ class DashboardWidget(QWidget):
 
         if online:
             lines.append(
-                "Erreichbar: "
-                + ", ".join(
-                    source.name
-                    for source in online
+                tr(
+                    "reachable",
+                    self.language,
+                    names=", ".join(source.name for source in online),
                 )
             )
 
         if offline:
             lines.append(
-                "Nicht erreichbar: "
-                + ", ".join(
-                    f"{source.name} ({source.path})"
-                    for source in offline
+                tr(
+                    "unreachable",
+                    self.language,
+                    sources=", ".join(
+                        f"{source.name} ({source.path})" for source in offline
+                    ),
                 )
             )
 
         if not lines:
             lines.append(
-                "Noch keine aktive Musikquelle eingerichtet."
+                tr("no_source", self.language)
             )
         self.add_source_button.setVisible(
             not bool(sources)

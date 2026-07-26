@@ -32,11 +32,12 @@ def test_dashboard_has_library_metrics():
         encoding="utf-8"
     )
 
+    # Kennzahlen-Karten sind i18n-basiert (tr-Keys).
     for label in (
-        '"Alben"',
-        '"Künstler"',
-        '"Indizierte Titel"',
-        '"Musikquellen"',
+        '"albums"',
+        '"artists"',
+        '"indexed_tracks"',
+        '"music_sources"',
     ):
         assert label in dashboard
 

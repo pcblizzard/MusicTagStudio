@@ -9,10 +9,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..i18n import tr, tr_plural
+
 
 def _summary_text(
     changes: list[tuple[str, str, str, str]],
     file_count: int | None,
+    language: str = "automatic",
 ) -> str:
     """Beschreibt Feldänderungen und die Zahl betroffener Titel eindeutig."""
     change_count = len(changes)
@@ -20,14 +23,8 @@ def _summary_text(
     if file_count is None:
         file_count = len({subject for subject, _f, _b, _a in changes})
 
-    changes_word = "Änderung" if change_count == 1 else "Änderungen"
-    titles_word = "Titel" if file_count == 1 else "Titeln"
-    verb = "wird" if change_count == 1 else "werden"
-
-    return (
-        f"{change_count} {changes_word} an {file_count} "
-        f"{titles_word} {verb} geschrieben."
-    )
+    titles = tr_plural("preview_titles", file_count, language)
+    return tr_plural("preview_write", change_count, language, titles=titles)
 
 
 class ChangePreviewDialog(QDialog):
@@ -39,12 +36,13 @@ class ChangePreviewDialog(QDialog):
         parent=None,
         *,
         file_count: int | None = None,
+        language: str = "automatic",
     ) -> None:
         super().__init__(
             parent
         )
         self.setWindowTitle(
-            "Änderungsvorschau"
+            tr("change_preview_title", language)
         )
         self.resize(
             950,
@@ -56,7 +54,7 @@ class ChangePreviewDialog(QDialog):
         )
         layout.addWidget(
             QLabel(
-                _summary_text(changes, file_count)
+                _summary_text(changes, file_count, language)
             )
         )
 
@@ -66,10 +64,10 @@ class ChangePreviewDialog(QDialog):
         )
         table.setHorizontalHeaderLabels(
             [
-                "Datei/Titel",
-                "Feld",
-                "Vorher",
-                "Nachher",
+                tr("col_file_title", language),
+                tr("col_field", language),
+                tr("col_before", language),
+                tr("col_after", language),
             ]
         )
 
@@ -107,7 +105,7 @@ class ChangePreviewDialog(QDialog):
         buttons.button(
             QDialogButtonBox.StandardButton.Save
         ).setText(
-            "Änderungen schreiben"
+            tr("write_changes", language)
         )
         buttons.accepted.connect(
             self.accept

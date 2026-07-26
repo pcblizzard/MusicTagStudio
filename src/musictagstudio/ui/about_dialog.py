@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from .. import __version__
 from ..diagnostics import project_root
+from ..i18n import tr
 from ..settings import load_settings
 
 
@@ -39,9 +40,10 @@ PUBLIC_INTERFACES = (
 
 
 class AboutDialog(QDialog):
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, *, language: str = "automatic") -> None:
         super().__init__(parent)
-        self.setWindowTitle("Über MusicTagStudio")
+        self.language = language
+        self.setWindowTitle(tr("about_window_title", language))
         self.resize(660, 570)
 
         layout = QVBoxLayout(self)
@@ -49,16 +51,16 @@ class AboutDialog(QDialog):
         layout.addWidget(heading)
 
         self.tabs = QTabWidget()
-        self.about_browser = _browser(about_html())
-        self.contributors_browser = _browser(contributors_html())
+        self.about_browser = _browser(about_html(language))
+        self.contributors_browser = _browser(contributors_html(language))
         self.debug_browser = _browser(f"<pre>{_escape_html(debug_information())}</pre>")
-        self.tabs.addTab(self.about_browser, "Über")
-        self.tabs.addTab(self.contributors_browser, "Mitwirkende")
-        self.tabs.addTab(self.debug_browser, "Debug-Info")
+        self.tabs.addTab(self.about_browser, tr("tab_about", language))
+        self.tabs.addTab(self.contributors_browser, tr("tab_contributors", language))
+        self.tabs.addTab(self.debug_browser, tr("tab_debug", language))
         layout.addWidget(self.tabs, 1)
 
         button_row = QHBoxLayout()
-        self.copy_button = QPushButton("Debug-Info in die Zwischenablage kopieren")
+        self.copy_button = QPushButton(tr("copy_debug", language))
         self.copy_button.clicked.connect(self.copy_debug_information)
         button_row.addWidget(self.copy_button)
         button_row.addStretch(1)
@@ -70,36 +72,22 @@ class AboutDialog(QDialog):
     def copy_debug_information(self) -> None:
         clipboard = QApplication.clipboard()
         clipboard.setText(debug_information())
-        self.copy_button.setText("Debug-Info wurde kopiert")
+        self.copy_button.setText(tr("copy_debug_done", self.language))
 
 
-def about_html() -> str:
+def about_html(language: str = "automatic") -> str:
     interfaces = "".join(f"<li>{item}</li>" for item in PUBLIC_INTERFACES)
-    license_text = _license_description()
-    return (
-        "<p><b>MusicTagStudio</b> ist ein lokaler Metadaten-Editor, "
-        "Musikkatalog und Audiowerkzeug für Windows.</p>"
-        '<p>Projektseite: <a href="https://github.com/pcblizzard/'
-        'MusicTagStudio">github.com/pcblizzard/MusicTagStudio</a></p>'
-        f"<p><b>Version:</b> {__version__}<br>"
-        f"<b>Lizenz:</b> {license_text}<br>"
-        "<b>Copyright:</b> © 2026 Michael (pcblizzard)</p>"
-        "<p><b>Verwendete Programmschnittstellen:</b></p>"
-        f"<ul>{interfaces}</ul>"
-        "<p>Die Verfügbarkeit einzelner Schnittstellen hängt von den "
-        "Einstellungen, Zugangsdaten und dem jeweiligen Anbieter ab.</p>"
+    return tr(
+        "about_intro_html",
+        language,
+        version=__version__,
+        license=_license_description(),
+        interfaces=interfaces,
     )
 
 
-def contributors_html() -> str:
-    return (
-        "<h2>Mitwirkende</h2>"
-        '<p><b>Michael / <a href="https://github.com/pcblizzard">'
-        "pcblizzard</a></b><br>"
-        "Projektidee, Entwicklung, Tests und Pflege</p>"
-        '<p><a href="https://github.com/pcblizzard/MusicTagStudio/'
-        'graphs/contributors">Mitwirkende auf GitHub anzeigen</a></p>'
-    )
+def contributors_html(language: str = "automatic") -> str:
+    return tr("contributors_html", language)
 
 
 def debug_information() -> str:

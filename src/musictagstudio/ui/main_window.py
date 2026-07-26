@@ -677,7 +677,8 @@ class MainWindow(QMainWindow):
         )
 
         self.dashboard_workspace = DashboardWidget(
-            self
+            self,
+            language=self.language,
         )
         self.dashboard_workspace.open_workspace.connect(
             self.switch_workspace
@@ -1198,7 +1199,7 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self.show_about_dialog)
 
     def show_about_dialog(self) -> None:
-        AboutDialog(self).exec()
+        AboutDialog(self, language=self.language).exec()
 
     def _selected_album_artist(
         self,
@@ -1662,6 +1663,7 @@ class MainWindow(QMainWindow):
                 changes,
                 self,
                 file_count=len(changed_rows),
+                language=self.language,
             ).exec()
             == ChangePreviewDialog.DialogCode.Accepted
         )
