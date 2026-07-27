@@ -1,5 +1,19 @@
 # MusicTagStudio 0.8.6-alpha26
 
+## Dateien nach Schema umbenennen
+
+- Neue Aktion **Bearbeiten → Dateien umbenennen …** benennt die geladenen
+  Dateien nach einem konfigurierbaren Muster um (Einstellung
+  **Darstellung/Umbenennen → Namensschema**, Platzhalter u. a. `{track}`,
+  `{title}`, `{artist}`, `{album}`, `{disc}`, `{year}`). Track-/Disc-Nummern
+  werden zweistellig aufgefüllt, verbotene Zeichen ersetzt, die Dateiendung
+  bleibt erhalten.
+- Vor dem Umbenennen zeigt die bekannte **Alt→Neu-Vorschau**; erst nach
+  Bestätigung wird umbenannt. Kollisionen innerhalb der Auswahl und bereits
+  vorhandene Zieldateien werden erkannt und übersprungen.
+- Die Umbenennung ist wie Tag-Änderungen **rückgängig und wiederholbar**
+  (gemeinsamer Verlauf).
+
 ## Einstellbare Textgröße
 
 - Neue Einstellung **Darstellung → Textgröße** (Klein · Normal · Groß · Sehr
