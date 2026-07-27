@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
@@ -45,12 +47,41 @@ def apply_font_scale(
 
     font.setPointSizeF(base * factor)
     app.setFont(font)
+    app.setProperty("fontScale", factor)
+
+
+def _clamp_font_scale(scale: float) -> float:
+    try:
+        factor = float(scale)
+    except (TypeError, ValueError):
+        return 1.0
+    return max(0.8, min(factor, 1.6))
+
+
+_FONT_SIZE_RE = re.compile(r"(font-size:\s*)([\d.]+)(pt|px)")
+
+
+def _scale_stylesheet_fonts(qss: str, scale: float) -> str:
+    """Skaliert alle `font-size`-Angaben im QSS mit dem Faktor.
+
+    Notwendig, weil ein QSS-`font-size` die App-Schrift ueberschreibt; ohne
+    diese Anpassung bliebe die Textgroesse trotz geaenderter App-Schrift gleich.
+    """
+    if abs(scale - 1.0) < 1e-3:
+        return qss
+
+    def _replace(match: re.Match[str]) -> str:
+        value = float(match.group(2)) * scale
+        return f"{match.group(1)}{value:.1f}{match.group(3)}"
+
+    return _FONT_SIZE_RE.sub(_replace, qss)
 
 
 def apply_theme(
     app: QApplication,
     mode: str,
     style: str = "standard",
+    font_scale: float = 1.0,
 ) -> None:
     resolved_mode = _resolve_theme_mode(
         app,
@@ -61,6 +92,7 @@ def apply_theme(
         if style in {"standard", "apple"}
         else "standard"
     )
+    factor = _clamp_font_scale(font_scale)
     app.setStyle("Fusion")
     app.setProperty("themeStyle", resolved_style)
 
@@ -72,12 +104,10 @@ def apply_theme(
                 else _dark_palette()
             )
         )
-        app.setStyleSheet(
-            (
-                _apple_dark_stylesheet()
-                if resolved_style == "apple"
-                else _dark_stylesheet()
-            )
+        stylesheet = (
+            _apple_dark_stylesheet()
+            if resolved_style == "apple"
+            else _dark_stylesheet()
         )
     else:
         app.setPalette(
@@ -87,13 +117,15 @@ def apply_theme(
                 else _light_palette()
             )
         )
-        app.setStyleSheet(
-            (
-                _apple_light_stylesheet()
-                if resolved_style == "apple"
-                else _light_stylesheet()
-            )
+        stylesheet = (
+            _apple_light_stylesheet()
+            if resolved_style == "apple"
+            else _light_stylesheet()
         )
+
+    app.setStyleSheet(_scale_stylesheet_fonts(stylesheet, factor))
+    # App-Schrift ebenfalls skalieren, damit Widgets ohne QSS-font-size folgen.
+    apply_font_scale(app, factor)
 
 
 def _resolve_theme_mode(

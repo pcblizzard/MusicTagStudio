@@ -81,7 +81,6 @@ from ..theme import (
     BUTTON_NORMAL,
     INPUT_CHANGED,
     INPUT_NORMAL,
-    apply_font_scale,
     apply_theme,
 )
 from ..batch_comparison_logic import BatchSongProposal
@@ -955,14 +954,15 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
 
         if isinstance(app, QApplication):
+            # Theme + Schriftgroesse zusammen anwenden: apply_theme skaliert die
+            # font-size im Stylesheet mit, damit die Auswahl ohne Neustart
+            # sichtbar wird; Sidebar danach an die neue Schrift anpassen.
             apply_theme(
                 app,
                 new_settings.theme,
                 new_settings.theme_style,
+                new_settings.font_scale,
             )
-            # Schriftgroesse sofort anwenden, damit die Auswahl ohne Neustart
-            # sichtbar wird; Sidebar danach an die neue Schrift anpassen.
-            apply_font_scale(app, new_settings.font_scale)
             self._adjust_sidebar_width()
 
         self.load_configured_sources()
