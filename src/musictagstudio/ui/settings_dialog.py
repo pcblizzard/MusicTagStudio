@@ -596,6 +596,19 @@ class SettingsDialog(QDialog):
         self._update_feature_preview()
         layout.addWidget(normalization)
 
+        rename = QGroupBox(tr("rename_group", language))
+        rename_form = QFormLayout(rename)
+        self.rename_pattern_edit = QLineEdit(settings.rename_pattern)
+        self.rename_pattern_edit.setPlaceholderText("{track} - {title}")
+        rename_form.addRow(
+            tr("rename_pattern_label", language),
+            self.rename_pattern_edit,
+        )
+        rename_hint = QLabel(tr("rename_pattern_hint", language))
+        rename_hint.setWordWrap(True)
+        rename_form.addRow("", rename_hint)
+        layout.addWidget(rename)
+
         layout.addStretch()
 
         scroll_area.setWidget(content)
@@ -848,6 +861,9 @@ class SettingsDialog(QDialog):
             theme_style=str(self.theme_style_combo.currentData()),
             language=str(self.language_combo.currentData()),
             font_scale=float(self.font_scale_combo.currentData() or 1.0),
+            rename_pattern=(
+                self.rename_pattern_edit.text().strip() or "{track} - {title}"
+            ),
             selected_provider=provider,
             enrich_missing_fields=(self.enrich_checkbox.isChecked()),
             apple_country=str(self.country_combo.currentData()),

@@ -38,6 +38,8 @@ class AppSettings:
     language: str = "automatic"
     # Skaliert die App-Schrift zusaetzlich zur Windows-DPI-Skalierung.
     font_scale: float = 1.0
+    # Muster für die Datei-Umbenennung (Platzhalter wie {track}, {title}).
+    rename_pattern: str = "{track} - {title}"
     selected_provider: str = "apple_music"
     enrich_missing_fields: bool = True
     apple_country: str = "DE"
@@ -133,6 +135,7 @@ def load_settings(
         {},
     )
     network = data.get("network", {})
+    rename = data.get("rename", {})
 
     theme = str(
         appearance.get(
@@ -291,6 +294,10 @@ def load_settings(
         theme_style=theme_style,
         language=language,
         font_scale=font_scale,
+        rename_pattern=(
+            str(rename.get("pattern", "{track} - {title}")).strip()
+            or "{track} - {title}"
+        ),
         selected_provider=selected_provider,
         enrich_missing_fields=bool(
             providers.get(
@@ -501,6 +508,9 @@ def save_settings(
             f"{str(settings.apple_web_search_enabled).lower()}"
         ),
         f'preview_source = "{_toml_string(settings.preview_source)}"',
+        "",
+        "[rename]",
+        f'pattern = "{_toml_string(settings.rename_pattern)}"',
         "",
         "[library]",
         (f"load_sources_on_startup = {str(settings.load_sources_on_startup).lower()}"),
