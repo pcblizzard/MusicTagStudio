@@ -14,7 +14,10 @@ def _pin_automatic_language(monkeypatch):
     Viele UI-Tests prüfen den deutschen Anzeigetext. Ohne diese Fixierung
     haengt ``automatic`` am System-Locale der Maschine: lokal (DE) gruen, auf
     dem CI-Runner (EN) rot. Das Pinnen macht die Testsuite locale-unabhaengig.
-    Tests mit explizitem ``language=`` (z. B. "en") sind davon unberuehrt.
+    Tests mit explizitem ``language=`` (z. B. "en") sind davon unberuehrt. Die
+    tatsaechliche Locale-Erkennung wird separat geprueft (siehe
+    ``test_language_detection_v086a26.py``), damit diese Fixierung dort keine
+    echten Fehler verdecken kann.
     """
     monkeypatch.setattr(i18n, "system_language", lambda: "de")
 
