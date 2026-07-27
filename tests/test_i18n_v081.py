@@ -6,6 +6,12 @@ def test_required_languages_are_available():
     assert {"automatic", "de", "en", "es", "fr", "it", "pt_PT", "pt_BR"} <= codes
 
 
+def test_internal_locale_files_are_not_offered_as_languages():
+    # _review_*.json und .translation_usage.json sind Werkzeug-Dateien.
+    codes = {code for code, _label in SUPPORTED_LANGUAGES}
+    assert not any(code.startswith(("_", ".")) for code in codes)
+
+
 def test_save_button_is_localized():
     assert tr("save", "de") == "Speichern"
     assert tr("save", "en") == "Save"

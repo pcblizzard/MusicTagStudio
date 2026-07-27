@@ -30,6 +30,9 @@ def _load_translations() -> dict[str, dict[str, str]]:
     if not _LOCALES_DIR.is_dir():
         return catalogs
     for path in sorted(_LOCALES_DIR.glob("*.json")):
+        # Interne Dateien (Review-Konflikte, Usage-Report) sind keine Sprachen.
+        if path.name.startswith(("_", ".")):
+            continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (ValueError, OSError):

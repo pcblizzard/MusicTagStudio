@@ -705,7 +705,7 @@ class MainWindow(QMainWindow):
             """
         )
         sidebar.setFixedWidth(
-            168
+            196
         )
         sidebar_layout = QVBoxLayout(
             sidebar
