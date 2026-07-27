@@ -14,7 +14,7 @@ from .diagnostics import (
     log_application_stop,
 )
 from .settings import apply_request_intervals, load_settings
-from .theme import apply_theme
+from .theme import apply_font_scale, apply_theme
 from .ui.main_window import MainWindow
 
 
@@ -96,6 +96,7 @@ def main():
             settings.theme,
             settings.theme_style,
         )
+        apply_font_scale(app, settings.font_scale)
         logger.info("Theme angewendet")
 
         app.styleHints().colorSchemeChanged.connect(refresh_automatic_theme)

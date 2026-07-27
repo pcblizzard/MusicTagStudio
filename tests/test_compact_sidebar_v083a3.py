@@ -10,6 +10,8 @@ def test_sidebar_and_workspace_buttons_are_compact():
         / "main_window.py"
     ).read_text(encoding="utf-8")
 
-    assert "sidebar.setFixedWidth(\n            168" in source
+    # Die Sidebar-Breite wird jetzt adaptiv aus der Textbreite berechnet
+    # (Sprache + Schriftgroesse), mit kompaktem Minimum statt fester Zahl.
+    assert "sidebar.setFixedWidth(max(180, widest_text + 78))" in source
     assert "button.setMinimumHeight(\n                34" in source
     assert "sidebar_layout.setContentsMargins(\n            8," in source

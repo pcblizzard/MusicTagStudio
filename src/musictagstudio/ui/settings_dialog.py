@@ -158,6 +158,24 @@ class SettingsDialog(QDialog):
             tr("language", language),
             self.language_combo,
         )
+
+        self.font_scale_combo = QComboBox()
+        for label_key, value in (
+            ("text_size_small", 0.85),
+            ("text_size_normal", 1.0),
+            ("text_size_large", 1.15),
+            ("text_size_xlarge", 1.3),
+            ("text_size_xxlarge", 1.5),
+        ):
+            self.font_scale_combo.addItem(tr(label_key, language), value)
+        self._set_combo_value(
+            self.font_scale_combo,
+            self._closest_font_scale(settings.font_scale),
+        )
+        appearance_form.addRow(
+            tr("text_size", language),
+            self.font_scale_combo,
+        )
         layout.addWidget(appearance)
 
         library = QGroupBox(tr("music_sources", language))
@@ -829,6 +847,7 @@ class SettingsDialog(QDialog):
             theme=str(self.theme_combo.currentData()),
             theme_style=str(self.theme_style_combo.currentData()),
             language=str(self.language_combo.currentData()),
+            font_scale=float(self.font_scale_combo.currentData() or 1.0),
             selected_provider=provider,
             enrich_missing_fields=(self.enrich_checkbox.isChecked()),
             apple_country=str(self.country_combo.currentData()),
@@ -1036,6 +1055,17 @@ class SettingsDialog(QDialog):
         if last_success:
             return tr("last_checked_success", self.language, when=last_success)
         return tr("not_checked_yet", self.language)
+
+    @staticmethod
+    def _closest_font_scale(value: float) -> float:
+        # Auf den naechstliegenden angebotenen Wert einrasten, damit ein
+        # (z. B. von Hand editierter) Zwischenwert die Auswahl nicht leer laesst.
+        options = (0.85, 1.0, 1.15, 1.3, 1.5)
+        try:
+            target = float(value)
+        except (TypeError, ValueError):
+            return 1.0
+        return min(options, key=lambda option: abs(option - target))
 
     @staticmethod
     def _set_combo_value(

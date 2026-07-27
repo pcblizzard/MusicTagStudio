@@ -36,6 +36,8 @@ class AppSettings:
     theme: ThemeMode = "automatic"
     theme_style: ThemeStyle = "standard"
     language: str = "automatic"
+    # Skaliert die App-Schrift zusaetzlich zur Windows-DPI-Skalierung.
+    font_scale: float = 1.0
     selected_provider: str = "apple_music"
     enrich_missing_fields: bool = True
     apple_country: str = "DE"
@@ -162,6 +164,13 @@ def load_settings(
     }:
         language = "automatic"
 
+    font_scale = _safe_float(
+        appearance.get("font_scale", 1.0),
+        default=1.0,
+        minimum=0.8,
+        maximum=1.6,
+    )
+
     if theme not in {
         "automatic",
         "light",
@@ -281,6 +290,7 @@ def load_settings(
         theme=theme,
         theme_style=theme_style,
         language=language,
+        font_scale=font_scale,
         selected_provider=selected_provider,
         enrich_missing_fields=bool(
             providers.get(
@@ -439,6 +449,7 @@ def save_settings(
         f'theme = "{settings.theme}"',
         f'style = "{settings.theme_style}"',
         f'language = "{settings.language}"',
+        f"font_scale = {settings.font_scale:.2f}",
         "",
         "[providers]",
         f'selected = "{settings.selected_provider}"',

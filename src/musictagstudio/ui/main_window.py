@@ -14,6 +14,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QAction,
     QCloseEvent,
+    QFontMetrics,
     QKeySequence,
     QPalette,
     QPixmap,
@@ -704,9 +705,6 @@ class MainWindow(QMainWindow):
             }
             """
         )
-        sidebar.setFixedWidth(
-            196
-        )
         sidebar_layout = QVBoxLayout(
             sidebar
         )
@@ -782,6 +780,17 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(
             self.lyrics_search_button
         )
+
+        # Sidebar-Breite an den laengsten Buttontext anpassen (Sprache + evtl.
+        # groessere Schrift), statt eine feste Pixelzahl zu erzwingen. So laeuft
+        # kein Label ueber und schmale Sprachen verschwenden keinen Platz.
+        metrics = QFontMetrics(self.lyrics_search_button.font())
+        nav_labels = [tr(name, self.language) for name, _index, _icon in workspace_pages]
+        nav_labels.append(tr("lyrics_search", self.language))
+        widest_text = max(metrics.horizontalAdvance(label) for label in nav_labels)
+        # Icon (18) + Icon-Abstand + linkes Padding (8) + Layout-Raender (2x8)
+        # + etwas Luft rechts, damit nichts an der Trennlinie klebt.
+        sidebar.setFixedWidth(max(180, widest_text + 78))
 
         sidebar_layout.addStretch()
 

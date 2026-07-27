@@ -19,6 +19,34 @@ BUTTON_NORMAL = "Änderungen speichern"
 BUTTON_CHANGED = "Änderungen speichern *"
 
 
+def apply_font_scale(
+    app: QApplication,
+    scale: float,
+) -> None:
+    """Skaliert die Standard-App-Schrift zusaetzlich zur DPI-Skalierung.
+
+    Basis ist die vom System gelieferte Schriftgroesse; wir merken sie uns
+    einmalig, damit wiederholtes Anwenden nicht kumuliert.
+    """
+    try:
+        factor = float(scale)
+    except (TypeError, ValueError):
+        factor = 1.0
+    factor = max(0.8, min(factor, 1.6))
+
+    font = app.font()
+    base = app.property("baseFontPointSizeF")
+    if not isinstance(base, float) or base <= 0:
+        base = font.pointSizeF()
+        if base <= 0:
+            # Kein punktbasierter Wert (Pixel-Font) -> nicht skalieren.
+            return
+        app.setProperty("baseFontPointSizeF", base)
+
+    font.setPointSizeF(base * factor)
+    app.setFont(font)
+
+
 def apply_theme(
     app: QApplication,
     mode: str,

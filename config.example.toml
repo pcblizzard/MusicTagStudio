@@ -2,6 +2,8 @@
 theme = "automatic"
 style = "standard"
 language = "automatic"
+# Zusaetzliche Schriftskalierung (0.8-1.6, 1.0 = Standard).
+font_scale = 1.0
 
 [providers]
 selected = "apple_music"
