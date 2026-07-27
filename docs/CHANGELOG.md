@@ -1,3 +1,33 @@
+# MusicTagStudio 0.8.6-alpha26
+
+## Einstellbare Textgröße
+
+- Neue Einstellung **Darstellung → Textgröße** (Klein · Normal · Groß · Sehr
+  groß · Maximal). Skaliert die App-Schrift zusätzlich zur Windows-DPI-
+  Skalierung und wirkt **sofort ohne Neustart** – inklusive der Texte im
+  Apple-Music-inspirierten Design, weil `apply_theme()` die `font-size`-Angaben
+  im Stylesheet mitskaliert.
+
+## Adaptive Seitenleiste
+
+- Die linke Navigation berechnet ihre Breite jetzt aus dem längsten Button-Text
+  (in der aktuellen Sprache **und** Schriftgröße), statt eine feste Pixelzahl zu
+  erzwingen. Lange Labels wie „Song über Text finden" werden nicht mehr
+  abgeschnitten; schmale Sprachen verschwenden keinen Platz.
+
+## Sprachauswahl bereinigt
+
+- Interne Werkzeug-Dateien (`_review_*.json`, `.translation_usage.json`) tauchen
+  nicht mehr fälschlich als wählbare Sprachen in den Einstellungen auf.
+
+## Testsuite locale-unabhängig
+
+- UI-Tests, die deutschen Anzeigetext prüfen, hingen zuvor über
+  „Automatisch (System)" am Locale des Rechners und schlugen auf englisch-
+  sprachigen CI-Runnern fehl. Eine Test-Fixierung macht die automatische
+  Sprachauflösung während der Tests deterministisch; der CI-Lauf ist damit
+  unabhängig vom Runner-Locale grün.
+
 # MusicTagStudio 0.8.6-alpha25
 
 ## i18n Phase 1 (Batch 2): Werkzeugleisten-Knöpfe übersetzbar

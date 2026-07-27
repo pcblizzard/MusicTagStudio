@@ -11,6 +11,9 @@ jobs:
   test:
     runs-on: windows-latest
     strategy:
+      # Beide Python-Versionen immer vollständig prüfen, statt bei der ersten
+      # fehlschlagenden Version die andere abzubrechen.
+      fail-fast: false
       matrix:
         # Ränder der unterstützten Spanne (requires-python >=3.12): Untergrenze
         # 3.12 und neueste 3.14. Die Mitte (3.13) liegt sicher dazwischen.
@@ -27,6 +30,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[dev]"
-      - run: python -m ruff check src tests
-      - run: python -m mypy
-      - run: python scripts/release_check.py
+      - name: Ruff (Lint)
+        run: python -m ruff check src tests
+      - name: Mypy (Typprüfung)
+        run: python -m mypy
+      - name: Compile Python sources
+        run: python -m compileall -q src
+      - name: Run tests
+        run: python -m pytest -q

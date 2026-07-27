@@ -46,3 +46,6 @@ Thumbs.db
 # Test-Scratch-Verzeichnis
 .codex-test-temp/
 .codex-test-settings/
+
+# Lokale KI-Assistent-Einstellungen (nur maschinenlokal)
+.claude/

@@ -6,7 +6,7 @@ MusicTagStudio ist ein Metadaten-Editor, Musikkatalog und lokaler Audioplayer
 für Windows. Die Anwendung verbindet lokale Audiodateien mit MusicBrainz,
 Discogs, Apple Music, Deezer, TheAudioDB, Cover Art Archive und LRCLIB.
 
-Aktueller Entwicklungsstand: **v0.8.6-alpha20**
+Aktueller Entwicklungsstand: **v0.8.6-alpha26**
 
 ## Funktionsumfang
 
