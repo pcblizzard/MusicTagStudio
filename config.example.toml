@@ -5,6 +5,16 @@ language = "automatic"
 # Zusaetzliche Schriftskalierung (0.8-1.6, 1.0 = Standard).
 font_scale = 1.0
 
+[rename]
+# Namensschema fuer die Datei-Umbenennung (Platzhalter: {track}, {title},
+# {artist}, {album_artist}, {album}, {disc}, {year}, {genre}).
+pattern = "{track} - {title}"
+
+[license]
+# Signierter Lizenzschluessel (schaltet Premium-Funktionen frei). Leer =
+# Basisversion. Nicht geheim; wirkt nur mit gueltiger Signatur.
+key = ""
+
 [providers]
 selected = "apple_music"
 enrich_missing_fields = true

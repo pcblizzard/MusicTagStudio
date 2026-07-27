@@ -49,3 +49,7 @@ Thumbs.db
 
 # Lokale KI-Assistent-Einstellungen (nur maschinenlokal)
 .claude/
+
+# Privater Lizenz-Signierschlüssel – NIEMALS committen (nur beim Anbieter).
+licensing_private_key.pem
+*.license.pem

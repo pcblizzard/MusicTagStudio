@@ -1,5 +1,22 @@
 # MusicTagStudio 0.8.6-alpha26
 
+## Premium-Lizenzierung (Feature-Gating, offline)
+
+- Grundgerüst für ein Demo-/Premium-Modell: bestimmte Funktionen lassen sich
+  hinter einen **Lizenzschlüssel** legen (zunächst die Datei-Umbenennung). Ohne
+  gültige Lizenz erscheint ein Hinweis statt der Funktion; die Basisversion
+  bleibt voll nutzbar.
+- Der Schlüssel wird unter **Einstellungen → Lizenz** eingetragen; der Status
+  („Premium aktiv" / „Basisversion") wird sofort angezeigt. Er ist **offline**
+  prüfbar: eine **Ed25519-Signatur** wird gegen den in der App hinterlegten
+  öffentlichen Schlüssel verifiziert – deterministisch, ohne Server, ohne
+  versehentliches Herabstufen bei fehlendem Internet.
+- Lizenzen erzeugt der Anbieter mit `scripts/make_license.py` und dem privaten
+  Signierschlüssel (nur lokal, nie ausgeliefert). Optionale Ein-Geräte-Bindung
+  über einen Maschinen-Fingerprint ist vorbereitet.
+- Ehrliche Grenze: rein clientseitiges Gating schützt gegen Weitergabe, nicht
+  gegen entschlossenes Cracking – dafür wäre Serverlogik nötig.
+
 ## Dateien nach Schema umbenennen
 
 - Neue Aktion **Bearbeiten → Dateien umbenennen …** benennt die geladenen

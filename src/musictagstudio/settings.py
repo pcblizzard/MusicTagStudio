@@ -40,6 +40,9 @@ class AppSettings:
     font_scale: float = 1.0
     # Muster für die Datei-Umbenennung (Platzhalter wie {track}, {title}).
     rename_pattern: str = "{track} - {title}"
+    # Signierter Lizenzschlüssel (schaltet Premium-Funktionen frei). Leer =
+    # Basisversion. Nicht geheim; wirkt nur mit gültiger Signatur.
+    license_key: str = ""
     selected_provider: str = "apple_music"
     enrich_missing_fields: bool = True
     apple_country: str = "DE"
@@ -136,6 +139,7 @@ def load_settings(
     )
     network = data.get("network", {})
     rename = data.get("rename", {})
+    license_section = data.get("license", {})
 
     theme = str(
         appearance.get(
@@ -298,6 +302,7 @@ def load_settings(
             str(rename.get("pattern", "{track} - {title}")).strip()
             or "{track} - {title}"
         ),
+        license_key=str(license_section.get("key", "")).strip(),
         selected_provider=selected_provider,
         enrich_missing_fields=bool(
             providers.get(
@@ -511,6 +516,9 @@ def save_settings(
         "",
         "[rename]",
         f'pattern = "{_toml_string(settings.rename_pattern)}"',
+        "",
+        "[license]",
+        f'key = "{_toml_string(settings.license_key)}"',
         "",
         "[library]",
         (f"load_sources_on_startup = {str(settings.load_sources_on_startup).lower()}"),

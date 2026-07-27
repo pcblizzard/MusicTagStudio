@@ -62,6 +62,7 @@ from ..services.cover import (
     load_cover,
     load_cover_info,
 )
+from ..licensing import is_feature_enabled, load_license
 from ..services.metadata_io import save_song_metadata
 from ..services.rename import plan_renames
 from ..services.proposal import (
@@ -1782,6 +1783,17 @@ class MainWindow(QMainWindow):
         Der Vorgang wird als rückgängig-fähiger History-Eintrag protokolliert;
         die Ansicht wird per scan_music neu vom Datenträger eingelesen.
         """
+        settings = load_settings()
+        if not is_feature_enabled(
+            "rename", load_license(settings.license_key)
+        ):
+            QMessageBox.information(
+                self,
+                tr("premium_required_title", self.language),
+                tr("premium_required_msg", self.language),
+            )
+            return
+
         if not self.songs:
             QMessageBox.information(
                 self,
@@ -1790,7 +1802,7 @@ class MainWindow(QMainWindow):
             )
             return
 
-        pattern = load_settings().rename_pattern
+        pattern = settings.rename_pattern
         plans = plan_renames(self.songs, pattern)
         applicable = [plan for plan in plans if plan.applies]
         skipped = [

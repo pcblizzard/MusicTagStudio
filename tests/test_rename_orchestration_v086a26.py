@@ -24,6 +24,8 @@ def window(tmp_path, monkeypatch):
     win.history = HistoryManager(tmp_path / "hist")
     # Neu-Einlesen vom Datenträger im Test überspringen.
     monkeypatch.setattr(win, "scan_music", lambda: None)
+    # Premium-Gating für die Umbenennungs-Tests freischalten.
+    monkeypatch.setattr(mw, "is_feature_enabled", lambda *a, **k: True)
     yield win, mw
     win.close()
 
@@ -68,6 +70,34 @@ def test_rename_files_renames_and_records_history(window, tmp_path, monkeypatch)
     # Undo benennt zurück.
     win.history.undo()
     assert Path(a).is_file() and Path(b).is_file()
+
+
+def test_rename_blocked_without_license(tmp_path, monkeypatch):
+    # Eigenes Fenster OHNE die Freischalt-Fixture: Gating muss greifen.
+    from musictagstudio.ui import main_window as mw
+
+    QApplication.instance() or QApplication([])
+    win = mw.MainWindow()
+    monkeypatch.setattr(win, "scan_music", lambda: None)
+    win.history = HistoryManager(tmp_path / "hist")
+
+    captured: list[str] = []
+    monkeypatch.setattr(
+        mw.QMessageBox, "information", lambda *a, **k: captured.append("info")
+    )
+
+    a = _make_file(tmp_path / "raw1.flac")
+    win.folder = str(tmp_path)
+    win.songs = [Song(path=a, track="1", title="Erster")]
+
+    win.rename_files()
+
+    # Datei bleibt unverändert, kein History-Eintrag.
+    assert Path(a).is_file()
+    assert not (tmp_path / "01 - Erster.flac").exists()
+    assert not win.history.can_undo
+    assert captured  # Premium-Hinweis wurde angezeigt
+    win.close()
 
 
 def test_rename_files_skips_collision(window, tmp_path, monkeypatch):

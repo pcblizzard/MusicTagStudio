@@ -56,6 +56,7 @@ from ..providers.tidal_auth import (
     tidal_is_connected,
 )
 from ..i18n import SUPPORTED_LANGUAGES, tr
+from ..licensing import load_license
 
 
 STATUS_STYLES = {
@@ -609,6 +610,21 @@ class SettingsDialog(QDialog):
         rename_form.addRow("", rename_hint)
         layout.addWidget(rename)
 
+        license_box = QGroupBox(tr("license_group", language))
+        license_form = QFormLayout(license_box)
+        self.license_key_edit = QLineEdit(settings.license_key)
+        self.license_key_edit.setPlaceholderText("…")
+        license_form.addRow(
+            tr("license_key_label", language),
+            self.license_key_edit,
+        )
+        self.license_status_label = QLabel()
+        self.license_status_label.setWordWrap(True)
+        license_form.addRow(tr("license_status", language), self.license_status_label)
+        self.license_key_edit.textChanged.connect(self._update_license_status)
+        self._update_license_status()
+        layout.addWidget(license_box)
+
         layout.addStretch()
 
         scroll_area.setWidget(content)
@@ -864,6 +880,7 @@ class SettingsDialog(QDialog):
             rename_pattern=(
                 self.rename_pattern_edit.text().strip() or "{track} - {title}"
             ),
+            license_key=self.license_key_edit.text().strip(),
             selected_provider=provider,
             enrich_missing_fields=(self.enrich_checkbox.isChecked()),
             apple_country=str(self.country_combo.currentData()),
@@ -1071,6 +1088,15 @@ class SettingsDialog(QDialog):
         if last_success:
             return tr("last_checked_success", self.language, when=last_success)
         return tr("not_checked_yet", self.language)
+
+    def _update_license_status(self) -> None:
+        license_ = load_license(self.license_key_edit.text().strip())
+        if license_ is None:
+            self.license_status_label.setText(tr("license_inactive", self.language))
+        else:
+            self.license_status_label.setText(
+                tr("license_active", self.language, name=license_.licensee)
+            )
 
     @staticmethod
     def _closest_font_scale(value: float) -> float:
