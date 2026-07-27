@@ -81,6 +81,7 @@ from ..theme import (
     BUTTON_NORMAL,
     INPUT_CHANGED,
     INPUT_NORMAL,
+    apply_font_scale,
     apply_theme,
 )
 from ..batch_comparison_logic import BatchSongProposal
@@ -784,13 +785,10 @@ class MainWindow(QMainWindow):
         # Sidebar-Breite an den laengsten Buttontext anpassen (Sprache + evtl.
         # groessere Schrift), statt eine feste Pixelzahl zu erzwingen. So laeuft
         # kein Label ueber und schmale Sprachen verschwenden keinen Platz.
-        metrics = QFontMetrics(self.lyrics_search_button.font())
-        nav_labels = [tr(name, self.language) for name, _index, _icon in workspace_pages]
-        nav_labels.append(tr("lyrics_search", self.language))
-        widest_text = max(metrics.horizontalAdvance(label) for label in nav_labels)
-        # Icon (18) + Icon-Abstand + linkes Padding (8) + Layout-Raender (2x8)
-        # + etwas Luft rechts, damit nichts an der Trennlinie klebt.
-        sidebar.setFixedWidth(max(180, widest_text + 78))
+        self._sidebar = sidebar
+        self._sidebar_nav_keys = [name for name, _index, _icon in workspace_pages]
+        self._sidebar_nav_keys.append("lyrics_search")
+        self._adjust_sidebar_width()
 
         sidebar_layout.addStretch()
 
@@ -930,6 +928,21 @@ class MainWindow(QMainWindow):
                 checked_button.setChecked(False)
                 self.workspace_buttons.setExclusive(True)
 
+    def _adjust_sidebar_width(self) -> None:
+        # Breite = breitester Nav-Text (in aktueller Schrift) + Icon/Padding.
+        # Die App-Schrift ist massgeblich (spiegelt eine gerade geaenderte
+        # Schriftgroesse sofort, ohne auf einen Event-Loop zu warten).
+        app = QApplication.instance()
+        font = app.font() if isinstance(app, QApplication) else self._sidebar.font()
+        metrics = QFontMetrics(font)
+        widest_text = max(
+            metrics.horizontalAdvance(tr(key, self.language))
+            for key in self._sidebar_nav_keys
+        )
+        # Icon (18) + Icon-Abstand + linkes Padding (8) + Layout-Raender (2x8)
+        # + etwas Luft rechts, damit nichts an der Trennlinie klebt.
+        self._sidebar.setFixedWidth(max(180, widest_text + 78))
+
     def apply_embedded_settings(
         self,
         new_settings,
@@ -947,6 +960,10 @@ class MainWindow(QMainWindow):
                 new_settings.theme,
                 new_settings.theme_style,
             )
+            # Schriftgroesse sofort anwenden, damit die Auswahl ohne Neustart
+            # sichtbar wird; Sidebar danach an die neue Schrift anpassen.
+            apply_font_scale(app, new_settings.font_scale)
+            self._adjust_sidebar_width()
 
         self.load_configured_sources()
         self.statusBar().showMessage(
