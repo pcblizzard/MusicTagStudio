@@ -63,6 +63,7 @@ from ..services.cover import (
     load_cover_info,
 )
 from ..services.metadata_io import save_song_metadata
+from ..services.rename import plan_renames
 from ..services.proposal import (
     build_batch_proposals,
     build_proposal,
@@ -1215,6 +1216,14 @@ class MainWindow(QMainWindow):
         )
 
         edit_menu.addSeparator()
+        rename_action = edit_menu.addAction(
+            tr("rename_action", self.language)
+        )
+        rename_action.triggered.connect(
+            self.rename_files
+        )
+
+        edit_menu.addSeparator()
         reset_columns_action = edit_menu.addAction(
             tr("reset_columns", self.language)
         )
@@ -1764,6 +1773,85 @@ class MainWindow(QMainWindow):
             self.update_history_actions()
 
         return saved, failed
+
+    def rename_files(self) -> None:
+        """Benennt die geladenen Dateien nach dem eingestellten Schema um.
+
+        Vorschau (alt->neu) über den bestehenden ChangePreviewDialog, danach
+        die eigentliche Umbenennung mit Kollisionsschutz aus plan_renames.
+        Der Vorgang wird als rückgängig-fähiger History-Eintrag protokolliert;
+        die Ansicht wird per scan_music neu vom Datenträger eingelesen.
+        """
+        if not self.songs:
+            QMessageBox.information(
+                self,
+                tr("rename_action", self.language),
+                tr("rename_none", self.language),
+            )
+            return
+
+        pattern = load_settings().rename_pattern
+        plans = plan_renames(self.songs, pattern)
+        applicable = [plan for plan in plans if plan.applies]
+        skipped = [
+            plan
+            for plan in plans
+            if not plan.applies and plan.reason in ("collision", "target_exists")
+        ]
+
+        if not applicable:
+            QMessageBox.information(
+                self,
+                tr("rename_action", self.language),
+                tr("rename_none", self.language),
+            )
+            return
+
+        field = tr("rename_field", self.language)
+        changes = [
+            (plan.old_name, field, plan.old_name, plan.new_name)
+            for plan in applicable
+        ]
+        accepted = (
+            ChangePreviewDialog(
+                changes,
+                self,
+                file_count=len(applicable),
+                language=self.language,
+            ).exec()
+            == ChangePreviewDialog.DialogCode.Accepted
+        )
+        if not accepted:
+            return
+
+        moves: list[tuple[str, str]] = []
+        failed: list[str] = []
+        for plan in applicable:
+            try:
+                Path(plan.old_path).rename(plan.new_path)
+                moves.append((plan.old_path, plan.new_path))
+            except OSError as error:
+                failed.append(f"{plan.old_name}: {error}")
+
+        if moves:
+            self.history.commit_rename("rename_history", moves)
+            self.update_history_actions()
+            # Neu einlesen, damit Tabelle/Index die neuen Pfade übernehmen.
+            self.scan_music()
+
+        parts = [tr_plural("rename_done", len(moves), self.language)]
+        if skipped:
+            parts.append(
+                tr_plural("rename_skipped", len(skipped), self.language)
+            )
+        self.statusBar().showMessage(" · ".join(parts), 6000)
+
+        if failed:
+            QMessageBox.warning(
+                self,
+                tr("rename_action", self.language),
+                "\n".join(failed[:20]),
+            )
 
     def open_library_audit(self):
         self.switch_workspace(3)
