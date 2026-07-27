@@ -2,7 +2,21 @@ from __future__ import annotations
 
 import pytest
 
+from musictagstudio import i18n
 from musictagstudio.providers import http_cache
+
+
+@pytest.fixture(autouse=True)
+def _pin_automatic_language(monkeypatch):
+    """
+    Legt die Sprache für ``language="automatic"`` deterministisch auf Deutsch.
+
+    Viele UI-Tests prüfen den deutschen Anzeigetext. Ohne diese Fixierung
+    haengt ``automatic`` am System-Locale der Maschine: lokal (DE) gruen, auf
+    dem CI-Runner (EN) rot. Das Pinnen macht die Testsuite locale-unabhaengig.
+    Tests mit explizitem ``language=`` (z. B. "en") sind davon unberuehrt.
+    """
+    monkeypatch.setattr(i18n, "system_language", lambda: "de")
 
 
 @pytest.fixture(autouse=True)
