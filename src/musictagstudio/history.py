@@ -46,6 +46,9 @@ class HistoryEntry:
     created_at: str
     files: tuple[str, ...]
     committed: bool = False
+    # Datei-Umbenennungen (alt, neu). Leer bei reinen Tag-/Cover-Vorgängen.
+    # Ein Eintrag hat entweder Tag-Snapshots ODER Moves, nie beides.
+    moves: tuple[tuple[str, str], ...] = ()
 
 
 class HistoryManager:
@@ -128,6 +131,38 @@ class HistoryManager:
 
         return committed
 
+    def commit_rename(
+        self,
+        description: str,
+        moves: list[tuple[str, str]] | tuple[tuple[str, str], ...],
+    ) -> HistoryEntry:
+        """Protokolliert bereits ausgeführte Datei-Umbenennungen (alt, neu).
+
+        Die eigentliche Umbenennung führt der Aufrufer aus (er aktualisiert
+        dabei Modell/Tabelle); hier wird nur der reversible Vorgang für
+        Undo/Redo festgehalten. Beim Undo werden die Moves rückwärts, beim
+        Redo vorwärts ausgeführt.
+        """
+        recorded = tuple((str(old), str(new)) for old, new in moves)
+        entry_id = (
+            datetime.now().strftime("%Y%m%d-%H%M%S")
+            + "-"
+            + uuid.uuid4().hex[:8]
+        )
+        entry = HistoryEntry(
+            entry_id=entry_id,
+            description=description,
+            created_at=datetime.now().isoformat(timespec="seconds"),
+            files=tuple(new for _old, new in recorded),
+            committed=True,
+            moves=recorded,
+        )
+        self.undo_stack.append(entry)
+        self.redo_stack.clear()
+        self._write_manifest(entry)
+        self._prune()
+        return entry
+
     def rollback_pending(self, entry: HistoryEntry) -> None:
         self._restore(entry, use_after=False)
 
@@ -136,7 +171,10 @@ class HistoryManager:
             return None
 
         entry = self.undo_stack.pop()
-        self._restore(entry, use_after=False)
+        if entry.moves:
+            self._apply_moves(entry, reverse=True)
+        else:
+            self._restore(entry, use_after=False)
         self.redo_stack.append(entry)
 
         return entry
@@ -147,6 +185,11 @@ class HistoryManager:
 
         entry = self.redo_stack.pop()
 
+        if entry.moves:
+            self._apply_moves(entry, reverse=False)
+            self.undo_stack.append(entry)
+            return entry
+
         if not (self.root / entry.entry_id / "after.json").is_file():
             return None
 
@@ -154,6 +197,27 @@ class HistoryManager:
         self.undo_stack.append(entry)
 
         return entry
+
+    def _apply_moves(self, entry: HistoryEntry, *, reverse: bool) -> None:
+        """Führt die Umbenennungen aus (rückwärts beim Undo, vorwärts beim Redo).
+
+        Best effort und robust: fehlt die Quelle oder existiert das Ziel
+        bereits, wird der einzelne Move übersprungen, statt den ganzen
+        Vorgang abzubrechen. Beim Rückwärtsgang wird die Reihenfolge gedreht.
+        """
+        pairs = [(new, old) for old, new in entry.moves] if reverse else list(entry.moves)
+        if reverse:
+            pairs.reverse()
+        for source, target in pairs:
+            source_path = Path(source)
+            target_path = Path(target)
+            if not source_path.is_file() or target_path.exists():
+                continue
+            try:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                source_path.rename(target_path)
+            except OSError:
+                continue
 
     def entries(self) -> list[HistoryEntry]:
         return list(reversed(self.undo_stack))
@@ -278,6 +342,7 @@ class HistoryManager:
                     "created_at": entry.created_at,
                     "files": list(entry.files),
                     "committed": entry.committed,
+                    "moves": [list(pair) for pair in entry.moves],
                 },
                 ensure_ascii=False,
                 indent=2,
