@@ -3,14 +3,18 @@ from __future__ import annotations
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import (
+    QObject,
+    QRunnable,
     QSettings,
     QSize,
     QThreadPool,
     QTimer,
     Qt,
+    Signal,
 )
 from PySide6.QtGui import (
     QAction,
@@ -63,6 +67,7 @@ from ..services.cover import (
     load_cover,
     load_cover_info,
 )
+from .. import licensing_keygen as keygen
 from ..licensing import is_feature_enabled, load_license
 from ..services.metadata_io import save_song_metadata
 from ..services.rename import plan_renames
@@ -126,6 +131,29 @@ OPTIONAL_FIELDS = (
     "composer",
     "comment",
 )
+
+
+class _LicenseSignals(QObject):
+    done = Signal(bool)
+
+
+class _LicenseCheck(QRunnable):
+    """Prüft die Keygen-Lizenz im Hintergrund (Netzwerk blockiert die UI nicht)."""
+
+    def __init__(self, license_key: str, fingerprint: str) -> None:
+        super().__init__()
+        self._key = license_key
+        self._fingerprint = fingerprint
+        self.signals = _LicenseSignals()
+
+    def run(self) -> None:
+        premium = keygen.refresh_premium(
+            self._key,
+            self._fingerprint,
+            now=datetime.now(),
+            cache_path=keygen.default_cache_path(),
+        )
+        self.signals.done.emit(premium)
 
 
 def _save_songs_in_parallel(
@@ -205,9 +233,22 @@ class MainWindow(QMainWindow):
         self.source_scan_worker = None
         self.language = load_settings().language
 
+        # Premium-Status (Keygen) sofort aus dem lokalen Cache vorbelegen, damit
+        # die App auch offline direkt richtig gated; danach im Hintergrund
+        # aktualisieren.
+        self._keygen_premium = keygen.cached_premium(
+            load_settings().license_key,
+            now=datetime.now(),
+            cache_path=keygen.default_cache_path(),
+        )
+        # Laufende Lizenz-Hintergrundprüfungen festhalten, damit ihr Ergebnis-
+        # Signal nicht durch vorzeitiges Aufräumen verloren geht.
+        self._license_workers: set = set()
+
         self.create_ui()
         self.create_menu()
         self.update_history_actions()
+        self._refresh_license_async(load_settings().license_key)
         QTimer.singleShot(
             0,
             self.load_configured_sources,
@@ -954,6 +995,14 @@ class MainWindow(QMainWindow):
         )
         self.language = new_settings.language
         self.media_library.language = new_settings.language
+        # Lizenzstatus nach dem Speichern neu ermitteln (Key evtl. geändert):
+        # sofort aus dem Cache, dann im Hintergrund online verifizieren.
+        self._keygen_premium = keygen.cached_premium(
+            new_settings.license_key,
+            now=datetime.now(),
+            cache_path=keygen.default_cache_path(),
+        )
+        self._refresh_license_async(new_settings.license_key)
         app = QApplication.instance()
 
         if isinstance(app, QApplication):
@@ -1776,6 +1825,33 @@ class MainWindow(QMainWindow):
 
         return saved, failed
 
+    def _refresh_license_async(self, license_key: str) -> None:
+        """Startet die Keygen-Prüfung im Hintergrund und aktualisiert den Status."""
+        from ..licensing import machine_fingerprint
+
+        if not license_key.strip() or not keygen.is_configured():
+            self._keygen_premium = False
+            return
+        worker = _LicenseCheck(license_key, machine_fingerprint())
+        worker.setAutoDelete(False)
+        self._license_workers.add(worker)
+        worker.signals.done.connect(
+            lambda premium, w=worker: self._on_license_checked(premium, w)
+        )
+        QThreadPool.globalInstance().start(worker)
+
+    def _on_license_checked(self, premium: bool, worker) -> None:
+        self._set_keygen_premium(premium)
+        self._license_workers.discard(worker)
+
+    def _set_keygen_premium(self, premium: bool) -> None:
+        self._keygen_premium = premium
+
+    def _premium_active(self, settings) -> bool:
+        """Premium, wenn eigene Offline-Signatur ODER Keygen (gecacht) gültig ist."""
+        offline = is_feature_enabled("rename", load_license(settings.license_key))
+        return bool(offline or self._keygen_premium)
+
     def _rename_one_file(self, old_path: str, new_path: str) -> str | None:
         """Benennt eine Datei um; gibt None zurück oder die Fehlermeldung.
 
@@ -1803,9 +1879,7 @@ class MainWindow(QMainWindow):
         die Ansicht wird per scan_music neu vom Datenträger eingelesen.
         """
         settings = load_settings()
-        if not is_feature_enabled(
-            "rename", load_license(settings.license_key)
-        ):
+        if not self._premium_active(settings):
             QMessageBox.information(
                 self,
                 tr("premium_required_title", self.language),

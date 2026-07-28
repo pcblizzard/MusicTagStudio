@@ -5,9 +5,11 @@ from datetime import datetime, timedelta
 from musictagstudio.licensing_keygen import (
     CachedState,
     KeygenResult,
+    cached_premium,
     check_license,
     evaluate_cache,
     make_cache_state,
+    refresh_premium,
 )
 
 
@@ -93,6 +95,52 @@ def test_evaluate_cache_respects_expiry():
     cache = make_cache_state("KEY", result, now - timedelta(days=1))
     # Innerhalb Kulanz, aber Lizenz ist abgelaufen -> nicht mehr aktiv.
     assert evaluate_cache(cache, "KEY", now, grace_days=14) is False
+
+
+def _raise(*_a, **_k):
+    raise OSError("no network")
+
+
+def test_refresh_premium_valid_writes_cache(tmp_path):
+    now = datetime(2026, 7, 27, 12, 0, 0)
+    cache = tmp_path / "lic.json"
+    transport = _FakeTransport([_valid(expiry="")])
+    assert refresh_premium("KEY", "fp", now=now, cache_path=cache, transport=transport)
+    # Cache wurde geschrieben und wird als aktiv gewertet.
+    assert cached_premium("KEY", now=now, cache_path=cache) is True
+
+
+def test_refresh_premium_network_error_uses_grace(tmp_path):
+    now = datetime(2026, 7, 27, 12, 0, 0)
+    cache = tmp_path / "lic.json"
+    # Frischen Cache anlegen (letzte erfolgreiche Prüfung vor 2 Tagen).
+    from musictagstudio.licensing_keygen import save_cache
+
+    save_cache(cache, make_cache_state("KEY", KeygenResult(True, "VALID"), now - timedelta(days=2)))
+    assert refresh_premium("KEY", "fp", now=now, cache_path=cache, transport=_raise) is True
+
+
+def test_refresh_premium_network_error_without_cache_is_false(tmp_path):
+    now = datetime(2026, 7, 27, 12, 0, 0)
+    cache = tmp_path / "lic.json"
+    assert refresh_premium("KEY", "fp", now=now, cache_path=cache, transport=_raise) is False
+
+
+def test_refresh_premium_expired_clears_cache(tmp_path):
+    now = datetime(2026, 7, 27, 12, 0, 0)
+    cache = tmp_path / "lic.json"
+    from musictagstudio.licensing_keygen import save_cache
+
+    save_cache(cache, make_cache_state("KEY", KeygenResult(True, "VALID"), now))
+    transport = _FakeTransport([_invalid("EXPIRED")])
+    assert refresh_premium("KEY", "fp", now=now, cache_path=cache, transport=transport) is False
+    # Cache wurde verworfen -> auch offline kein Premium mehr.
+    assert cached_premium("KEY", now=now, cache_path=cache) is False
+
+
+def test_refresh_premium_empty_key_is_false(tmp_path):
+    now = datetime(2026, 7, 27, 12, 0, 0)
+    assert refresh_premium("", "fp", now=now, cache_path=tmp_path / "x.json") is False
 
 
 def test_evaluate_cache_none_is_false():

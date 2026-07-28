@@ -22,12 +22,16 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 # --- Konfiguration (aus dem Keygen-Dashboard; öffentlich, nicht geheim) ------
 # Account-Slug/UUID aus den API-URLs (api.keygen.sh/v1/accounts/<HIER>/...).
-KEYGEN_ACCOUNT_ID = ""
-# Optionaler Ed25519-Public-Key des Accounts (für Offline-Signaturprüfung).
-KEYGEN_PUBLIC_KEY_B64 = ""
+KEYGEN_ACCOUNT_ID = "674d8ac1-8f62-479f-ac8f-d6e259bb7cda"
+# Ed25519-Public-Key des Accounts als Hex (für optionale Offline-Signatur-
+# prüfung signierter Schlüssel; im Online-Modell mit Scheme=None ungenutzt).
+KEYGEN_PUBLIC_KEY_HEX = (
+    "a618d4d566ffa78fa66ee14ebe44e45661898b9d8aeb371e869d759140e4f52b"
+)
 
 _API_BASE = "https://api.keygen.sh/v1/accounts"
 _MEDIA_TYPE = "application/vnd.api+json"
@@ -204,3 +208,86 @@ def make_cache_state(key: str, result: KeygenResult, now: datetime) -> CachedSta
         last_valid=now.isoformat(timespec="seconds"),
         expiry=result.expiry,
     )
+
+
+# --- Persistenz + High-Level-Orchestrierung ---------------------------------
+
+
+def default_cache_path() -> Path:
+    from .diagnostics import project_root
+
+    return Path(project_root()) / ".musictagstudio" / "license_cache.json"
+
+
+def load_cache(path: Path) -> CachedState | None:
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return CachedState(
+        key_id=str(data.get("key_id", "")),
+        last_valid=str(data.get("last_valid", "")),
+        expiry=str(data.get("expiry", "")),
+    )
+
+
+def save_cache(path: Path, state: CachedState) -> None:
+    path = Path(path)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "key_id": state.key_id,
+                    "last_valid": state.last_valid,
+                    "expiry": state.expiry,
+                }
+            ),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
+def cached_premium(license_key: str, *, now: datetime, cache_path: Path) -> bool:
+    """Sofort-Einschätzung aus dem lokalen Cache (für den Programmstart)."""
+    if not license_key.strip():
+        return False
+    return evaluate_cache(load_cache(cache_path), license_key, now)
+
+
+def refresh_premium(
+    license_key: str,
+    fingerprint: str,
+    *,
+    now: datetime,
+    cache_path: Path,
+    transport: Transport | None = None,
+    grace_days: int = 14,
+) -> bool:
+    """Prüft online und aktualisiert den Cache; nutzt bei Netzfehler die Kulanz.
+
+    - Server erreichbar + gültig  -> Cache erneuern, True.
+    - Server erreichbar + ungültig -> Cache verwerfen, False (autoritativ).
+    - Server nicht erreichbar     -> Kulanzfrist aus dem Cache.
+    Ist Keygen nicht konfiguriert oder kein Schlüssel gesetzt: False.
+    """
+    if not is_configured() or not license_key.strip():
+        return False
+    try:
+        result = check_license(license_key, fingerprint, transport=transport)
+    except OSError:
+        return evaluate_cache(
+            load_cache(cache_path), license_key, now, grace_days=grace_days
+        )
+    if result.valid:
+        save_cache(cache_path, make_cache_state(license_key, result, now))
+        return True
+    # Autoritative Ablehnung (EXPIRED/SUSPENDED/…): Cache leeren.
+    try:
+        Path(cache_path).unlink()
+    except OSError:
+        pass
+    return False
