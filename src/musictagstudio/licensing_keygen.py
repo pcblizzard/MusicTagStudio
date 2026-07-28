@@ -57,6 +57,7 @@ class KeygenResult:
     license_id: str = ""
     expiry: str = ""  # ISO-8601 oder leer (perpetual)
     detail: str = ""
+    name: str = ""  # Anzeigename der Lizenz (Lizenznehmer)
 
 
 def _urllib_transport(
@@ -93,6 +94,7 @@ def _validate_key(
         license_id=str(data.get("id", "") if isinstance(data, dict) else ""),
         expiry=str(attributes.get("expiry") or ""),
         detail=str(meta.get("detail", "")),
+        name=str(attributes.get("name") or ""),
     )
 
 
@@ -158,6 +160,7 @@ class CachedState:
     key_id: str  # Hash des Schlüssels, um Schlüsselwechsel zu erkennen
     last_valid: str  # ISO-Zeitpunkt der letzten erfolgreichen Prüfung
     expiry: str = ""  # ISO oder leer (perpetual)
+    name: str = ""  # zuletzt gesehener Lizenzname (für Offline-Anzeige)
 
 
 def _hash_key(key: str) -> str:
@@ -207,6 +210,7 @@ def make_cache_state(key: str, result: KeygenResult, now: datetime) -> CachedSta
         key_id=_hash_key(key),
         last_valid=now.isoformat(timespec="seconds"),
         expiry=result.expiry,
+        name=result.name,
     )
 
 
@@ -230,6 +234,7 @@ def load_cache(path: Path) -> CachedState | None:
         key_id=str(data.get("key_id", "")),
         last_valid=str(data.get("last_valid", "")),
         expiry=str(data.get("expiry", "")),
+        name=str(data.get("name", "")),
     )
 
 
@@ -243,6 +248,7 @@ def save_cache(path: Path, state: CachedState) -> None:
                     "key_id": state.key_id,
                     "last_valid": state.last_valid,
                     "expiry": state.expiry,
+                    "name": state.name,
                 }
             ),
             encoding="utf-8",
@@ -258,6 +264,41 @@ def cached_premium(license_key: str, *, now: datetime, cache_path: Path) -> bool
     return evaluate_cache(load_cache(cache_path), license_key, now)
 
 
+def check_and_cache(
+    license_key: str,
+    fingerprint: str,
+    *,
+    now: datetime,
+    cache_path: Path,
+    transport: Transport | None = None,
+    grace_days: int = 14,
+) -> tuple[bool, str]:
+    """Wie :func:`refresh_premium`, gibt zusätzlich den Lizenznamen zurück.
+
+    - Server erreichbar + gültig  -> Cache erneuern, (True, Name).
+    - Server erreichbar + ungültig -> Cache verwerfen, (False, "").
+    - Server nicht erreichbar     -> Kulanzfrist + gecachter Name.
+    Ohne Konfiguration/Schlüssel: (False, "").
+    """
+    if not is_configured() or not license_key.strip():
+        return False, ""
+    try:
+        result = check_license(license_key, fingerprint, transport=transport)
+    except OSError:
+        cache = load_cache(cache_path)
+        active = evaluate_cache(cache, license_key, now, grace_days=grace_days)
+        return active, (cache.name if active and cache else "")
+    if result.valid:
+        save_cache(cache_path, make_cache_state(license_key, result, now))
+        return True, result.name
+    # Autoritative Ablehnung (EXPIRED/SUSPENDED/…): Cache leeren.
+    try:
+        Path(cache_path).unlink()
+    except OSError:
+        pass
+    return False, ""
+
+
 def refresh_premium(
     license_key: str,
     fingerprint: str,
@@ -267,27 +308,12 @@ def refresh_premium(
     transport: Transport | None = None,
     grace_days: int = 14,
 ) -> bool:
-    """Prüft online und aktualisiert den Cache; nutzt bei Netzfehler die Kulanz.
-
-    - Server erreichbar + gültig  -> Cache erneuern, True.
-    - Server erreichbar + ungültig -> Cache verwerfen, False (autoritativ).
-    - Server nicht erreichbar     -> Kulanzfrist aus dem Cache.
-    Ist Keygen nicht konfiguriert oder kein Schlüssel gesetzt: False.
-    """
-    if not is_configured() or not license_key.strip():
-        return False
-    try:
-        result = check_license(license_key, fingerprint, transport=transport)
-    except OSError:
-        return evaluate_cache(
-            load_cache(cache_path), license_key, now, grace_days=grace_days
-        )
-    if result.valid:
-        save_cache(cache_path, make_cache_state(license_key, result, now))
-        return True
-    # Autoritative Ablehnung (EXPIRED/SUSPENDED/…): Cache leeren.
-    try:
-        Path(cache_path).unlink()
-    except OSError:
-        pass
-    return False
+    """Prüft online und aktualisiert den Cache; nutzt bei Netzfehler die Kulanz."""
+    return check_and_cache(
+        license_key,
+        fingerprint,
+        now=now,
+        cache_path=cache_path,
+        transport=transport,
+        grace_days=grace_days,
+    )[0]

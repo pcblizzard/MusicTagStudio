@@ -2,8 +2,32 @@ from __future__ import annotations
 
 import pytest
 
-from musictagstudio import i18n
+from musictagstudio import i18n, licensing_keygen
 from musictagstudio.providers import http_cache
+
+
+@pytest.fixture(autouse=True)
+def _isolate_license(request, monkeypatch, tmp_path):
+    """
+    Hält die Online-Lizenzprüfung (Keygen) komplett aus den Tests heraus.
+
+    Sonst würde ein in der echten config.toml hinterlegter Lizenzschlüssel bei
+    jedem Fenster-/Dialogaufbau eine echte Netzwerkanfrage auslösen (Timeouts,
+    Flakiness). is_configured -> False verhindert jede Online-Prüfung; der
+    Cache-Pfad zeigt auf ein leeres Temp-Verzeichnis.
+
+    Die reinen Keygen-Logiktests (mit eingespeistem Transport) brauchen den
+    konfigurierten Zustand und schalten die Isolation per Marker ``real_license``
+    ab.
+    """
+    if request.node.get_closest_marker("real_license") is not None:
+        return
+    monkeypatch.setattr(licensing_keygen, "is_configured", lambda: False)
+    monkeypatch.setattr(
+        licensing_keygen,
+        "default_cache_path",
+        lambda: tmp_path / "license_cache.json",
+    )
 
 
 @pytest.fixture(autouse=True)

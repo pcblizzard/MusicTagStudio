@@ -76,9 +76,9 @@ STATUS_STYLES = {
 
 
 class _LicenseStatusSignals(QObject):
-    # (aktiv, bereits geprüfter Schlüssel) – Schlüssel, um veraltete Antworten
-    # zu verwerfen, falls der Nutzer zwischenzeitlich weitergetippt hat.
-    done = Signal(bool, str)
+    # (aktiv, Lizenzname, geprüfter Schlüssel) – der Schlüssel dient dazu,
+    # veraltete Antworten zu verwerfen, falls der Nutzer weitergetippt hat.
+    done = Signal(bool, str, str)
 
 
 class _LicenseStatusCheck(QRunnable):
@@ -91,13 +91,17 @@ class _LicenseStatusCheck(QRunnable):
         self.signals = _LicenseStatusSignals()
 
     def run(self) -> None:
-        premium = keygen.refresh_premium(
+        active, name = keygen.check_and_cache(
             self._key,
             self._fingerprint,
             now=datetime.now(),
             cache_path=keygen.default_cache_path(),
         )
-        self.signals.done.emit(premium, self._key)
+        try:
+            self.signals.done.emit(active, name, self._key)
+        except RuntimeError:
+            # Dialog wurde während der Prüfung geschlossen -> Ergebnis egal.
+            pass
 
 
 class SettingsDialog(QDialog):
@@ -1157,20 +1161,22 @@ class SettingsDialog(QDialog):
         worker.setAutoDelete(False)
         self._license_status_workers.add(worker)
         worker.signals.done.connect(
-            lambda active, checked, w=worker: self._on_license_checked(
-                active, checked, w
+            lambda active, name, checked, w=worker: self._on_license_checked(
+                active, name, checked, w
             )
         )
         QThreadPool.globalInstance().start(worker)
 
-    def _on_license_checked(self, active: bool, checked_key: str, worker) -> None:
+    def _on_license_checked(
+        self, active: bool, name: str, checked_key: str, worker
+    ) -> None:
         self._license_status_workers.discard(worker)
         # Veraltete Antwort verwerfen, falls der Nutzer weitergetippt hat.
         if checked_key != self.license_key_edit.text().strip():
             return
         if active:
             self.license_status_label.setText(
-                tr("license_active", self.language, name="Keygen")
+                tr("license_active", self.language, name=name or "—")
             )
         else:
             self.license_status_label.setText(tr("license_inactive", self.language))

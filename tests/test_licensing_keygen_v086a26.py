@@ -2,10 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from musictagstudio.licensing_keygen import (
+import pytest
+
+# Diese Tests prüfen die konfigurierte Keygen-Logik direkt (mit Transport-Stub)
+# und dürfen daher nicht durch die Online-Isolation aus conftest lahmgelegt
+# werden.
+pytestmark = pytest.mark.real_license
+
+from musictagstudio.licensing_keygen import (  # noqa: E402
     CachedState,
     KeygenResult,
     cached_premium,
+    check_and_cache,
     check_license,
     evaluate_cache,
     make_cache_state,
@@ -25,11 +33,14 @@ class _FakeTransport:
         return self._responses.pop(0)
 
 
-def _valid(code="VALID", license_id="lic_1", expiry=""):
+def _valid(code="VALID", license_id="lic_1", expiry="", name=""):
     return (
         200,
         {
-            "data": {"id": license_id, "attributes": {"expiry": expiry}},
+            "data": {
+                "id": license_id,
+                "attributes": {"expiry": expiry, "name": name},
+            },
             "meta": {"valid": True, "code": code},
         },
     )
@@ -141,6 +152,30 @@ def test_refresh_premium_expired_clears_cache(tmp_path):
 def test_refresh_premium_empty_key_is_false(tmp_path):
     now = datetime(2026, 7, 27, 12, 0, 0)
     assert refresh_premium("", "fp", now=now, cache_path=tmp_path / "x.json") is False
+
+
+def test_check_and_cache_returns_license_name(tmp_path):
+    now = datetime(2026, 7, 27, 12, 0, 0)
+    cache = tmp_path / "lic.json"
+    transport = _FakeTransport([_valid(name="James Bond")])
+    active, name = check_and_cache(
+        "KEY", "fp", now=now, cache_path=cache, transport=transport
+    )
+    assert active is True and name == "James Bond"
+
+
+def test_check_and_cache_name_survives_offline_grace(tmp_path):
+    now = datetime(2026, 7, 27, 12, 0, 0)
+    cache = tmp_path / "lic.json"
+    # Erst online (Name gecacht), dann offline innerhalb der Kulanz.
+    check_and_cache(
+        "KEY", "fp", now=now, cache_path=cache,
+        transport=_FakeTransport([_valid(name="James Bond")]),
+    )
+    active, name = check_and_cache(
+        "KEY", "fp", now=now + timedelta(days=2), cache_path=cache, transport=_raise
+    )
+    assert active is True and name == "James Bond"
 
 
 def test_evaluate_cache_none_is_false():

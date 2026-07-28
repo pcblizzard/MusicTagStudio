@@ -153,7 +153,11 @@ class _LicenseCheck(QRunnable):
             now=datetime.now(),
             cache_path=keygen.default_cache_path(),
         )
-        self.signals.done.emit(premium)
+        try:
+            self.signals.done.emit(premium)
+        except RuntimeError:
+            # Fenster wurde während der Prüfung geschlossen -> Ergebnis egal.
+            pass
 
 
 def _save_songs_in_parallel(
