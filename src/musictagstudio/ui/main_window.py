@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
@@ -1775,6 +1776,24 @@ class MainWindow(QMainWindow):
 
         return saved, failed
 
+    def _rename_one_file(self, old_path: str, new_path: str) -> str | None:
+        """Benennt eine Datei um; gibt None zurück oder die Fehlermeldung.
+
+        Windows gibt ein gerade geschlossenes Datei-Handle (z. B. vom Player)
+        nicht immer sofort frei. Deshalb ein paar kurze Wiederholungen, bevor
+        endgültig ein Fehler gemeldet wird.
+        """
+        last_error: OSError | None = None
+        for attempt in range(5):
+            try:
+                Path(old_path).rename(new_path)
+                return None
+            except OSError as error:
+                last_error = error
+                QApplication.processEvents()
+                time.sleep(0.05 * (attempt + 1))
+        return str(last_error)
+
     def rename_files(self) -> None:
         """Benennt die geladenen Dateien nach dem eingestellten Schema um.
 
@@ -1836,13 +1855,23 @@ class MainWindow(QMainWindow):
         if not accepted:
             return
 
+        # Falls der Player gerade eine der Dateien abspielt, hält Windows sie
+        # gesperrt (WinError 32). Vor dem Umbenennen die Datei freigeben.
+        applicable_keys = {
+            str(Path(plan.old_path).resolve()).casefold() for plan in applicable
+        }
+        current = self.player_bar.engine.current_song
+        if current and str(Path(current.path).resolve()).casefold() in applicable_keys:
+            self.player_bar.engine.release_file()
+            QApplication.processEvents()
+
         moves: list[tuple[str, str]] = []
         failed: list[str] = []
         for plan in applicable:
-            try:
-                Path(plan.old_path).rename(plan.new_path)
+            error = self._rename_one_file(plan.old_path, plan.new_path)
+            if error is None:
                 moves.append((plan.old_path, plan.new_path))
-            except OSError as error:
+            else:
                 failed.append(f"{plan.old_name}: {error}")
 
         if moves:

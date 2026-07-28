@@ -100,6 +100,30 @@ def test_rename_blocked_without_license(tmp_path, monkeypatch):
     win.close()
 
 
+def test_rename_releases_playing_file(window, tmp_path, monkeypatch):
+    win, mw = window
+    monkeypatch.setattr(mw, "ChangePreviewDialog", _AcceptDialog)
+
+    a = _make_file(tmp_path / "raw1.flac")
+    win.folder = str(tmp_path)
+    song = Song(path=a, track="1", title="Spielt")
+    win.songs = [song]
+    # Nur das Queue-Modell setzen (current_song liefert die Datei), ohne sie
+    # ins QMediaPlayer-Backend zu laden – das würde offscreen blockieren.
+    win.player_bar.engine.queue.replace([song], 0)
+
+    released: list[bool] = []
+    monkeypatch.setattr(
+        win.player_bar.engine, "release_file", lambda: released.append(True)
+    )
+
+    win.rename_files()
+
+    # Freigabe wurde ausgelöst und die Datei umbenannt.
+    assert released
+    assert (tmp_path / "01 - Spielt.flac").is_file()
+
+
 def test_rename_files_skips_collision(window, tmp_path, monkeypatch):
     win, mw = window
     monkeypatch.setattr(mw, "ChangePreviewDialog", _AcceptDialog)

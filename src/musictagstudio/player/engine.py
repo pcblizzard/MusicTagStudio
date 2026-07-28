@@ -136,6 +136,16 @@ class PlayerEngine(QObject):
     def stop(self) -> None:
         self.media_player.stop()
 
+    def release_file(self) -> None:
+        """Gibt die aktuell geöffnete Audiodatei frei (Datei-Handle schließen).
+
+        Nötig, bevor die gerade abgespielte Datei umbenannt/verschoben wird:
+        Windows sperrt sie sonst (WinError 32). Setzt die Quelle auf leer; ein
+        späterer Play-Aufruf lädt sie über die (ggf. neue) Warteschlange neu.
+        """
+        self.media_player.stop()
+        self.media_player.setSource(QUrl())
+
     def _load_song(self, song: Song | None, *, autoplay: bool) -> bool:
         if song is None:
             return False
