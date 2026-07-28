@@ -1880,11 +1880,16 @@ class MainWindow(QMainWindow):
         """
         settings = load_settings()
         if not self._premium_active(settings):
-            QMessageBox.information(
-                self,
-                tr("premium_required_title", self.language),
-                tr("premium_required_msg", self.language),
-            )
+            # Liegt ein Schlüssel vor, konnte aber (noch) nicht online bestätigt
+            # werden (Erstaktivierung offline oder Kulanzfrist abgelaufen), bitten
+            # wir gezielt darum, online zu gehen – statt „kein Premium".
+            if settings.license_key.strip() and keygen.is_configured():
+                title = tr("license_needs_online_title", self.language)
+                message = tr("license_needs_online_msg", self.language)
+            else:
+                title = tr("premium_required_title", self.language)
+                message = tr("premium_required_msg", self.language)
+            QMessageBox.information(self, title, message)
             return
 
         if not self.songs:

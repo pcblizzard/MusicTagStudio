@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime
 from pathlib import Path
 import logging
 import threading
 
 logger = logging.getLogger(__name__)
 
-from PySide6.QtCore import QSettings, Signal, Qt
+from PySide6.QtCore import (
+    QObject,
+    QRunnable,
+    QSettings,
+    QThreadPool,
+    Qt,
+    Signal,
+)
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -55,8 +63,9 @@ from ..providers.tidal_auth import (
     disconnect_tidal,
     tidal_is_connected,
 )
+from .. import licensing_keygen as keygen
 from ..i18n import SUPPORTED_LANGUAGES, tr
-from ..licensing import load_license
+from ..licensing import load_license, machine_fingerprint
 
 
 STATUS_STYLES = {
@@ -64,6 +73,31 @@ STATUS_STYLES = {
     "setup_required": ("color:#c28b00;font-weight:600;"),
     "unsupported": ("color:#d04a4a;font-weight:600;"),
 }
+
+
+class _LicenseStatusSignals(QObject):
+    # (aktiv, bereits geprüfter Schlüssel) – Schlüssel, um veraltete Antworten
+    # zu verwerfen, falls der Nutzer zwischenzeitlich weitergetippt hat.
+    done = Signal(bool, str)
+
+
+class _LicenseStatusCheck(QRunnable):
+    """Prüft einen Lizenzschlüssel online (Keygen) für die Statusanzeige."""
+
+    def __init__(self, license_key: str, fingerprint: str) -> None:
+        super().__init__()
+        self._key = license_key
+        self._fingerprint = fingerprint
+        self.signals = _LicenseStatusSignals()
+
+    def run(self) -> None:
+        premium = keygen.refresh_premium(
+            self._key,
+            self._fingerprint,
+            now=datetime.now(),
+            cache_path=keygen.default_cache_path(),
+        )
+        self.signals.done.emit(premium, self._key)
 
 
 class SettingsDialog(QDialog):
@@ -621,8 +655,13 @@ class SettingsDialog(QDialog):
         self.license_status_label = QLabel()
         self.license_status_label.setWordWrap(True)
         license_form.addRow(tr("license_status", language), self.license_status_label)
+        self._license_status_workers: set = set()
         self.license_key_edit.textChanged.connect(self._update_license_status)
+        # Online-Prüfung (Netzwerk) erst, wenn die Eingabe abgeschlossen ist –
+        # nicht bei jedem Tastendruck.
+        self.license_key_edit.editingFinished.connect(self._check_license_online)
         self._update_license_status()
+        self._check_license_online()
         layout.addWidget(license_box)
 
         layout.addStretch()
@@ -1090,13 +1129,51 @@ class SettingsDialog(QDialog):
         return tr("not_checked_yet", self.language)
 
     def _update_license_status(self) -> None:
-        license_ = load_license(self.license_key_edit.text().strip())
-        if license_ is None:
+        """Sofort-Anzeige ohne Netzwerk: Offline-Signatur bzw. Zwischenstand."""
+        key = self.license_key_edit.text().strip()
+        if not key:
             self.license_status_label.setText(tr("license_inactive", self.language))
-        else:
+            return
+        # Eigene, offline signierte Lizenz (make_license.py) sofort erkennen.
+        license_ = load_license(key)
+        if license_ is not None:
             self.license_status_label.setText(
                 tr("license_active", self.language, name=license_.licensee)
             )
+        elif keygen.is_configured():
+            # Keygen-Schlüssel wird online geprüft -> Zwischenstand anzeigen.
+            self.license_status_label.setText(tr("license_checking", self.language))
+        else:
+            self.license_status_label.setText(tr("license_inactive", self.language))
+
+    def _check_license_online(self) -> None:
+        key = self.license_key_edit.text().strip()
+        # Nur nötig, wenn ein Schlüssel vorliegt, er nicht schon offline gültig
+        # ist und Keygen konfiguriert ist.
+        if not key or load_license(key) is not None or not keygen.is_configured():
+            return
+        self.license_status_label.setText(tr("license_checking", self.language))
+        worker = _LicenseStatusCheck(key, machine_fingerprint())
+        worker.setAutoDelete(False)
+        self._license_status_workers.add(worker)
+        worker.signals.done.connect(
+            lambda active, checked, w=worker: self._on_license_checked(
+                active, checked, w
+            )
+        )
+        QThreadPool.globalInstance().start(worker)
+
+    def _on_license_checked(self, active: bool, checked_key: str, worker) -> None:
+        self._license_status_workers.discard(worker)
+        # Veraltete Antwort verwerfen, falls der Nutzer weitergetippt hat.
+        if checked_key != self.license_key_edit.text().strip():
+            return
+        if active:
+            self.license_status_label.setText(
+                tr("license_active", self.language, name="Keygen")
+            )
+        else:
+            self.license_status_label.setText(tr("license_inactive", self.language))
 
     @staticmethod
     def _closest_font_scale(value: float) -> float:
