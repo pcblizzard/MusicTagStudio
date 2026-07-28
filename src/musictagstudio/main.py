@@ -1,6 +1,13 @@
+import os
 import sys
 
-from PySide6.QtCore import (
+# Multimedia-Backend deterministisch auf FFmpeg festlegen (breite Codec-
+# Unterstützung: FLAC, ALAC, Opus, Vorbis, AAC, MP3 …), damit nie das
+# schwächere Windows-Media-Foundation-Plugin einspringt. Muss vor der ersten
+# QMediaPlayer-Erzeugung stehen. setdefault lässt eine bewusste Übersteuerung zu.
+os.environ.setdefault("QT_MEDIA_BACKEND", "ffmpeg")
+
+from PySide6.QtCore import (  # noqa: E402
     qInstallMessageHandler,
     Qt,
 )
