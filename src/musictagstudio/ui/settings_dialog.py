@@ -14,6 +14,7 @@ from PySide6.QtCore import (
     QSettings,
     QThreadPool,
     Qt,
+    QTimer,
     QUrl,
     Signal,
 )
@@ -760,9 +761,14 @@ class SettingsDialog(QDialog):
         self.license_deactivate_button.clicked.connect(self._deactivate_machine)
         license_form.addRow("", self.license_deactivate_button)
         self._license_status_workers: set = set()
-        self.license_key_edit.textChanged.connect(self._update_license_status)
-        # Online-Prüfung (Netzwerk) erst, wenn die Eingabe abgeschlossen ist –
-        # nicht bei jedem Tastendruck.
+        # Entprellte Online-Prüfung: kurz nach dem Tippen/Einfügen automatisch
+        # prüfen, ohne dass der Nutzer das Feld verlassen oder speichern muss.
+        self._license_check_timer = QTimer(self)
+        self._license_check_timer.setSingleShot(True)
+        self._license_check_timer.setInterval(600)
+        self._license_check_timer.timeout.connect(self._check_license_online)
+        self.license_key_edit.textChanged.connect(self._on_license_key_changed)
+        # Bei Enter/Fokusverlust sofort prüfen (ohne auf den Timer zu warten).
         self.license_key_edit.editingFinished.connect(self._check_license_online)
         self._update_license_status()
         self._check_license_online()
@@ -1332,6 +1338,16 @@ class SettingsDialog(QDialog):
         if last_success:
             return tr("last_checked_success", self.language, when=last_success)
         return tr("not_checked_yet", self.language)
+
+    def _on_license_key_changed(self) -> None:
+        """Sofort-Anzeige aktualisieren und die Online-Prüfung entprellt anstoßen."""
+        self._update_license_status()
+        key = self.license_key_edit.text().strip()
+        # Nur prüfen, wenn ein Keygen-Schlüssel vorliegt (kein Offline-Key).
+        if key and load_license(key) is None and keygen.is_configured():
+            self._license_check_timer.start()
+        else:
+            self._license_check_timer.stop()
 
     def _update_license_status(self) -> None:
         """Sofort-Anzeige ohne Netzwerk: Offline-Signatur bzw. Zwischenstand."""
