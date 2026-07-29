@@ -43,6 +43,8 @@ class AppSettings:
     # Signierter Lizenzschlüssel (schaltet Premium-Funktionen frei). Leer =
     # Basisversion. Nicht geheim; wirkt nur mit gültiger Signatur.
     license_key: str = ""
+    # Tag-Felder, die NICHT in die Dateien geschrieben werden (leer = alle an).
+    disabled_tag_fields: tuple[str, ...] = ()
     selected_provider: str = "apple_music"
     enrich_missing_fields: bool = True
     apple_country: str = "DE"
@@ -140,6 +142,13 @@ def load_settings(
     network = data.get("network", {})
     rename = data.get("rename", {})
     license_section = data.get("license", {})
+    metadata_section = data.get("metadata", {})
+    raw_disabled = metadata_section.get("disabled_fields", [])
+    disabled_tag_fields = tuple(
+        str(name).strip()
+        for name in (raw_disabled if isinstance(raw_disabled, list) else [])
+        if str(name).strip()
+    )
 
     theme = str(
         appearance.get(
@@ -303,6 +312,7 @@ def load_settings(
             or "{track} - {title}"
         ),
         license_key=str(license_section.get("key", "")).strip(),
+        disabled_tag_fields=disabled_tag_fields,
         selected_provider=selected_provider,
         enrich_missing_fields=bool(
             providers.get(
@@ -519,6 +529,15 @@ def save_settings(
         "",
         "[license]",
         f'key = "{_toml_string(settings.license_key)}"',
+        "",
+        "[metadata]",
+        (
+            "disabled_fields = ["
+            + ", ".join(
+                f'"{_toml_string(name)}"' for name in settings.disabled_tag_fields
+            )
+            + "]"
+        ),
         "",
         "[library]",
         (f"load_sources_on_startup = {str(settings.load_sources_on_startup).lower()}"),

@@ -1783,6 +1783,25 @@ class MainWindow(QMainWindow):
         if not items:
             return 0, []
 
+        # Abgeschaltete Tag-Felder nicht überschreiben: für sie den bisherigen
+        # Wert der Datei beibehalten (Einstellung "Eingebettete Tags").
+        disabled = load_settings().disabled_tag_fields
+        if disabled:
+            items = [
+                (
+                    row,
+                    replace(
+                        updated,
+                        **{
+                            field: getattr(self.songs[row], field)
+                            for field in disabled
+                            if hasattr(updated, field)
+                        },
+                    ),
+                )
+                for row, updated in items
+            ]
+
         if not self._preview_changes(
             items
         ):

@@ -15,6 +15,12 @@ pattern = "{track} - {title}"
 # Basisversion. Nicht geheim; wirkt nur mit gueltiger Signatur.
 key = ""
 
+[metadata]
+# Tag-Felder, die NICHT in die Dateien geschrieben werden (leer = alle an).
+# Moegliche Werte: title, artist, album_artist, album, genre, year, track,
+# total_tracks, disc, total_discs, isrc, label, copyright, composer, comment.
+disabled_fields = []
+
 [providers]
 selected = "apple_music"
 enrich_missing_fields = true

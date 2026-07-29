@@ -710,5 +710,9 @@
   "rename_preview_label": "Pré-visualização",
   "open_config_folder": "Abrir pasta de configuração",
   "reset_defaults": "Restaurar padrões",
-  "reset_defaults_confirm_msg": "Restaurar aparência, esquema de nomes e normalização para os padrões? As fontes de música, os provedores, as chaves de API e a licença são mantidos."
+  "reset_defaults_confirm_msg": "Restaurar aparência, esquema de nomes e normalização para os padrões? As fontes de música, os provedores, as chaves de API e a licença são mantidos.",
+  "embedded_tags_group": "Tags incorporadas",
+  "embedded_tags_hint": "Apenas os campos ativados são gravados nos arquivos ao salvar. Os campos desativados permanecem inalterados nos arquivos.",
+  "enable_all": "Ativar tudo",
+  "disable_all": "Desativar tudo"
 }

@@ -710,5 +710,9 @@
   "rename_preview_label": "Aperçu",
   "open_config_folder": "Ouvrir le dossier de configuration",
   "reset_defaults": "Réinitialiser par défaut",
-  "reset_defaults_confirm_msg": "Réinitialiser l'apparence, le schéma de nommage et la normalisation aux valeurs par défaut ? Les sources musicales, les fournisseurs, les clés API et la licence sont conservés."
+  "reset_defaults_confirm_msg": "Réinitialiser l'apparence, le schéma de nommage et la normalisation aux valeurs par défaut ? Les sources musicales, les fournisseurs, les clés API et la licence sont conservés.",
+  "embedded_tags_group": "Balises intégrées",
+  "embedded_tags_hint": "Seuls les champs activés sont écrits dans les fichiers lors de l'enregistrement. Les champs désactivés restent inchangés dans les fichiers.",
+  "enable_all": "Tout activer",
+  "disable_all": "Tout désactiver"
 }

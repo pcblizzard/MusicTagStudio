@@ -710,5 +710,9 @@
   "rename_preview_label": "Preview",
   "open_config_folder": "Open config folder",
   "reset_defaults": "Reset to defaults",
-  "reset_defaults_confirm_msg": "Reset appearance, naming scheme and normalization to defaults? Music sources, providers, API keys and license are kept."
+  "reset_defaults_confirm_msg": "Reset appearance, naming scheme and normalization to defaults? Music sources, providers, API keys and license are kept.",
+  "embedded_tags_group": "Embedded tags",
+  "embedded_tags_hint": "Only enabled fields are written to files when saving. Disabled fields are left unchanged in the files.",
+  "enable_all": "Enable all",
+  "disable_all": "Disable all"
 }

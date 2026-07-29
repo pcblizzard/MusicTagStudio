@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -77,6 +78,26 @@ STATUS_STYLES = {
     "setup_required": ("color:#c28b00;font-weight:600;"),
     "unsupported": ("color:#d04a4a;font-weight:600;"),
 }
+
+
+# Tag-Felder, deren Schreiben einzeln an-/abschaltbar ist (wie history._TAG_FIELDS).
+TAG_FIELDS: tuple[str, ...] = (
+    "title",
+    "artist",
+    "album_artist",
+    "album",
+    "genre",
+    "year",
+    "track",
+    "total_tracks",
+    "disc",
+    "total_discs",
+    "isrc",
+    "label",
+    "copyright",
+    "composer",
+    "comment",
+)
 
 
 class _LicenseStatusSignals(QObject):
@@ -689,6 +710,30 @@ class SettingsDialog(QDialog):
         self._update_rename_preview()
         layout.addWidget(rename)
 
+        metadata_box = QGroupBox(tr("embedded_tags_group", language))
+        metadata_layout = QVBoxLayout(metadata_box)
+        metadata_hint = QLabel(tr("embedded_tags_hint", language))
+        metadata_hint.setWordWrap(True)
+        metadata_layout.addWidget(metadata_hint)
+        toggle_row = QHBoxLayout()
+        enable_all = QPushButton(tr("enable_all", language))
+        enable_all.clicked.connect(lambda: self._set_all_tag_fields(True))
+        disable_all = QPushButton(tr("disable_all", language))
+        disable_all.clicked.connect(lambda: self._set_all_tag_fields(False))
+        toggle_row.addWidget(enable_all)
+        toggle_row.addWidget(disable_all)
+        toggle_row.addStretch()
+        metadata_layout.addLayout(toggle_row)
+        tag_grid = QGridLayout()
+        self.tag_field_checks: dict[str, QCheckBox] = {}
+        for index, field in enumerate(TAG_FIELDS):
+            check = QCheckBox(tr(f"field_{field}", language))
+            check.setChecked(field not in settings.disabled_tag_fields)
+            self.tag_field_checks[field] = check
+            tag_grid.addWidget(check, index // 2, index % 2)
+        metadata_layout.addLayout(tag_grid)
+        layout.addWidget(metadata_box)
+
         license_box = QGroupBox(tr("license_group", language))
         license_form = QFormLayout(license_box)
         self.license_key_edit = QLineEdit(settings.license_key)
@@ -746,6 +791,10 @@ class SettingsDialog(QDialog):
         self._update_button_texts()
         self.language_combo.currentIndexChanged.connect(self._update_button_texts)
         outer_layout.addWidget(button_box)
+
+    def _set_all_tag_fields(self, enabled: bool) -> None:
+        for check in self.tag_field_checks.values():
+            check.setChecked(enabled)
 
     def _open_config_folder(self) -> None:
         folder = Path(DEFAULT_CONFIG_PATH).resolve().parent
@@ -1049,6 +1098,11 @@ class SettingsDialog(QDialog):
                 self.rename_pattern_edit.text().strip() or "{track} - {title}"
             ),
             license_key=self.license_key_edit.text().strip(),
+            disabled_tag_fields=tuple(
+                field
+                for field, check in self.tag_field_checks.items()
+                if not check.isChecked()
+            ),
             selected_provider=provider,
             enrich_missing_fields=(self.enrich_checkbox.isChecked()),
             apple_country=str(self.country_combo.currentData()),

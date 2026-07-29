@@ -710,5 +710,9 @@
   "rename_preview_label": "Vorschau",
   "open_config_folder": "Konfigurationsordner öffnen",
   "reset_defaults": "Auf Standard zurücksetzen",
-  "reset_defaults_confirm_msg": "Darstellung, Namensschema und Normalisierung auf die Standardwerte zurücksetzen? Musikquellen, Provider, API-Schlüssel und Lizenz bleiben erhalten."
+  "reset_defaults_confirm_msg": "Darstellung, Namensschema und Normalisierung auf die Standardwerte zurücksetzen? Musikquellen, Provider, API-Schlüssel und Lizenz bleiben erhalten.",
+  "embedded_tags_group": "Eingebettete Tags",
+  "embedded_tags_hint": "Nur aktivierte Felder werden beim Speichern in die Dateien geschrieben. Abgeschaltete Felder bleiben in den Dateien unverändert.",
+  "enable_all": "Alle aktivieren",
+  "disable_all": "Alle deaktivieren"
 }
