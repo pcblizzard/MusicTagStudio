@@ -150,7 +150,9 @@ class _MachineDeactivate(QRunnable):
                 self._fingerprint,
                 cache_path=keygen.default_cache_path(),
             )
-        except OSError:
+        except Exception:
+            # Jeder Fehler (Netz, JSON, ...) muss zu ok=False führen, damit das
+            # done-Signal garantiert kommt und der Status nicht hängen bleibt.
             ok = False
         try:
             self.signals.done.emit(ok)
@@ -1411,19 +1413,31 @@ class SettingsDialog(QDialog):
     def _on_machine_deactivated(self, ok: bool, worker) -> None:
         self._license_status_workers.discard(worker)
         if ok:
+            # Den Schlüssel lokal entfernen und sofort speichern. Sonst würde
+            # die automatische Online-Prüfung (hier und beim nächsten Start)
+            # die gerade freigegebene Maschine umgehend wieder aktivieren und
+            # Premium bliebe fälschlich aktiv.
+            self.license_key_edit.blockSignals(True)
+            self.license_key_edit.clear()
+            self.license_key_edit.blockSignals(False)
+            self.settings_saved.emit(self.selected_settings())
             QMessageBox.information(
                 self,
                 tr("license_deactivate", self.language),
                 tr("license_deactivated_msg", self.language),
             )
-            self.license_status_label.setText(tr("license_inactive", self.language))
-        else:
-            QMessageBox.warning(
-                self,
-                tr("license_deactivate", self.language),
-                tr("license_deactivate_failed_msg", self.language),
-            )
+            # Key ist leer -> zeigt "inaktiv", Knopf wird deaktiviert.
+            self._update_license_status()
+            return
+        QMessageBox.warning(
+            self,
+            tr("license_deactivate", self.language),
+            tr("license_deactivate_failed_msg", self.language),
+        )
+        # Knopf/Zwischenstand zurücksetzen und den echten Status online
+        # nachziehen -- sonst bliebe die Anzeige auf "wird geprüft" hängen.
         self._update_license_status()
+        self._check_license_online()
 
     @staticmethod
     def _closest_font_scale(value: float) -> float:
