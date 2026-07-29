@@ -96,6 +96,7 @@ from ..batch_comparison_logic import BatchSongProposal
 from .batch_dialog import BatchComparisonDialog
 from .about_dialog import AboutDialog
 from .comparison_dialog import ComparisonDialog
+from .premium_dialog import PremiumDialog
 from .settings_dialog import SettingsDialog
 from .cover_dialog import (
     CoverSelectionDialog,
@@ -246,6 +247,9 @@ class MainWindow(QMainWindow):
             now=datetime.now(),
             cache_path=keygen.default_cache_path(),
         )
+        # Zeitbasierte Testphase beim allerersten Start merken (danach unbegrenzt
+        # Premium für TRIAL_DAYS Tage; siehe usage_limits).
+        usage_limits.ensure_trial_started(datetime.now())
         # Laufende Lizenz-Hintergrundprüfungen festhalten, damit ihr Ergebnis-
         # Signal nicht durch vorzeitiges Aufräumen verloren geht.
         self._license_workers: set = set()
@@ -1928,16 +1932,31 @@ class MainWindow(QMainWindow):
         """
         settings = load_settings()
         premium = self._premium_active(settings)
-        # Ohne Lizenz sind FREE_RENAME_LIMIT Umbenennungen gratis; erst danach
-        # (oder bei vorhandenem, aber unbestätigtem Schlüssel) wird geblockt.
-        if not premium and usage_limits.remaining_free_renames() <= 0:
+        # In der zeitbasierten Testphase ist ebenfalls alles freigeschaltet.
+        trial = usage_limits.trial_active(datetime.now())
+        unlocked = premium or trial
+        # Ohne Freischaltung sind FREE_RENAME_LIMIT Umbenennungen gratis; erst
+        # danach (oder bei vorhandenem, aber unbestätigtem Schlüssel) wird
+        # geblockt – dann kommt der freundliche Premium-Hinweis.
+        if not unlocked and usage_limits.remaining_free_renames() <= 0:
             if settings.license_key.strip() and keygen.is_configured():
                 title = tr("license_needs_online_title", self.language)
                 message = tr("license_needs_online_msg", self.language)
+                show_enter = False
             else:
                 title = tr("premium_required_title", self.language)
                 message = tr("free_limit_reached_msg", self.language)
-            QMessageBox.information(self, title, message)
+                show_enter = True
+            dialog = PremiumDialog(
+                self,
+                language=self.language,
+                title=title,
+                message=message,
+                show_enter_license=show_enter,
+            )
+            if dialog.exec() == PremiumDialog.DialogCode.Accepted:
+                self.open_settings()
+                self.settings_workspace.focus_license_tab()
             return
 
         if not self.songs:
@@ -2004,8 +2023,10 @@ class MainWindow(QMainWindow):
         if moves:
             self.history.commit_rename("rename_history", moves)
             self.update_history_actions()
-            # Gratis genutzte Umbenennungen zählen (nur ohne Premium).
-            if not premium:
+            # Gratis genutzte Umbenennungen zählen – nur wenn weder Lizenz noch
+            # laufende Testphase (in der Testphase wird nichts vom Kontingent
+            # abgezogen).
+            if not unlocked:
                 usage_limits.record_renames(len(moves))
             # Neu einlesen, damit Tabelle/Index die neuen Pfade übernehmen.
             self.scan_music()
@@ -2015,8 +2036,11 @@ class MainWindow(QMainWindow):
             parts.append(
                 tr_plural("rename_skipped", len(skipped), self.language)
             )
-        # Im Gratis-Modus das verbleibende Kontingent anzeigen.
-        if not premium:
+        # Hinweis auf Testphase bzw. verbleibendes Gratis-Kontingent.
+        if trial and not premium:
+            days = usage_limits.trial_days_remaining(datetime.now())
+            parts.append(tr_plural("trial_days_left", days, self.language))
+        elif not premium:
             remaining = usage_limits.remaining_free_renames()
             parts.append(
                 tr_plural("free_renames_remaining", remaining, self.language)

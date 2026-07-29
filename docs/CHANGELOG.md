@@ -1,5 +1,31 @@
 # MusicTagStudio 0.8.6-alpha26
 
+## Windows-Installer (PyInstaller + Inno Setup)
+
+- Neue Build-Kette unter `packaging/`: PyInstaller baut `MusicTagStudio.exe`
+  (inkl. Qt-Multimedia-FFmpeg), Inno Setup packt ein `MusicTagStudio-Setup.exe`
+  mit Desktop-/Startmenü-Verknüpfung und Uninstaller.
+- **Frozen-aware Pfade:** installiert liegen Nutzerdaten in
+  `%LOCALAPPDATA%\MusicTagStudio` (update-fest, auch unter *Programme*
+  beschreibbar) statt im Programmordner.
+- **Portabel wählbar:** Setup-Option speichert die Nutzerdaten stattdessen im
+  Installationsordner (`portable.flag` neben der Exe).
+
+## Testphase & aufgehübschter Premium-Hinweis
+
+- **3-Tage-Testphase:** ab dem ersten Start sind die Premium-Funktionen
+  unbegrenzt nutzbar; danach greift das dauerhafte Gratis-Kontingent von 30
+  Umbenennungen. Bewusst lokal (kein Server, keine Keygen-Keys).
+- **Neuer Premium-Hinweis-Dialog** statt schlichter Meldung: mit Knopf
+  „Lizenzschlüssel eingeben" (springt direkt zum Lizenz-Reiter) und klarem
+  Hinweis, dass eine Spende **kein** Premium freischaltet.
+- Statusleiste zeigt in der Testphase die verbleibenden Tage.
+
+## Info-Dialog: ❤️ Unterstützen-Tab
+
+- Eigener Tab mit persönlichem Dankestext und Spenden-Links (PayPal, Ko-fi,
+  Buy Me a Coffee, Patreon). Premium-Nutzer sehen nur Dank statt Bitte.
+
 ## Einstellungen aufgeräumt: Reiter, Tag-Schalter, Vorschau
 
 - Die Einstellungen sind jetzt in **Reiter** gegliedert (Darstellung,

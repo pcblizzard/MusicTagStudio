@@ -200,6 +200,7 @@ class SettingsDialog(QDialog):
         sources_page = self._add_settings_tab(tr("tab_sources", language))
         naming_page = self._add_settings_tab(tr("tab_naming", language))
         license_page = self._add_settings_tab(tr("tab_license", language))
+        self._license_tab_index = self.settings_tabs.count() - 1
 
         appearance = QGroupBox(tr("appearance", language))
         appearance_form = QFormLayout(appearance)
@@ -809,6 +810,11 @@ class SettingsDialog(QDialog):
         self._update_button_texts()
         self.language_combo.currentIndexChanged.connect(self._update_button_texts)
         outer_layout.addWidget(button_box)
+
+    def focus_license_tab(self) -> None:
+        """Wechselt zum Lizenz-Reiter und fokussiert das Schlüsselfeld."""
+        self.settings_tabs.setCurrentIndex(self._license_tab_index)
+        self.license_key_edit.setFocus()
 
     def _add_settings_tab(self, title: str) -> QVBoxLayout:
         """Legt einen scrollbaren Reiter an und gibt dessen Layout zurück."""

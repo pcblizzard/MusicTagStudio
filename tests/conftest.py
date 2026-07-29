@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from musictagstudio import i18n, licensing_keygen, usage_limits
@@ -29,10 +31,17 @@ def _isolate_license(request, monkeypatch, tmp_path):
         "default_cache_path",
         lambda: tmp_path / "license_cache.json",
     )
+    usage_file = tmp_path / "usage.json"
     monkeypatch.setattr(
         usage_limits,
         "default_usage_path",
-        lambda: tmp_path / "usage.json",
+        lambda: usage_file,
+    )
+    # Testphase standardmäßig als abgelaufen vormerken, damit die Gratis-Stufe
+    # (Nutzungskontingent) in den Tests greift und nicht die zeitbasierte
+    # Testphase Premium freischaltet. Tests der Testphase setzen dies gezielt um.
+    usage_file.write_text(
+        json.dumps({"trial_start": "2000-01-01T00:00:00"}), encoding="utf-8"
     )
 
 

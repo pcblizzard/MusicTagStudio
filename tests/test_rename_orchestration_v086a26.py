@@ -8,7 +8,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QDialog  # noqa: E402
 
 from musictagstudio.history import HistoryManager  # noqa: E402
 from musictagstudio.models.song import Song  # noqa: E402
@@ -99,9 +99,17 @@ def test_rename_free_tier_allows_then_blocks(tmp_path, monkeypatch):
     # Kontingent erschöpfen -> jetzt wird geblockt.
     usage_limits.record_renames(usage_limits.FREE_RENAME_LIMIT)
     captured: list[str] = []
-    monkeypatch.setattr(
-        mw.QMessageBox, "information", lambda *a, **k: captured.append("info")
-    )
+
+    class _RejectPremium:
+        DialogCode = QDialog.DialogCode
+
+        def __init__(self, *args, **kwargs):
+            captured.append("premium-hint")
+
+        def exec(self):
+            return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(mw, "PremiumDialog", _RejectPremium)
     b = _make_file(tmp_path / "raw2.flac")
     win.songs = [Song(path=b, track="2", title="Zweiter")]
     win.rename_files()
