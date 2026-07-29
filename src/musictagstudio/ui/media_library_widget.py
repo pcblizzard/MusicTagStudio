@@ -41,7 +41,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QPushButton,
     QScrollArea,
     QSplitter,
@@ -88,6 +87,7 @@ from ..models.song import Song
 from ..icons import make_icon
 from ..direct_album_lookup import is_prerelease_date
 from ..local_track import local_duration_ms
+from ..audio_analysis.quality import AlbumQuality, summarize_album
 from .formatting import localized_date
 
 
@@ -944,6 +944,13 @@ class MediaLibraryWidget(QWidget):
         detail_layout.addWidget(
             self.streaming_status
         )
+
+        self.quality_status = QLabel(
+            tr("quality_not_checked", self.language)
+        )
+        self.quality_status.setWordWrap(True)
+        self.quality_status.setTextFormat(Qt.TextFormat.RichText)
+        detail_layout.addWidget(self.quality_status)
 
         self.editorial_info = QTextBrowser()
         self.editorial_info.setObjectName("editorialInfo")
@@ -2408,7 +2415,11 @@ class MediaLibraryWidget(QWidget):
             else tr("source_unreachable_tip", self.language)
         )
         self.streaming_button.setEnabled(True)
-        self.quality_button.setEnabled(True)
+        # Qualitätsprüfung wertet die lokalen Dateien aus -> nur sinnvoll, wenn
+        # das Album lokal verfügbar ist.
+        self.quality_button.setEnabled(bool(local_path) and local_online)
+        self.quality_status.setText(tr("quality_not_checked", self.language))
+        self.quality_status.setToolTip("")
         self.apple_button.setEnabled(False)
         self.tidal_button.setEnabled(False)
         self.spotify_button.setEnabled(False)
@@ -3734,11 +3745,55 @@ class MediaLibraryWidget(QWidget):
     def check_quality(
         self,
     ) -> None:
-        QMessageBox.information(
-            self,
-            tr("quality_check_title", self.language),
-            tr("quality_check_msg", self.language),
+        group = self.current_group
+        if group is None:
+            return
+        songs = self._current_local_album_songs()
+        if not songs:
+            self.quality_status.setText(tr("quality_no_local", self.language))
+            self.quality_status.setToolTip("")
+            return
+        paths = [song.path for song in songs]
+        self.quality_button.setEnabled(False)
+        self.quality_status.setText(tr("quality_checking", self.language))
+        self._run(
+            summarize_album,
+            paths,
+            finished=self._quality_loaded,
+            transform=lambda album, gid=group.release_group_id: (gid, album),
         )
+
+    def _quality_loaded(self, result) -> None:
+        group_id, album = result
+        if (
+            self.current_group is None
+            or self.current_group.release_group_id != group_id
+        ):
+            return
+        self.quality_button.setEnabled(True)
+        if not isinstance(album, AlbumQuality):
+            return
+        self.quality_status.setText(self._format_quality(album))
+        self.quality_status.setToolTip(self._quality_tooltip(album))
+
+    def _format_quality(self, album: AlbumQuality) -> str:
+        label = html.escape(tr("quality_local_label", self.language))
+        analyzed = album.analyzed
+        if not analyzed:
+            return f"<b>{label}:</b> {html.escape(album.summary())}"
+        parts = [html.escape(album.summary())]
+        parts.append(tr_plural("quality_track_count", len(analyzed), self.language))
+        if album.failed:
+            parts.append(
+                tr_plural("quality_unreadable", len(album.failed), self.language)
+            )
+        return f"<b>{label}:</b> " + " · ".join(parts)
+
+    def _quality_tooltip(self, album: AlbumQuality) -> str:
+        lines = []
+        for track in album.tracks:
+            lines.append(f"{track.filename}: {track.summary()}")
+        return "\n".join(lines)
 
     def open_apple(
         self,
