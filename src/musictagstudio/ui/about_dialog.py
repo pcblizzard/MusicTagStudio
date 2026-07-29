@@ -6,13 +6,15 @@ import sys
 from pathlib import Path
 
 import PySide6
-from PySide6.QtCore import QLibraryInfo, QSettings, qVersion
+from PySide6.QtCore import QLibraryInfo, QSettings, QUrl, qVersion
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QPushButton,
     QTabWidget,
     QTextBrowser,
@@ -23,6 +25,15 @@ from .. import __version__
 from ..diagnostics import project_root
 from ..i18n import tr
 from ..settings import load_settings
+
+
+# (Anzeigename, URL) – im ❤️-Menü in dieser Reihenfolge.
+DONATION_OPTIONS = (
+    ("PayPal", "https://paypal.com/donate/?hosted_button_id=GJT2FRBFEU9KJ"),
+    ("Ko-fi", "https://ko-fi.com/br1984"),
+    ("Buy Me a Coffee", "https://buymeacoffee.com/br1984"),
+    ("Patreon", "https://patreon.com/c/BR1984"),
+)
 
 
 PUBLIC_INTERFACES = (
@@ -60,6 +71,14 @@ class AboutDialog(QDialog):
         layout.addWidget(self.tabs, 1)
 
         button_row = QHBoxLayout()
+        self.donate_button = QPushButton("❤️ " + tr("support_button", language))
+        self.donate_button.setToolTip(tr("support_tooltip", language))
+        donate_menu = QMenu(self.donate_button)
+        for name, url in DONATION_OPTIONS:
+            action = donate_menu.addAction(name)
+            action.triggered.connect(lambda _checked=False, u=url: self._open_donation(u))
+        self.donate_button.setMenu(donate_menu)
+        button_row.addWidget(self.donate_button)
         self.copy_button = QPushButton(tr("copy_debug", language))
         self.copy_button.clicked.connect(self.copy_debug_information)
         button_row.addWidget(self.copy_button)
@@ -68,6 +87,9 @@ class AboutDialog(QDialog):
         close_buttons.rejected.connect(self.reject)
         button_row.addWidget(close_buttons)
         layout.addLayout(button_row)
+
+    def _open_donation(self, url: str) -> None:
+        QDesktopServices.openUrl(QUrl(url))
 
     def copy_debug_information(self) -> None:
         clipboard = QApplication.clipboard()

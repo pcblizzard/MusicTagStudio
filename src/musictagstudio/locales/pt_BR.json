@@ -175,6 +175,8 @@
   "compare_metadata": "Comparar metadados",
   "contributors_html": "<h2>Colaboradores</h2><p><b>Michael / <a href=\"https://github.com/pcblizzard\">pcblizzard</a></b><br>Ideia do projeto, desenvolvimento, testes e manutenção</p><p><a href=\"https://github.com/pcblizzard/MusicTagStudio/graphs/contributors\">Exibir colaboradores no GitHub</a></p>",
   "copy_debug": "Copiar informações de depuração para a área de transferência",
+  "support_button": "Apoiar",
+  "support_tooltip": "Apoie o desenvolvimento com uma doação via PayPal",
   "copy_debug_done": "As informações de depuração foram copiadas",
   "country_at": "Áustria",
   "country_ch": "Suíça",
