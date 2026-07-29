@@ -49,7 +49,9 @@ PUBLIC_INTERFACES = (
 
 
 class AboutDialog(QDialog):
-    def __init__(self, parent=None, *, language: str = "automatic") -> None:
+    def __init__(
+        self, parent=None, *, language: str = "automatic", premium: bool = False
+    ) -> None:
         super().__init__(parent)
         self.language = language
         self.setWindowTitle(tr("about_window_title", language))
@@ -61,7 +63,7 @@ class AboutDialog(QDialog):
 
         self.tabs = QTabWidget()
         self.about_browser = _browser(about_html(language))
-        self.support_browser = _browser(support_html(language))
+        self.support_browser = _browser(support_html(language, premium=premium))
         self.contributors_browser = _browser(contributors_html(language))
         self.debug_browser = _browser(f"<pre>{_escape_html(debug_information())}</pre>")
         self.tabs.addTab(self.about_browser, tr("tab_about", language))
@@ -97,16 +99,19 @@ def about_html(language: str = "automatic") -> str:
     )
 
 
-def support_html(language: str = "automatic") -> str:
+def support_html(language: str = "automatic", *, premium: bool = False) -> str:
     links = "".join(
         f'<li style="margin-bottom:4px;">'
         f'<a href="{url}" style="color:#e05555; text-decoration:none;">{name}</a>'
         f"</li>"
         for name, url in DONATION_OPTIONS
     )
+    # Premium-Nutzer werden nicht mehr um Spenden gebeten -- nur ein Dank.
+    # Wer trotzdem zusätzlich spenden möchte, findet die Links weiterhin.
+    thanks_key = "support_thanks_premium" if premium else "support_thanks"
     return (
         f"<p>{tr('support_intro', language)}</p>"
-        f"<p>{tr('support_thanks', language)}</p>"
+        f"<p>{tr(thanks_key, language)}</p>"
         f"<p><b>{tr('support_links_heading', language)}</b></p>"
         f'<ul style="list-style:none; padding-left:0;">{links}</ul>'
     )

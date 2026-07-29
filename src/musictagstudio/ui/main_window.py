@@ -1302,7 +1302,8 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self.show_about_dialog)
 
     def show_about_dialog(self) -> None:
-        AboutDialog(self, language=self.language).exec()
+        premium = self._premium_active(load_settings())
+        AboutDialog(self, language=self.language, premium=premium).exec()
 
     def _selected_album_artist(
         self,
