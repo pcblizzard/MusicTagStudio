@@ -551,6 +551,9 @@ class MediaLibraryWidget(QWidget):
         ] = {}
         self._provider_streaming_errors: dict[str, dict[str, str]] = {}
         self._streaming_checked_at: dict[str, datetime] = {}
+        # Zuletzt ermittelte lokale Qualität (HTML) der aktuellen Veröffentlichung;
+        # die Qualitätszeile kombiniert sie mit der TIDAL-Streaming-Qualität.
+        self._quality_local_text = ""
         self._editorial_request_key = ""
         self._editorial_heading = ""
         self._editorial_text = ""
@@ -2418,8 +2421,12 @@ class MediaLibraryWidget(QWidget):
         # Qualitätsprüfung wertet die lokalen Dateien aus -> nur sinnvoll, wenn
         # das Album lokal verfügbar ist.
         self.quality_button.setEnabled(bool(local_path) and local_online)
-        self.quality_status.setText(tr("quality_not_checked", self.language))
+        # Qualitätszeile für die neue Veröffentlichung zurücksetzen (lokale
+        # Qualität verwerfen; die Streaming-Qualität ergibt sich aus den – hier
+        # noch nicht vorhandenen – frischen Prüfergebnissen).
+        self._quality_local_text = ""
         self.quality_status.setToolTip("")
+        self._refresh_quality_status()
         self.apple_button.setEnabled(False)
         self.tidal_button.setEnabled(False)
         self.spotify_button.setEnabled(False)
@@ -3474,6 +3481,8 @@ class MediaLibraryWidget(QWidget):
         for availability in report.results.values():
             self.streaming_cache.put(availability)
         self._apply_provider_buttons(report.results)
+        # TIDAL-Qualität (falls vorhanden) neben der lokalen Qualität zeigen.
+        self._refresh_quality_status()
 
         apple_result = report.results.get("apple_music")
         if (
@@ -3616,29 +3625,17 @@ class MediaLibraryWidget(QWidget):
             result = results.get(provider)
             if result is not None:
                 if result.status is AvailabilityStatus.AVAILABLE:
-                    # Qualitätskennzeichen (z. B. TIDAL "Hi-Res Lossless") gehört
-                    # in dieselbe Klammer wie die Trefferquote, damit es klar zum
-                    # Anbieter gehört und nicht wie ein eigener Listenpunkt wirkt.
-                    quality = getattr(result, "quality", "")
-                    if quality:
-                        parts.append(
-                            tr(
-                                "provider_found_quality",
-                                self.language,
-                                label=label,
-                                confidence=result.confidence,
-                                quality=quality,
-                            )
+                    # Die Anbieterzeile bleibt reine Verfügbarkeit; das
+                    # Qualitätskennzeichen (z. B. TIDAL "Hi-Res Lossless")
+                    # erscheint in der Qualitätszeile neben der lokalen Qualität.
+                    parts.append(
+                        tr(
+                            "provider_found",
+                            self.language,
+                            label=label,
+                            confidence=result.confidence,
                         )
-                    else:
-                        parts.append(
-                            tr(
-                                "provider_found",
-                                self.language,
-                                label=label,
-                                confidence=result.confidence,
-                            )
-                        )
+                    )
                 else:
                     parts.append(tr("provider_not_found", self.language, label=label))
             elif provider in errors:
@@ -3793,8 +3790,34 @@ class MediaLibraryWidget(QWidget):
         self.quality_button.setEnabled(True)
         if not isinstance(album, AlbumQuality):
             return
-        self.quality_status.setText(self._format_quality(album))
+        self._quality_local_text = self._format_quality(album)
         self.quality_status.setToolTip(self._quality_tooltip(album))
+        self._refresh_quality_status()
+
+    def _refresh_quality_status(self) -> None:
+        """Kombiniert lokale Qualität und TIDAL-Streaming-Qualität in einer Zeile."""
+        parts = []
+        if self._quality_local_text:
+            parts.append(self._quality_local_text)
+        streaming = self._streaming_quality_text()
+        if streaming:
+            parts.append(streaming)
+        if parts:
+            self.quality_status.setText("<br>".join(parts))
+        else:
+            self.quality_status.setText(tr("quality_not_checked", self.language))
+
+    def _streaming_quality_text(self) -> str:
+        group = self.current_group
+        if group is None:
+            return ""
+        results = self._provider_streaming_results.get(group.release_group_id, {})
+        tidal = results.get("tidal")
+        quality = getattr(tidal, "quality", "") if tidal is not None else ""
+        if not quality:
+            return ""
+        label = html.escape(tr("quality_streaming_label", self.language))
+        return f"<b>{label}:</b> {html.escape(quality)}"
 
     def _format_quality(self, album: AlbumQuality) -> str:
         label = html.escape(tr("quality_local_label", self.language))

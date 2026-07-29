@@ -195,8 +195,9 @@ def test_tidal_album_search_parses_json_api_included_resources(monkeypatch):
     assert result[0].track_count == 14
     assert result[0].external_url == ("https://tidal.com/browse/album/tidal-album")
     assert result[0].confidence == 100
-    # Höchste vorhandene Qualität gewinnt (HIRES_LOSSLESS vor LOSSLESS).
-    assert result[0].quality == "Hi-Res Lossless"
+    # Höchste vorhandene Qualität gewinnt (HIRES_LOSSLESS vor LOSSLESS),
+    # inkl. maximaler technischer Spezifikation der Stufe.
+    assert result[0].quality == "Hi-Res Lossless (max. 24 Bit/192 kHz)"
     assert "/v2/searchResults/" in requested_urls[1]
     assert "Deja%20Vu%201%202" in requested_urls[1]
     assert "include=albums" in requested_urls[1]
