@@ -19,15 +19,36 @@ _SESSION_ID = (
 _EXCEPTION_HOOK_INSTALLED = False
 
 
+def is_frozen() -> bool:
+    """True, wenn die App als gebündeltes Exe (PyInstaller) läuft."""
+    return bool(getattr(sys, "frozen", False))
+
+
+def user_data_dir() -> Path:
+    """Beschreibbarer Ablageort für Konfiguration, Logs, Cache (installiert).
+
+    Nutzt %LOCALAPPDATA%\\MusicTagStudio (bzw. %APPDATA%), damit die
+    installierte App auch unter schreibgeschütztem Programme-Ordner
+    funktioniert und Nutzerdaten ein Update überleben.
+    """
+    base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+    root = Path(base) / "MusicTagStudio" if base else Path.home() / ".musictagstudio"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
 def project_root() -> Path:
     """
-    Ermittelt den Projektordner.
+    Ermittelt den Ablageort für Nutzerdaten (Konfiguration, Logs, Cache).
 
-    Zuerst wird vom aktuellen Arbeitsverzeichnis nach einer pyproject.toml
-    gesucht. Wird keine gefunden, bleibt das aktuelle Arbeitsverzeichnis der
-    Ablageort. Das passt sowohl zum normalen Start im Repository als auch zu
-    Tests und portablen Installationen.
+    Als installierte Exe (frozen) gibt es kein Repository -> ein
+    beschreibbarer, benutzereigener Ordner wird verwendet. Im Entwicklungs-
+    und Testbetrieb wird vom Arbeitsverzeichnis nach einer pyproject.toml
+    gesucht; wird keine gefunden, bleibt das Arbeitsverzeichnis der Ablageort.
     """
+    if is_frozen():
+        return user_data_dir()
+
     cwd = Path.cwd().resolve()
 
     for parent in (
@@ -41,6 +62,19 @@ def project_root() -> Path:
             return parent
 
     return cwd
+
+def resource_root() -> Path:
+    """Read-only-Ablageort für mitgelieferte Ressourcen (frozen: Bundle).
+
+    Als installierte Exe liegen gebündelte Dateien (locales, assets, tools)
+    im PyInstaller-Bundle (sys._MEIPASS); im Entwicklungsbetrieb im
+    Repository-Wurzelverzeichnis.
+    """
+    if is_frozen():
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+    # Repository-Wurzel (…/src/musictagstudio/diagnostics.py -> parents[2]).
+    return Path(__file__).resolve().parents[2]
+
 
 def log_directory() -> Path:
     path = (

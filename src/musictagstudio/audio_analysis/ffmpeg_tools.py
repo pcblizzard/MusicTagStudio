@@ -143,7 +143,11 @@ def find_ffprobe() -> str:
 
 
 def application_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    # Mitgelieferte Binärwerkzeuge (tools/ffmpeg) liegen als installierte Exe
+    # im PyInstaller-Bundle, im Entwicklungsbetrieb im Repository-Wurzelordner.
+    from ..diagnostics import resource_root
+
+    return resource_root()
 
 
 def executable_name(

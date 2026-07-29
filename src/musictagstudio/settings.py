@@ -5,9 +5,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from .diagnostics import is_frozen, user_data_dir
 from .library_sources import MusicSource
 
-DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config.toml"
+
+def _default_config_path() -> Path:
+    # Installierte Exe: benutzereigener, beschreibbarer Ordner. Sonst Repo.
+    if is_frozen():
+        return user_data_dir() / "config.toml"
+    return Path(__file__).resolve().parents[2] / "config.toml"
+
+
+DEFAULT_CONFIG_PATH = _default_config_path()
 
 from .cover_source_catalog import COVER_SOURCES_BY_ID
 from .provider_catalog import PROVIDERS_BY_ID
