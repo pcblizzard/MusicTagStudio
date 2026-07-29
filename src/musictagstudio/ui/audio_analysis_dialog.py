@@ -45,15 +45,13 @@ from ..audio_analysis.album_check import (
     group_results_by_album,
     signature_text,
 )
+from ..audio_analysis import av_backend
 from ..audio_analysis.analyzer import (
     analyze_album_loudness,
     analyze_file,
 )
 from ..audio_analysis.cache import (
     AudioAnalysisCache,
-)
-from ..audio_analysis.ffmpeg_tools import (
-    find_ffmpeg,
 )
 from ..audio_analysis.models import (
     AudioAnalysisResult,
@@ -207,7 +205,6 @@ class AnalysisWorker(QObject):
                         executor.submit(
                             analyze_file,
                             song.path,
-                            self.installation,
                         ): song
                         for song in uncached_songs
                     }
@@ -376,7 +373,6 @@ class AnalysisWorker(QObject):
                                 song.path
                                 for song in album_songs
                             ],
-                            self.installation,
                         )
                     )
                     self.album_result_ready.emit(
@@ -439,7 +435,6 @@ class _SpectrogramTask(QRunnable):
         try:
             image_path = render_spectrogram(
                 self._source_path,
-                self._installation,
                 width=self._width,
                 height=self._height,
             )
@@ -487,7 +482,19 @@ class AudioAnalysisDialog(QDialog):
         self._spectrogram_pool = QThreadPool(self)
         self._spectrogram_pool.setMaxThreadCount(1)
 
-        self.installation = find_ffmpeg()
+        # Audio-Analyse läuft über PyAV (gebündeltes FFmpeg) – keine externe
+        # ffmpeg.exe mehr. Der Installation-Shim hält die vorhandenen
+        # .available/.version-Prüfungen der UI kompatibel.
+        if av_backend.is_available():
+            self.installation = FFmpegInstallation(
+                ffmpeg_path="PyAV",
+                ffprobe_path="PyAV",
+                version=av_backend.ffmpeg_version(),
+            )
+        else:
+            self.installation = FFmpegInstallation(
+                ffmpeg_path="", ffprobe_path="", version=""
+            )
         settings = load_settings()
         self.max_workers = (
             settings.audio_analysis_parallel_jobs

@@ -45,19 +45,8 @@ def test_release_text_template_and_path(
         "_load_apple_track_titles",
         lambda songs, settings: {},
     )
-    monkeypatch.setattr(
-        release_text,
-        "find_ffmpeg",
-        lambda configured_directory="":
-        type(
-            "Installation",
-            (),
-            {
-                "available": False,
-                "ffprobe_path": "",
-            },
-        )(),
-    )
+    # Dummy-Dateien sind kein echtes Audio -> av_backend.probe scheitert und
+    # die Qualitätszeile bleibt leer; der Rest des Textes ist davon unberührt.
     settings = AppSettings(
         artist_folder_levels_up=1
     )

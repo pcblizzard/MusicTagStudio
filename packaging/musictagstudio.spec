@@ -40,16 +40,11 @@ if os.path.isfile(_license):
 # Mitgelieferte Binärwerkzeuge (tools/), damit der Nutzer nichts nachinstallieren
 # muss. fpcalc (~4 MB) für die Klang-Identifikation wird immer eingebunden,
 # sofern vorhanden (per scripts/fetch_tools.py geholt).
+# ffmpeg/ffprobe werden NICHT mehr gebündelt: die Audio-Analyse läuft über PyAV
+# (gebündeltes FFmpeg als pip-Paket, ~28 MB) statt über externe Binärdateien.
 _fpcalc = os.path.join(REPO_ROOT, "tools", "fpcalc", "fpcalc.exe")
 if os.path.isfile(_fpcalc):
     datas.append((_fpcalc, "tools/fpcalc"))
-# ffmpeg/ffprobe (~195 MB) nur einbinden, wenn ausdrücklich gewünscht
-# (Umgebungsvariable MTS_BUNDLE_FFMPEG=1) -- sonst bläht es das Setup stark auf.
-if os.environ.get("MTS_BUNDLE_FFMPEG") == "1":
-    for _name in ("ffmpeg.exe", "ffprobe.exe"):
-        _p = os.path.join(REPO_ROOT, "tools", "ffmpeg", _name)
-        if os.path.isfile(_p):
-            datas.append((_p, "tools/ffmpeg"))
 
 # Qt-Multimedia-FFmpeg-Backend und weitere PySide6-Datendateien mitnehmen.
 datas += collect_data_files("PySide6", includes=["**/ffmpeg*", "**/multimedia*"])

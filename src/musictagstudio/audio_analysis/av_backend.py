@@ -138,6 +138,17 @@ def render_spectrogram_png(
         container.close()
 
 
+def format_tags(filepath: str) -> dict[str, str]:
+    """Container-Metadaten (format tags) – Fallback für Formate ohne mutagen."""
+    import av
+
+    try:
+        with av.open(str(filepath)) as container:
+            return {str(k): str(v) for k, v in dict(container.metadata).items()}
+    except Exception:
+        return {}
+
+
 def probe(filepath: str) -> dict:
     """Technische Eigenschaften (Codec/Rate/Bit-Tiefe/Kanäle/Dauer/Bitrate)."""
     import av

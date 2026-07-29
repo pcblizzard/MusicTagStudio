@@ -3,14 +3,10 @@ from __future__ import annotations
 import json
 import math
 import re
-import subprocess
-import tempfile
 from pathlib import Path
 
-from .models import (
-    AudioAnalysisResult,
-    FFmpegInstallation,
-)
+from . import av_backend
+from .models import AudioAnalysisResult
 
 
 REPLAYGAIN_REFERENCE_LUFS = -18.0
@@ -24,83 +20,72 @@ class AudioAnalysisError(
 
 def analyze_file(
     filepath: str | Path,
-    installation: FFmpegInstallation,
 ) -> AudioAnalysisResult:
     path = Path(filepath)
+    file_size = path.stat().st_size if path.is_file() else 0
 
     try:
-        probe_payload = _probe_file(
-            path,
-            installation,
-        )
-        loudness_payload = _measure_loudness(
-            path,
-            installation,
-        )
-    except AudioAnalysisError as error:
+        info = av_backend.probe(str(path))
+        loudness = _extract_loudness([str(path)])
+    except Exception as error:  # PyAV/Container-Fehler
         return AudioAnalysisResult(
             path=str(path),
-            file_size=(
-                path.stat().st_size
-                if path.is_file()
-                else 0
-            ),
-            error=str(error),
+            file_size=file_size,
+            error=str(error) or "Datei konnte nicht analysiert werden.",
         )
 
-    result = parse_probe_payload(
-        str(path),
-        probe_payload,
-    )
-    loudness = parse_loudnorm_output(
-        loudness_payload
-    )
+    if not info:
+        return AudioAnalysisResult(
+            path=str(path),
+            file_size=file_size,
+            error="Keine Audiospur gefunden.",
+        )
 
-    integrated_lufs = loudness.get(
-        "input_i"
-    )
-    true_peak_db = loudness.get(
-        "input_tp"
-    )
-    loudness_range = loudness.get(
-        "input_lra"
-    )
-    threshold = loudness.get(
-        "input_thresh"
-    )
-
-    track_gain = calculate_replaygain(
-        integrated_lufs
-    )
-    track_peak = db_to_linear(
-        true_peak_db
-    )
+    integrated_lufs = loudness.get("input_i")
+    true_peak_db = loudness.get("input_tp")
+    loudness_range = loudness.get("input_lra")
+    threshold = loudness.get("input_thresh")
 
     return AudioAnalysisResult(
-        **{
-            **result.__dict__,
-            "integrated_lufs": integrated_lufs,
-            "loudness_range_lu": loudness_range,
-            "true_peak_db": true_peak_db,
-            "threshold_lufs": threshold,
-            "replaygain_track_gain_db": track_gain,
-            "replaygain_track_peak": track_peak,
-            "peak_status": classify_true_peak(
-                true_peak_db
-            ),
-        }
+        path=str(path),
+        codec=info["codec"],
+        container=info["container"],
+        sample_rate=info["sample_rate"],
+        bit_depth=info["bit_depth"],
+        channels=info["channels"],
+        channel_layout="",
+        bitrate=info["bitrate"],
+        duration_seconds=info["duration_seconds"],
+        file_size=file_size,
+        integrated_lufs=integrated_lufs,
+        loudness_range_lu=loudness_range,
+        true_peak_db=true_peak_db,
+        threshold_lufs=threshold,
+        replaygain_track_gain_db=calculate_replaygain(integrated_lufs),
+        replaygain_track_peak=db_to_linear(true_peak_db),
+        peak_status=classify_true_peak(true_peak_db),
     )
+
+
+def _extract_loudness(paths: list[str]) -> dict[str, float]:
+    """loudnorm-Messwerte als float-Dict (input_i/tp/lra/thresh)."""
+    raw = av_backend.measure_loudness_json(paths)
+    result: dict[str, float] = {}
+    for name in ("input_i", "input_tp", "input_lra", "input_thresh"):
+        value = _as_optional_float(raw.get(name))
+        if value is not None:
+            result[name] = value
+    return result
 
 
 def analyze_album_loudness(
     filepaths: list[str],
-    installation: FFmpegInstallation,
 ) -> tuple[
     float | None,
     float | None,
 ]:
     existing_paths = [
-        Path(filepath)
+        str(Path(filepath))
         for filepath in filepaths
         if Path(filepath).is_file()
     ]
@@ -108,98 +93,15 @@ def analyze_album_loudness(
     if not existing_paths:
         return None, None
 
-    list_file_path = ""
-
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix=".txt",
-            encoding="utf-8",
-            delete=False,
-        ) as list_file:
-            list_file_path = (
-                list_file.name
-            )
-
-            for path in existing_paths:
-                escaped = str(
-                    path.resolve()
-                ).replace(
-                    "'",
-                    "'\\''",
-                )
-                list_file.write(
-                    f"file '{escaped}'\n"
-                )
-
-        command = [
-            installation.ffmpeg_path,
-            "-hide_banner",
-            "-nostats",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            list_file_path,
-            "-vn",
-            "-af",
-            (
-                "loudnorm="
-                "I=-18:TP=-1:LRA=11:"
-                "print_format=json"
-            ),
-            "-f",
-            "null",
-            "-",
-        ]
-
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=max(
-                120,
-                len(existing_paths) * 45,
-            ),
-            creationflags=_creation_flags(),
-        )
-
-        payload = parse_loudnorm_output(
-            completed.stderr
-        )
-        integrated = payload.get(
-            "input_i"
-        )
-        true_peak = payload.get(
-            "input_tp"
-        )
-
-        return (
-            calculate_replaygain(
-                integrated
-            ),
-            db_to_linear(
-                true_peak
-            ),
-        )
-    except (
-        OSError,
-        subprocess.SubprocessError,
-    ):
+        payload = _extract_loudness(existing_paths)
+    except Exception:  # PyAV/Container-Fehler
         return None, None
-    finally:
-        if list_file_path:
-            try:
-                Path(
-                    list_file_path
-                ).unlink(
-                    missing_ok=True
-                )
-            except OSError:
-                pass
+
+    return (
+        calculate_replaygain(payload.get("input_i")),
+        db_to_linear(payload.get("input_tp")),
+    )
 
 
 def parse_probe_payload(
@@ -378,110 +280,6 @@ def db_to_linear(
     )
 
 
-def _probe_file(
-    path: Path,
-    installation: FFmpegInstallation,
-) -> dict:
-    command = [
-        installation.ffprobe_path,
-        "-v",
-        "error",
-        "-show_entries",
-        (
-            "format=format_name,duration,"
-            "size,bit_rate:"
-            "stream=codec_type,codec_name,"
-            "sample_rate,bits_per_sample,"
-            "bits_per_raw_sample,channels,"
-            "channel_layout,bit_rate,duration"
-        ),
-        "-of",
-        "json",
-        str(path),
-    ]
-
-    try:
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=30,
-            creationflags=_creation_flags(),
-        )
-    except (
-        OSError,
-        subprocess.SubprocessError,
-    ) as error:
-        raise AudioAnalysisError(
-            f"ffprobe konnte nicht ausgeführt werden: {error}"
-        ) from error
-
-    if completed.returncode != 0:
-        raise AudioAnalysisError(
-            completed.stderr.strip()
-            or "ffprobe meldete einen Fehler."
-        )
-
-    try:
-        return json.loads(
-            completed.stdout
-        )
-    except json.JSONDecodeError as error:
-        raise AudioAnalysisError(
-            "Die ffprobe-Ausgabe war kein gültiges JSON."
-        ) from error
-
-
-def _measure_loudness(
-    path: Path,
-    installation: FFmpegInstallation,
-) -> str:
-    command = [
-        installation.ffmpeg_path,
-        "-hide_banner",
-        "-nostats",
-        "-i",
-        str(path),
-        "-vn",
-        "-af",
-        (
-            "loudnorm="
-            "I=-18:TP=-1:LRA=11:"
-            "print_format=json"
-        ),
-        "-f",
-        "null",
-        "-",
-    ]
-
-    try:
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=180,
-            creationflags=_creation_flags(),
-        )
-    except (
-        OSError,
-        subprocess.SubprocessError,
-    ) as error:
-        raise AudioAnalysisError(
-            f"FFmpeg konnte nicht ausgeführt werden: {error}"
-        ) from error
-
-    if completed.returncode != 0:
-        raise AudioAnalysisError(
-            completed.stderr.strip()
-            or "FFmpeg meldete einen Fehler."
-        )
-
-    return completed.stderr
-
 
 def _as_int(
     value: object,
@@ -522,13 +320,3 @@ def _as_optional_float(
         return None
 
     return number
-
-
-def _creation_flags() -> int:
-    return int(
-        getattr(
-            subprocess,
-            "CREATE_NO_WINDOW",
-            0,
-        )
-    )

@@ -6,14 +6,10 @@ from concurrent.futures import (
     as_completed,
 )
 from dataclasses import dataclass
-import json
 from pathlib import Path
 import re
-import subprocess
 
-from ..audio_analysis.ffmpeg_tools import (
-    find_ffmpeg,
-)
+from ..audio_analysis import av_backend
 from ..cover_management.image_tools import (
     safe_filename,
 )
@@ -103,44 +99,41 @@ def create_release_text(
         else "Unbekannt"
     )
 
-    installation = find_ffmpeg()
     infos: list[
         QuickAudioInfo
     ] = []
 
-    if installation.available:
-        max_workers = min(
-            4,
-            max(
-                1,
-                len(ordered),
-            ),
-        )
+    max_workers = min(
+        4,
+        max(
+            1,
+            len(ordered),
+        ),
+    )
 
-        with ThreadPoolExecutor(
-            max_workers=max_workers
-        ) as executor:
-            futures = {
-                executor.submit(
-                    _probe_quick,
-                    song.path,
-                    installation.ffprobe_path,
-                ): song.path
-                for song in ordered
-            }
+    with ThreadPoolExecutor(
+        max_workers=max_workers
+    ) as executor:
+        futures = {
+            executor.submit(
+                _probe_quick,
+                song.path,
+            ): song.path
+            for song in ordered
+        }
 
-            for future in as_completed(
-                futures
-            ):
-                try:
-                    info = future.result()
-                except Exception:
-                    continue
+        for future in as_completed(
+            futures
+        ):
+            try:
+                info = future.result()
+            except Exception:
+                continue
 
-                if info is not None:
-                    infos.append(
-                        info
-                    )
+            if info is not None:
+                infos.append(
+                    info
+                )
 
     quality = _quality_text(
         infos
@@ -478,89 +471,16 @@ def _folder_key(
 
 def _probe_quick(
     filepath: str,
-    ffprobe_path: str,
 ) -> QuickAudioInfo | None:
-    completed = subprocess.run(
-        [
-            ffprobe_path,
-            "-v",
-            "error",
-            "-select_streams",
-            "a:0",
-            "-show_entries",
-            (
-                "stream=codec_name,sample_rate,"
-                "bits_per_raw_sample,bits_per_sample,bit_rate:"
-                "format=bit_rate"
-            ),
-            "-of",
-            "json",
-            filepath,
-        ],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=20,
-        check=False,
-        creationflags=int(
-            getattr(
-                subprocess,
-                "CREATE_NO_WINDOW",
-                0,
-            )
-        ),
-    )
-
-    if completed.returncode:
+    info = av_backend.probe(filepath)
+    if not info:
         return None
-
-    payload = json.loads(
-        completed.stdout
-    )
-    stream = next(
-        iter(
-            payload.get(
-                "streams",
-                [],
-            )
-        ),
-        {},
-    )
-    format_info = payload.get(
-        "format",
-        {},
-    )
-
     return QuickAudioInfo(
         path=filepath,
-        codec=str(
-            stream.get(
-                "codec_name",
-                "",
-            )
-        ),
-        sample_rate=_as_int(
-            stream.get(
-                "sample_rate"
-            )
-        ),
-        bit_depth=_as_int(
-            stream.get(
-                "bits_per_raw_sample"
-            )
-            or stream.get(
-                "bits_per_sample"
-            )
-        ),
-        bitrate=_as_int(
-            stream.get(
-                "bit_rate"
-            )
-            or format_info.get(
-                "bit_rate"
-            )
-        ),
+        codec=str(info.get("codec", "")),
+        sample_rate=_as_int(info.get("sample_rate")),
+        bit_depth=_as_int(info.get("bit_depth")),
+        bitrate=_as_int(info.get("bitrate")),
     )
 
 

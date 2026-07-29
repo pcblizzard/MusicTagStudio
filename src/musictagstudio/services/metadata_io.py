@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import json
-import subprocess
 
 from mutagen.apev2 import APEv2, APETextValue
 from mutagen.asf import ASF
@@ -488,86 +486,13 @@ def _song_from_ape_tags(
 def _read_ffprobe_tags(
     path: Path,
 ) -> dict[str, str]:
-    from ..audio_analysis.ffmpeg_tools import find_ffprobe
+    # Container-Metadaten über PyAV (gebündeltes FFmpeg) statt externem ffprobe.
+    from ..audio_analysis import av_backend
 
-    executable = find_ffprobe()
-
-    if not executable:
-        return {}
-
-    command = [
-        executable,
-        "-v",
-        "error",
-        "-show_entries",
-        "format_tags",
-        "-of",
-        "json",
-        str(path),
-    ]
-
-    try:
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=30,
-            check=False,
-        )
-    except (
-        OSError,
-        subprocess.SubprocessError,
-    ):
-        get_diagnostic_logger(
-            "wavpack"
-        ).exception(
-            "ffprobe konnte nicht gestartet werden: %s",
-            path,
-        )
-
-        return {}
-
-    if completed.returncode != 0:
-        get_diagnostic_logger(
-            "wavpack"
-        ).error(
-            "ffprobe-Fehler für %s: %s",
-            path,
-            completed.stderr.strip(),
-        )
-
-        return {}
-
-    try:
-        payload = json.loads(
-            completed.stdout
-        )
-    except json.JSONDecodeError:
-        get_diagnostic_logger(
-            "wavpack"
-        ).exception(
-            "Ungültige ffprobe-JSON-Antwort: %s",
-            path,
-        )
-
-        return {}
-
-    raw_tags = (
-        payload.get(
-            "format",
-            {},
-        ).get(
-            "tags",
-            {},
-        )
-    )
-
+    raw_tags = av_backend.format_tags(str(path))
     return {
         str(key).casefold(): str(value)
-        for key, value
-        in raw_tags.items()
+        for key, value in raw_tags.items()
     }
 
 

@@ -1,20 +1,10 @@
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import pytest
 
-from musictagstudio.audio_analysis import spectrogram
-from musictagstudio.audio_analysis.models import FFmpegInstallation
-
-
-def _installation() -> FFmpegInstallation:
-    return FFmpegInstallation(
-        ffmpeg_path="ffmpeg",
-        ffprobe_path="ffprobe",
-        version="test",
-    )
+from musictagstudio.audio_analysis import av_backend, spectrogram
 
 
 @pytest.fixture
@@ -34,64 +24,49 @@ def _redirect_cache(monkeypatch, tmp_path: Path) -> None:
     )
 
 
-def test_render_builds_showspectrumpic_command(monkeypatch, audio_file: Path):
-    captured: dict[str, list[str]] = {}
+def test_render_calls_pyav_backend(monkeypatch, audio_file: Path):
+    captured: dict = {}
 
-    def fake_run(command, **_kwargs):
-        captured["command"] = command
-        Path(command[-1]).write_bytes(b"PNGDATA")
-        return subprocess.CompletedProcess(command, 0, "", "")
+    def fake_render(src, dst, *, width, height):
+        captured.update(src=src, dst=dst, width=width, height=height)
+        Path(dst).write_bytes(b"\x89PNG\r\n\x1a\n")
 
-    monkeypatch.setattr(spectrogram.subprocess, "run", fake_run)
+    monkeypatch.setattr(av_backend, "render_spectrogram_png", fake_render)
 
-    output = spectrogram.render_spectrogram(audio_file, _installation())
+    output = spectrogram.render_spectrogram(audio_file, width=800, height=400)
 
     assert output.is_file()
-    command = captured["command"]
-    filter_arg = command[command.index("-lavfi") + 1]
-    assert filter_arg.startswith("showspectrumpic=")
-    assert "legend=1" in filter_arg
-    assert str(audio_file) in command
+    assert captured["src"] == str(audio_file)
+    assert captured["width"] == 800
+    assert captured["height"] == 400
 
 
-def test_cache_hit_skips_ffmpeg(monkeypatch, audio_file: Path):
+def test_cache_hit_skips_render(monkeypatch, audio_file: Path):
     calls = {"count": 0}
 
-    def fake_run(command, **_kwargs):
+    def fake_render(src, dst, *, width, height):
         calls["count"] += 1
-        Path(command[-1]).write_bytes(b"PNGDATA")
-        return subprocess.CompletedProcess(command, 0, "", "")
+        Path(dst).write_bytes(b"\x89PNG\r\n\x1a\n")
 
-    monkeypatch.setattr(spectrogram.subprocess, "run", fake_run)
+    monkeypatch.setattr(av_backend, "render_spectrogram_png", fake_render)
 
-    first = spectrogram.render_spectrogram(audio_file, _installation())
-    second = spectrogram.render_spectrogram(audio_file, _installation())
+    first = spectrogram.render_spectrogram(audio_file)
+    second = spectrogram.render_spectrogram(audio_file)
 
     assert first == second
     assert calls["count"] == 1
 
 
-def test_ffmpeg_failure_raises(monkeypatch, audio_file: Path):
-    def fake_run(command, **_kwargs):
-        return subprocess.CompletedProcess(command, 1, "", "boom")
+def test_backend_failure_raises(monkeypatch, audio_file: Path):
+    def fake_render(src, dst, *, width, height):
+        raise RuntimeError("boom")
 
-    monkeypatch.setattr(spectrogram.subprocess, "run", fake_run)
+    monkeypatch.setattr(av_backend, "render_spectrogram_png", fake_render)
 
     with pytest.raises(spectrogram.SpectrogramError):
-        spectrogram.render_spectrogram(audio_file, _installation())
+        spectrogram.render_spectrogram(audio_file)
 
 
 def test_missing_file_raises():
     with pytest.raises(spectrogram.SpectrogramError):
-        spectrogram.render_spectrogram(
-            "does-not-exist.flac",
-            _installation(),
-        )
-
-
-def test_unavailable_ffmpeg_raises(audio_file: Path):
-    with pytest.raises(spectrogram.SpectrogramError):
-        spectrogram.render_spectrogram(
-            audio_file,
-            FFmpegInstallation(ffmpeg_path="", ffprobe_path=""),
-        )
+        spectrogram.render_spectrogram("does-not-exist.flac")
