@@ -150,6 +150,7 @@ def test_tidal_album_search_parses_json_api_included_resources(monkeypatch):
                             "title": "Deja Vu 1/2",
                             "releaseDate": "2026-02-27",
                             "numberOfItems": 14,
+                            "mediaTags": ["LOSSLESS", "HIRES_LOSSLESS"],
                             "externalLinks": [
                                 {"href": ("https://tidal.com/browse/album/tidal-album")}
                             ],
@@ -194,6 +195,8 @@ def test_tidal_album_search_parses_json_api_included_resources(monkeypatch):
     assert result[0].track_count == 14
     assert result[0].external_url == ("https://tidal.com/browse/album/tidal-album")
     assert result[0].confidence == 100
+    # Höchste vorhandene Qualität gewinnt (HIRES_LOSSLESS vor LOSSLESS).
+    assert result[0].quality == "Hi-Res Lossless"
     assert "/v2/searchResults/" in requested_urls[1]
     assert "Deja%20Vu%201%202" in requested_urls[1]
     assert "include=albums" in requested_urls[1]

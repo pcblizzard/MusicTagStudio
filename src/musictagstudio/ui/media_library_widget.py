@@ -3616,9 +3616,18 @@ class MediaLibraryWidget(QWidget):
             result = results.get(provider)
             if result is not None:
                 if result.status is AvailabilityStatus.AVAILABLE:
-                    parts.append(
-                        tr("provider_found", self.language, label=label, confidence=result.confidence)
+                    found = tr(
+                        "provider_found",
+                        self.language,
+                        label=label,
+                        confidence=result.confidence,
                     )
+                    # Qualitätskennzeichen (z. B. TIDAL "Hi-Res Lossless")
+                    # anhängen, wenn der Anbieter es geliefert hat.
+                    quality = getattr(result, "quality", "")
+                    if quality:
+                        found += f" · {quality}"
+                    parts.append(found)
                 else:
                     parts.append(tr("provider_not_found", self.language, label=label))
             elif provider in errors:

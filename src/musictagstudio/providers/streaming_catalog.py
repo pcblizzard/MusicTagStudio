@@ -16,6 +16,9 @@ class CatalogAlbumCandidate:
     track_count: int
     confidence: int
     country: str
+    # Optionales Qualitätskennzeichen des Anbieters (z. B. TIDAL "Hi-Res
+    # Lossless"). Leer, wenn der Anbieter nichts liefert.
+    quality: str = ""
 
 
 _ALBUM_SUFFIX_RE = re.compile(r"[\(\[][^\)\]]*[\)\]]\s*$")

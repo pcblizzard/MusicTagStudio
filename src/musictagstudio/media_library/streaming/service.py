@@ -225,4 +225,5 @@ def _check_catalog(
         track_count=best.track_count,
         confidence=best.confidence,
         country=country,
+        quality=best.quality,
     )

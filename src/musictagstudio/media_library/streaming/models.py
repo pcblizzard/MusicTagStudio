@@ -33,6 +33,9 @@ class StreamingAvailability:
     expires_at: str = ""
     # Tagesgenaues Veröffentlichungsdatum (ISO) für die Vorab-Erkennung.
     release_date: str = ""
+    # Optionales Qualitätskennzeichen des Anbieters (z. B. TIDAL "Hi-Res
+    # Lossless"). Wird nicht zwischengespeichert -> nur direkt nach der Prüfung.
+    quality: str = ""
 
     @classmethod
     def available(
@@ -40,6 +43,7 @@ class StreamingAvailability:
         external_url: str, album: str, artist: str, year: str,
         track_count: int, confidence: int, country: str,
         release_date: str = "",
+        quality: str = "",
         ttl_days: int = 7,
     ) -> "StreamingAvailability":
         checked = datetime.now().astimezone()
@@ -49,7 +53,7 @@ class StreamingAvailability:
             external_id=external_id, external_url=external_url,
             album=album, artist=artist, year=year,
             track_count=track_count, confidence=confidence, country=country,
-            release_date=release_date,
+            release_date=release_date, quality=quality,
             checked_at=checked.isoformat(timespec="seconds"),
             expires_at=(checked + timedelta(days=ttl_days)).isoformat(timespec="seconds"),
         )

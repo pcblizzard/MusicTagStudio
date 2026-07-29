@@ -154,12 +154,49 @@ def search_albums(
                     track_count=track_count,
                 ),
                 country=country.upper(),
+                quality=_media_quality_label(attributes),
             )
         )
     return sorted(
         candidates,
         key=lambda candidate: (-candidate.confidence, candidate.album.casefold()),
     )
+
+
+# TIDAL-Kennzeichen (mediaTags/audioModes) -> lesbares Label. Höchste
+# vorhandene Qualität gewinnt. Defensiv: verschiedene mögliche Feldnamen und
+# sowohl Listen als auch Strings werden akzeptiert; Unbekanntes -> "".
+_QUALITY_LABELS: tuple[tuple[str, str], ...] = (
+    ("HIRES_LOSSLESS", "Hi-Res Lossless"),
+    ("HI_RES_LOSSLESS", "Hi-Res Lossless"),
+    ("HI_RES", "Hi-Res"),
+    ("LOSSLESS", "Lossless"),
+    ("DOLBY_ATMOS", "Dolby Atmos"),
+    ("SONY_360RA", "360 Reality Audio"),
+    ("MQA", "MQA"),
+    ("HIGH", "High"),
+    ("LOW", "Low"),
+)
+
+
+def _media_quality_label(attributes: dict) -> str:
+    raw = (
+        attributes.get("mediaTags")
+        or attributes.get("audioModes")
+        or attributes.get("audioQuality")
+        or attributes.get("media_tags")
+        or ""
+    )
+    if isinstance(raw, str):
+        tokens = {raw.strip().upper()}
+    elif isinstance(raw, (list, tuple)):
+        tokens = {str(item).strip().upper() for item in raw}
+    else:
+        return ""
+    for token, label in _QUALITY_LABELS:
+        if token in tokens:
+            return label
+    return ""
 
 
 def _external_link(attributes: dict) -> str:

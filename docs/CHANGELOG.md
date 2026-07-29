@@ -1,5 +1,14 @@
 # MusicTagStudio 0.8.6-alpha26
 
+## Qualitätsprüfung in der Medienbibliothek
+
+- „Qualität prüfen" ist kein Platzhalter mehr: liest aus den **lokalen
+  Dateien** eines Albums Codec, Abtastrate, Bit-Tiefe, Kanäle (und Bitrate bei
+  verlustbehafteten Formaten) und zeigt eine Zusammenfassung + Titelzahl an;
+  Details je Titel im Tooltip. Zuverlässig, offline, ohne ffmpeg (via mutagen).
+- Zusätzlich zeigt „Streaming prüfen" – wenn vorhanden – das **TIDAL-
+  Qualitätskennzeichen** (z. B. „Hi-Res Lossless", „Lossless").
+
 ## Windows-Installer (PyInstaller + Inno Setup)
 
 - Neue Build-Kette unter `packaging/`: PyInstaller baut `MusicTagStudio.exe`
