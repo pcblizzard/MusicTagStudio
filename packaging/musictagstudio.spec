@@ -20,8 +20,9 @@ REPO_ROOT = os.path.abspath(os.path.join(SPECPATH, os.pardir))  # noqa: F821
 SRC = os.path.join(REPO_ROOT, "src")
 PKG = os.path.join(SRC, "musictagstudio")
 
-# Optionales App-Icon: packaging/app.ico, falls vorhanden (sonst Standard-Icon).
-_icon_candidate = os.path.join(SPECPATH, "app.ico")  # noqa: F821
+# Optionales App-Icon: src/musictagstudio/assets/app.ico, falls vorhanden
+# (per packaging/make_icon.py aus einem PNG erzeugbar). Sonst Standard-Icon.
+_icon_candidate = os.path.join(PKG, "assets", "app.ico")
 APP_ICON = _icon_candidate if os.path.isfile(_icon_candidate) else None
 
 # Mitgelieferte, read-only Ressourcen ins Bundle unter musictagstudio/... legen,

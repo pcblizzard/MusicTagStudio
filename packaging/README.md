@@ -44,15 +44,21 @@ Ergebnis: `dist/installer/MusicTagStudio-Setup.exe`.
 
 ## Optionales App-Icon
 
-Ohne Icon bekommt die Exe das Standard-Icon. Sobald ein Icon vorliegt:
+Ohne Icon bekommt die Exe das Standard-Icon. So rüstest du eins nach:
 
-- Eine `app.ico` (Multi-Size, z. B. 16/32/48/256 px) in `packaging/` ablegen.
-- Die Spec nimmt sie automatisch für die Exe.
-- Für das Setup-Icon in `installer.iss` die Zeile `SetupIconFile=app.ico`
-  einkommentieren.
+1. Ein quadratisches PNG deines Logos bereitlegen (möglichst ≥ 256×256).
+2. Icon erzeugen (schreibt `src/musictagstudio/assets/app.ico`):
+   ```
+   py -3 -m pip install pillow
+   py -3 packaging/make_icon.py pfad/zu/logo.png
+   ```
+3. Fertig – ab dann nutzen es automatisch:
+   - das **laufende Fenster** (Taskleiste/Titel, `main._apply_app_icon`),
+   - die **Exe** (PyInstaller-Spec erkennt `assets/app.ico`),
+   - optional das **Setup**: in `installer.iss` die Zeile `SetupIconFile=…`
+     einkommentieren.
 
-Ein `.ico` lässt sich z. B. aus einem quadratischen PNG erzeugen (viele
-Online-Konverter oder ImageMagick: `magick app.png -define icon:auto-resize=256,48,32,16 app.ico`).
+Danach App/Build neu erzeugen, damit das Icon greift.
 
 ## Datenspeicherung: Standard vs. portabel
 

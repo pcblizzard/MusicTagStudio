@@ -57,6 +57,22 @@ def _install_qt_logging() -> None:
     qInstallMessageHandler(qt_message_handler)
 
 
+def _apply_app_icon(app) -> None:
+    """Setzt das Fenster-/Taskleisten-Icon, falls ein App-Icon mitgeliefert ist.
+
+    Das Icon liegt paketrelativ (assets/app.ico), sodass es in Entwicklung und
+    im gebündelten Build gleichermaßen gefunden wird. Ohne Datei bleibt das
+    Standard-Icon – kein Fehler.
+    """
+    from pathlib import Path
+
+    from PySide6.QtGui import QIcon
+
+    icon_path = Path(__file__).resolve().parent / "assets" / "app.ico"
+    if icon_path.is_file():
+        app.setWindowIcon(QIcon(str(icon_path)))
+
+
 def main():
     install_global_exception_logging()
     log_application_start(
@@ -71,6 +87,7 @@ def main():
             Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
         )
         app = QApplication(sys.argv)
+        _apply_app_icon(app)
 
         def refresh_automatic_theme():
             settings = load_settings()

@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import __version__
-from ..diagnostics import project_root
+from ..diagnostics import project_root, resource_root
 from ..i18n import tr
 from ..settings import load_settings
 
@@ -210,7 +210,9 @@ def _streaming_cache_status() -> str:
 
 
 def _license_description() -> str:
-    license_path = project_root() / "LICENSE"
+    # LICENSE ist eine mitgelieferte read-only Ressource -> resource_root(),
+    # damit sie auch als installierte Exe (im Bundle) gefunden wird.
+    license_path = resource_root() / "LICENSE"
     try:
         content = license_path.read_text(encoding="utf-8").strip()
     except OSError:

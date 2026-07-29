@@ -42,8 +42,9 @@ WizardStyle=modern
 OutputBaseFilename=MusicTagStudio-Setup
 ; Ausgabeordner des fertigen Setups (relativ zum Skript).
 OutputDir=..\dist\installer
-; Optional: eigenes Setup-Icon, falls packaging\app.ico vorhanden.
-; SetupIconFile=app.ico
+; Optional: eigenes Setup-Icon. Sobald src\musictagstudio\assets\app.ico
+; existiert (via packaging\make_icon.py), diese Zeile einkommentieren:
+; SetupIconFile=..\src\musictagstudio\assets\app.ico
 ; Optional: Lizenzanzeige im Setup, falls vorhanden.
 ; LicenseFile=..\LICENSE
 
