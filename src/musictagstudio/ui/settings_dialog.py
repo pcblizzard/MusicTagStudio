@@ -42,6 +42,8 @@ from PySide6.QtWidgets import (
 
 from ..cover_source_catalog import COVER_SOURCES
 from ..core.normalizers import normalize_candidate
+from ..models.song import Song
+from ..services.rename import build_new_name
 from ..models.metadata import MetadataCandidate
 from ..provider_catalog import PROVIDERS
 from ..library_sources import MusicSource, new_source
@@ -671,9 +673,18 @@ class SettingsDialog(QDialog):
             tr("rename_pattern_label", language),
             self.rename_pattern_edit,
         )
+        self.rename_preview = QLabel()
+        self.rename_preview.setObjectName("renamePreview")
+        self.rename_preview.setWordWrap(True)
+        rename_form.addRow(tr("rename_preview_label", language), self.rename_preview)
         rename_hint = QLabel(tr("rename_pattern_hint", language))
         rename_hint.setWordWrap(True)
         rename_form.addRow("", rename_hint)
+        self.rename_pattern_edit.textChanged.connect(self._update_rename_preview)
+        # Vorschau reagiert auch auf die Feature-Künstler-Einstellung, da diese
+        # Titel/Künstler (und damit den Dateinamen) verändert.
+        self.feature_combo.currentIndexChanged.connect(self._update_rename_preview)
+        self._update_rename_preview()
         layout.addWidget(rename)
 
         license_box = QGroupBox(tr("license_group", language))
@@ -855,6 +866,41 @@ class SettingsDialog(QDialog):
             )
 
         return tuple(sources)
+
+    def _update_rename_preview(self, _index: int = -1) -> None:
+        """Live-Vorschau des Dateinamens für das aktuelle Schema.
+
+        Nutzt dasselbe Beispiel wie die Feature-Künstler-Vorschau, damit die
+        Vorschau sich auch bei einer Änderung dieser Einstellung mitändert.
+        """
+        example = MetadataCandidate(
+            source="preview",
+            title="California Love (feat. Dr. Dre)",
+            artist="2Pac",
+        )
+        normalized = normalize_candidate(
+            example,
+            feature_handling=str(self.feature_combo.currentData()),
+        )
+        song = Song(
+            title=normalized.title,
+            artist=normalized.artist,
+            album_artist="2Pac",
+            album="All Eyez on Me",
+            genre="Hip-Hop",
+            year="1996",
+            track="4",
+            disc="1",
+            path="beispiel.flac",
+        )
+        pattern = self.rename_pattern_edit.text().strip() or "{track} - {title}"
+        self.rename_preview.setText(build_new_name(song, pattern))
+        self.rename_preview.setStyleSheet(
+            "padding: 8px 10px;"
+            "border: 1px solid palette(mid);"
+            "border-radius: 7px;"
+            "background: palette(alternate-base);"
+        )
 
     def _update_feature_preview(
         self,

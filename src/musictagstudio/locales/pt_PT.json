@@ -706,5 +706,6 @@
   "write_rg_title": "Gravar ReplayGain",
   "writing_rg": "Estão a ser gravadas as etiquetas ReplayGain…",
   "writing_rg_label": "{filename}\n{index} / {total}",
-  "year_unknown": "Ano desconhecido"
+  "year_unknown": "Ano desconhecido",
+  "rename_preview_label": "Pré-visualização"
 }

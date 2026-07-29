@@ -706,5 +706,6 @@
   "write_rg_title": "Écrire ReplayGain",
   "writing_rg": "Les balises ReplayGain sont en cours d'écriture…",
   "writing_rg_label": "{filename}\n{index} / {total}",
-  "year_unknown": "Année inconnue"
+  "year_unknown": "Année inconnue",
+  "rename_preview_label": "Aperçu"
 }

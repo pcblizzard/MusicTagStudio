@@ -706,5 +706,6 @@
   "write_rg_title": "Write ReplayGain",
   "writing_rg": "Writing ReplayGain tags…",
   "writing_rg_label": "{filename}\n{index} / {total}",
-  "year_unknown": "Year unknown"
+  "year_unknown": "Year unknown",
+  "rename_preview_label": "Preview"
 }
