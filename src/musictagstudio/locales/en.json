@@ -513,6 +513,7 @@
   "progress_album_rg": "Album ReplayGain: {artist} – {album}",
   "provider_error": "{label}: error ({error})",
   "provider_found": "{label}: found ({confidence} %)",
+  "provider_found_quality": "{label}: found ({confidence} %, {quality})",
   "provider_not_configured": "{label}: not configured",
   "provider_not_found": "{label}: not found",
   "provider_priority_info": "The selected source has priority. Other supported sources can only fill in missing fields.",

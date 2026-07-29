@@ -513,6 +513,7 @@
   "progress_album_rg": "ReplayGain dell'album: {artist} – {album}",
   "provider_error": "{label}: Errore ({error})",
   "provider_found": "{label}: trovato ({confidence} %)",
+  "provider_found_quality": "{label}: trovato ({confidence} %, {quality})",
   "provider_not_configured": "{label}: non configurato",
   "provider_not_found": "{label}: non trovato",
   "provider_priority_info": "La fonte selezionata ha la priorità. Le altre fonti supportate possono solo integrare i campi mancanti.",
