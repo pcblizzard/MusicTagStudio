@@ -54,6 +54,24 @@ Ohne Icon bekommt die Exe das Standard-Icon. Sobald ein Icon vorliegt:
 Ein `.ico` lässt sich z. B. aus einem quadratischen PNG erzeugen (viele
 Online-Konverter oder ImageMagick: `magick app.png -define icon:auto-resize=256,48,32,16 app.ico`).
 
+## Datenspeicherung: Standard vs. portabel
+
+Im Setup gibt es die Option **„Portabel: Nutzerdaten im Installationsordner
+speichern"**:
+
+- **Standard (Häkchen aus):** Konfiguration, Logs, Cache, Lizenz-/Nutzungsdaten
+  liegen in `%LOCALAPPDATA%\MusicTagStudio\` – update-fest und auch unter
+  `C:\Program Files` beschreibbar.
+- **Portabel (Häkchen an):** Der Installer legt eine Datei `portable.flag` neben
+  die Exe; die App speichert dann alles in `<Installationsordner>\data\`.
+  Sinnvoll für USB-Sticks oder eine in sich geschlossene Installation.
+  **Achtung:** nur in einen beschreibbaren Ordner installieren – nicht nach
+  `C:\Program Files` (dort ohne Adminrechte kein Schreibzugriff). Das Setup warnt
+  in diesem Fall.
+
+Technisch entscheidet die App über `diagnostics._portable_data_root()` anhand
+der `portable.flag` neben der Exe.
+
 ## Hinweise
 
 - **ffmpeg:** Die Audio-Vorschau nutzt das in PySide6 gebündelte

@@ -53,6 +53,17 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+; Portabler Datenmodus: Nutzerdaten im Installationsordner statt %LOCALAPPDATA%.
+; Nur sinnvoll bei Installation in einen beschreibbaren Ordner (nicht Programme).
+Name: "portabledata"; Description: "{cm:PortableDataDesc}"; GroupDescription: "{cm:PortableDataGroup}"; Flags: unchecked
+
+[CustomMessages]
+german.PortableDataGroup=Datenspeicherung:
+german.PortableDataDesc=Portabel: Nutzerdaten im Installationsordner speichern (statt in %LOCALAPPDATA%)
+german.PortableProgramFilesWarn=Portabler Modus wurde gewählt, aber die Installation erfolgt in den Programme-Ordner. Dort können ohne Administratorrechte keine Nutzerdaten geschrieben werden. Bitte installiere in einen beschreibbaren Ordner (z. B. unter Dokumente oder auf einen USB-Stick) – oder deaktiviere den portablen Modus.
+english.PortableDataGroup=Data storage:
+english.PortableDataDesc=Portable: store user data in the install folder (instead of %LOCALAPPDATA%)
+english.PortableProgramFilesWarn=Portable mode was selected, but the app is being installed into the Program Files folder. User data cannot be written there without administrator rights. Please install into a writable folder (e.g. under Documents or on a USB drive) - or disable portable mode.
 
 [Files]
 ; Den kompletten PyInstaller-Ordner rekursiv übernehmen.
@@ -66,3 +77,33 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+; Markierungsdatei des portablen Modus mitentfernen (die Datendateien selbst
+; bleiben absichtlich erhalten – der Nutzer entscheidet über deren Löschung).
+Type: files; Name: "{app}\portable.flag"
+
+[Code]
+function InstallsUnderProgramFiles(): Boolean;
+var
+  AppDir: String;
+begin
+  AppDir := Lowercase(ExpandConstant('{app}'));
+  Result := (Pos(Lowercase(ExpandConstant('{commonpf}')), AppDir) = 1) or
+            (Pos(Lowercase(ExpandConstant('{commonpf32}')), AppDir) = 1);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+  begin
+    if WizardIsTaskSelected('portabledata') then
+    begin
+      // Warnen, falls portabel in den (nicht beschreibbaren) Programme-Ordner.
+      if InstallsUnderProgramFiles() then
+        MsgBox(ExpandConstant('{cm:PortableProgramFilesWarn}'), mbInformation, MB_OK);
+      // Markierungsdatei anlegen -> die App legt ihre Daten in {app}\data ab.
+      SaveStringToFile(ExpandConstant('{app}\portable.flag'), '', False);
+    end;
+  end;
+end;

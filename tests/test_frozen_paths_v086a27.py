@@ -32,3 +32,24 @@ def test_resource_root_uses_meipass_when_frozen(tmp_path, monkeypatch):
 
 def test_resource_root_is_repo_in_dev():
     assert diagnostics.resource_root() == Path(diagnostics.__file__).resolve().parents[2]
+
+
+def test_portable_marker_redirects_data_next_to_exe(tmp_path, monkeypatch):
+    # Frozen + Markierungsdatei neben der Exe -> Daten in <Exe-Ordner>\data.
+    exe = tmp_path / "MusicTagStudio.exe"
+    exe.write_bytes(b"")
+    (tmp_path / "portable.flag").write_text("", encoding="utf-8")
+    monkeypatch.setattr(diagnostics, "is_frozen", lambda: True)
+    monkeypatch.setattr(diagnostics.sys, "executable", str(exe))
+    assert diagnostics.user_data_dir() == tmp_path / "data"
+    assert (tmp_path / "data").is_dir()
+
+
+def test_no_portable_marker_uses_localappdata(tmp_path, monkeypatch):
+    exe = tmp_path / "MusicTagStudio.exe"
+    exe.write_bytes(b"")  # keine portable.flag daneben
+    appdata = tmp_path / "appdata"
+    monkeypatch.setattr(diagnostics, "is_frozen", lambda: True)
+    monkeypatch.setattr(diagnostics.sys, "executable", str(exe))
+    monkeypatch.setenv("LOCALAPPDATA", str(appdata))
+    assert diagnostics.user_data_dir() == appdata / "MusicTagStudio"

@@ -24,15 +24,37 @@ def is_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
+def _portable_data_root() -> Path | None:
+    """Ordner für portablen Datenmodus oder None (Standardmodus).
+
+    Legt der Installer neben die Exe eine Markierungsdatei ``portable.flag``,
+    werden die Nutzerdaten in ``<Exe-Ordner>\\data`` gehalten statt in
+    %LOCALAPPDATA%. Nur im gebündelten Betrieb relevant.
+    """
+    if not is_frozen():
+        return None
+    exe_dir = Path(sys.executable).resolve().parent
+    if (exe_dir / "portable.flag").is_file():
+        return exe_dir / "data"
+    return None
+
+
 def user_data_dir() -> Path:
     """Beschreibbarer Ablageort für Konfiguration, Logs, Cache (installiert).
 
-    Nutzt %LOCALAPPDATA%\\MusicTagStudio (bzw. %APPDATA%), damit die
+    Standard: %LOCALAPPDATA%\\MusicTagStudio (bzw. %APPDATA%), damit die
     installierte App auch unter schreibgeschütztem Programme-Ordner
-    funktioniert und Nutzerdaten ein Update überleben.
+    funktioniert und Nutzerdaten ein Update überleben. Im portablen Modus
+    (Markierungsdatei neben der Exe) liegen die Daten im Installationsordner.
     """
-    base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-    root = Path(base) / "MusicTagStudio" if base else Path.home() / ".musictagstudio"
+    portable = _portable_data_root()
+    if portable is not None:
+        root = portable
+    else:
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        root = (
+            Path(base) / "MusicTagStudio" if base else Path.home() / ".musictagstudio"
+        )
     root.mkdir(parents=True, exist_ok=True)
     return root
 
