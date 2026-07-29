@@ -1,5 +1,28 @@
 # MusicTagStudio 0.8.6-alpha26
 
+## Einstellungen aufgeräumt: Reiter, Tag-Schalter, Vorschau
+
+- Die Einstellungen sind jetzt in **Reiter** gegliedert (Darstellung,
+  Bibliothek, Quellen, Benennung, Lizenz) statt einer langen Scroll-Seite.
+- Neue Gruppe **Eingebettete Tags**: pro Feld (Titel, Interpret, Album … Kommentar)
+  ein Schalter plus „Alle aktivieren/deaktivieren". Abgeschaltete Felder werden
+  beim Speichern **nicht** in die Dateien geschrieben – ihr Wert bleibt erhalten.
+- **Live-Vorschau** des Dateinamens beim Umbenennen: zeigt sofort, wie eine
+  Datei hieße, und reagiert auch auf die Feature-Künstler-Einstellung.
+- Knöpfe **Konfigurationsordner öffnen** und **Auf Standard zurücksetzen**
+  (Letzteres behält Musikquellen, Provider, API-Schlüssel und Lizenz).
+
+## Premium-Testphase & Online-Lizenz (Keygen)
+
+- **Gratis-Kontingent:** ohne Lizenz 30 Datei-Umbenennungen kostenlos, dann
+  Premium-Hinweis (nutzungs-, nicht zeitbasiert – nicht durch Uhr-Manipulation
+  umgehbar).
+- **Online-Aktivierung über Keygen.sh** (optional): Ein-Geräte-Bindung, Ablauf
+  und Widerruf serverseitig; kein Admin-Token in der App. Offline gilt eine
+  **Kulanzfrist von 14 Tagen**; ab Tag 10 dezenter Hinweis „bitte online gehen".
+  Tägliche Hintergrundprüfung. **Gerät deaktivieren**-Knopf für legitimen
+  PC-Wechsel. Der Lizenzstatus zeigt den echten Lizenznamen.
+
 ## Premium-Lizenzierung (Feature-Gating, offline)
 
 - Grundgerüst für ein Demo-/Premium-Modell: bestimmte Funktionen lassen sich
