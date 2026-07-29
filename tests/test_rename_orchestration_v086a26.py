@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from musictagstudio.history import HistoryManager  # noqa: E402
 from musictagstudio.models.song import Song  # noqa: E402
+from musictagstudio.settings import AppSettings  # noqa: E402
 
 
 @pytest.fixture
@@ -26,6 +27,9 @@ def window(tmp_path, monkeypatch):
     monkeypatch.setattr(win, "scan_music", lambda: None)
     # Premium-Gating für die Umbenennungs-Tests freischalten.
     monkeypatch.setattr(mw, "is_feature_enabled", lambda *a, **k: True)
+    # Nicht die echte config.toml lesen (Namensschema/Key des Entwicklers) –
+    # deterministische Standardeinstellungen erzwingen.
+    monkeypatch.setattr(mw, "load_settings", lambda *a, **k: AppSettings())
     yield win, mw
     win.close()
 
@@ -72,31 +76,38 @@ def test_rename_files_renames_and_records_history(window, tmp_path, monkeypatch)
     assert Path(a).is_file() and Path(b).is_file()
 
 
-def test_rename_blocked_without_license(tmp_path, monkeypatch):
-    # Eigenes Fenster OHNE die Freischalt-Fixture: Gating muss greifen.
+def test_rename_free_tier_allows_then_blocks(tmp_path, monkeypatch):
+    # Eigenes Fenster OHNE die Freischalt-Fixture -> Gratis-Stufe greift.
     from musictagstudio.ui import main_window as mw
+    from musictagstudio import usage_limits
 
+    monkeypatch.setattr(mw, "ChangePreviewDialog", _AcceptDialog)
+    monkeypatch.setattr(mw, "load_settings", lambda *a, **k: AppSettings())
     QApplication.instance() or QApplication([])
     win = mw.MainWindow()
     monkeypatch.setattr(win, "scan_music", lambda: None)
     win.history = HistoryManager(tmp_path / "hist")
+    win.folder = str(tmp_path)
 
+    # Gratis-Kontingent: Umbenennung ist ohne Lizenz erlaubt.
+    a = _make_file(tmp_path / "raw1.flac")
+    win.songs = [Song(path=a, track="1", title="Erster")]
+    win.rename_files()
+    assert (tmp_path / "01 - Erster.flac").is_file()
+    assert usage_limits.remaining_free_renames() == usage_limits.FREE_RENAME_LIMIT - 1
+
+    # Kontingent erschöpfen -> jetzt wird geblockt.
+    usage_limits.record_renames(usage_limits.FREE_RENAME_LIMIT)
     captured: list[str] = []
     monkeypatch.setattr(
         mw.QMessageBox, "information", lambda *a, **k: captured.append("info")
     )
-
-    a = _make_file(tmp_path / "raw1.flac")
-    win.folder = str(tmp_path)
-    win.songs = [Song(path=a, track="1", title="Erster")]
-
+    b = _make_file(tmp_path / "raw2.flac")
+    win.songs = [Song(path=b, track="2", title="Zweiter")]
     win.rename_files()
-
-    # Datei bleibt unverändert, kein History-Eintrag.
-    assert Path(a).is_file()
-    assert not (tmp_path / "01 - Erster.flac").exists()
-    assert not win.history.can_undo
-    assert captured  # Premium-Hinweis wurde angezeigt
+    assert Path(b).is_file()  # nicht umbenannt
+    assert not (tmp_path / "02 - Zweiter.flac").exists()
+    assert captured  # Premium-/Limit-Hinweis wurde angezeigt
     win.close()
 
 

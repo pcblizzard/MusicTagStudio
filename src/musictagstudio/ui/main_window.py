@@ -68,6 +68,7 @@ from ..services.cover import (
     load_cover_info,
 )
 from .. import licensing_keygen as keygen
+from .. import usage_limits
 from ..licensing import is_feature_enabled, load_license
 from ..services.metadata_io import save_song_metadata
 from ..services.rename import plan_renames
@@ -1883,16 +1884,16 @@ class MainWindow(QMainWindow):
         die Ansicht wird per scan_music neu vom Datenträger eingelesen.
         """
         settings = load_settings()
-        if not self._premium_active(settings):
-            # Liegt ein Schlüssel vor, konnte aber (noch) nicht online bestätigt
-            # werden (Erstaktivierung offline oder Kulanzfrist abgelaufen), bitten
-            # wir gezielt darum, online zu gehen – statt „kein Premium".
+        premium = self._premium_active(settings)
+        # Ohne Lizenz sind FREE_RENAME_LIMIT Umbenennungen gratis; erst danach
+        # (oder bei vorhandenem, aber unbestätigtem Schlüssel) wird geblockt.
+        if not premium and usage_limits.remaining_free_renames() <= 0:
             if settings.license_key.strip() and keygen.is_configured():
                 title = tr("license_needs_online_title", self.language)
                 message = tr("license_needs_online_msg", self.language)
             else:
                 title = tr("premium_required_title", self.language)
-                message = tr("premium_required_msg", self.language)
+                message = tr("free_limit_reached_msg", self.language)
             QMessageBox.information(self, title, message)
             return
 
@@ -1960,6 +1961,9 @@ class MainWindow(QMainWindow):
         if moves:
             self.history.commit_rename("rename_history", moves)
             self.update_history_actions()
+            # Gratis genutzte Umbenennungen zählen (nur ohne Premium).
+            if not premium:
+                usage_limits.record_renames(len(moves))
             # Neu einlesen, damit Tabelle/Index die neuen Pfade übernehmen.
             self.scan_music()
 
@@ -1968,7 +1972,13 @@ class MainWindow(QMainWindow):
             parts.append(
                 tr_plural("rename_skipped", len(skipped), self.language)
             )
-        self.statusBar().showMessage(" · ".join(parts), 6000)
+        # Im Gratis-Modus das verbleibende Kontingent anzeigen.
+        if not premium:
+            remaining = usage_limits.remaining_free_renames()
+            parts.append(
+                tr_plural("free_renames_remaining", remaining, self.language)
+            )
+        self.statusBar().showMessage(" · ".join(parts), 8000)
 
         if failed:
             QMessageBox.warning(
