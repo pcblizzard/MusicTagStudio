@@ -43,6 +43,12 @@ dev = [
 translate = [
     "argostranslate>=1.9",
 ]
+# Optionale, EXAKTE TIDAL-Qualität über die inoffizielle App-API. Erfordert
+# einen eigenen TIDAL-Login (Hi-Fi/Plus) und ist ToS-seitig ein Graubereich –
+# daher bewusst opt-in und nicht Teil der Standardinstallation.
+tidal-exact = [
+    "tidalapi>=0.8",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
