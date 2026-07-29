@@ -14,8 +14,10 @@ from PySide6.QtCore import (
     QSettings,
     QThreadPool,
     Qt,
+    QUrl,
     Signal,
 )
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -48,7 +50,7 @@ from ..models.metadata import MetadataCandidate
 from ..provider_catalog import PROVIDERS
 from ..library_sources import MusicSource, new_source
 from ..providers import http_cache
-from ..settings import AppSettings
+from ..settings import DEFAULT_CONFIG_PATH, AppSettings
 from ..settings import apply_request_intervals
 from ..provider_diagnostics import check_provider_connections
 from ..secret_store import (
@@ -730,10 +732,51 @@ class SettingsDialog(QDialog):
             )
             button_box.accepted.connect(self.accept)
             button_box.rejected.connect(self.reject)
+        self.open_config_button = button_box.addButton(
+            tr("open_config_folder", language),
+            QDialogButtonBox.ButtonRole.ActionRole,
+        )
+        self.open_config_button.clicked.connect(self._open_config_folder)
+        self.reset_defaults_button = button_box.addButton(
+            tr("reset_defaults", language),
+            QDialogButtonBox.ButtonRole.ResetRole,
+        )
+        self.reset_defaults_button.clicked.connect(self._reset_to_defaults)
         self.button_box = button_box
         self._update_button_texts()
         self.language_combo.currentIndexChanged.connect(self._update_button_texts)
         outer_layout.addWidget(button_box)
+
+    def _open_config_folder(self) -> None:
+        folder = Path(DEFAULT_CONFIG_PATH).resolve().parent
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    def _reset_to_defaults(self) -> None:
+        """Setzt Darstellungs-, Benennungs- und Normalisierungs-Optionen zurück.
+
+        Musikquellen, Provider-Auswahl, API-Schlüssel und die Lizenz bleiben
+        bewusst erhalten (kein Datenverlust); nur reine Vorlieben werden auf den
+        Auslieferungszustand gesetzt.
+        """
+        confirmed = (
+            QMessageBox.question(
+                self,
+                tr("reset_defaults", self.language),
+                tr("reset_defaults_confirm_msg", self.language),
+            )
+            == QMessageBox.StandardButton.Yes
+        )
+        if not confirmed:
+            return
+        defaults = AppSettings()
+        self._set_combo_value(self.theme_combo, defaults.theme)
+        self._set_combo_value(self.theme_style_combo, defaults.theme_style)
+        self._set_combo_value(
+            self.font_scale_combo, self._closest_font_scale(defaults.font_scale)
+        )
+        self.rename_pattern_edit.setText(defaults.rename_pattern)
+        self._set_combo_value(self.feature_combo, defaults.feature_handling)
+        self._update_rename_preview()
 
     def _update_button_texts(
         self,

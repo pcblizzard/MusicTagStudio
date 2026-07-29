@@ -707,5 +707,8 @@
   "writing_rg": "Se están escribiendo las etiquetas ReplayGain…",
   "writing_rg_label": "{filename}\n{index} / {total}",
   "year_unknown": "Año desconocido",
-  "rename_preview_label": "Vista previa"
+  "rename_preview_label": "Vista previa",
+  "open_config_folder": "Abrir carpeta de configuración",
+  "reset_defaults": "Restablecer valores predeterminados",
+  "reset_defaults_confirm_msg": "¿Restablecer apariencia, esquema de nombres y normalización a los valores predeterminados? Se conservan las fuentes de música, los proveedores, las claves API y la licencia."
 }

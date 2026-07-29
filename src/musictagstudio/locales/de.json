@@ -707,5 +707,8 @@
   "writing_rg": "ReplayGain-Tags werden geschrieben …",
   "writing_rg_label": "{filename}\n{index} / {total}",
   "year_unknown": "Jahr unbekannt",
-  "rename_preview_label": "Vorschau"
+  "rename_preview_label": "Vorschau",
+  "open_config_folder": "Konfigurationsordner öffnen",
+  "reset_defaults": "Auf Standard zurücksetzen",
+  "reset_defaults_confirm_msg": "Darstellung, Namensschema und Normalisierung auf die Standardwerte zurücksetzen? Musikquellen, Provider, API-Schlüssel und Lizenz bleiben erhalten."
 }

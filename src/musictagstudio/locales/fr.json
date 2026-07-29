@@ -707,5 +707,8 @@
   "writing_rg": "Les balises ReplayGain sont en cours d'écriture…",
   "writing_rg_label": "{filename}\n{index} / {total}",
   "year_unknown": "Année inconnue",
-  "rename_preview_label": "Aperçu"
+  "rename_preview_label": "Aperçu",
+  "open_config_folder": "Ouvrir le dossier de configuration",
+  "reset_defaults": "Réinitialiser par défaut",
+  "reset_defaults_confirm_msg": "Réinitialiser l'apparence, le schéma de nommage et la normalisation aux valeurs par défaut ? Les sources musicales, les fournisseurs, les clés API et la licence sont conservés."
 }
