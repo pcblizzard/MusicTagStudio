@@ -293,7 +293,7 @@
   "folder_not_found_title": "Cartella non trovata",
   "fpcalc_label": "Percorso fpcalc:",
   "fpcalc_placeholder": "Percorso di fpcalc (facoltativo – altrimenti incluso nella distribuzione/PATH)",
-  "fpcalc_tip": "Percorso opzionale del file binario fpcalc di Chromaprint.",
+  "fpcalc_tip": "Di norma non necessario: fpcalc è incluso. Impostalo solo se vuoi usare deliberatamente un tuo binario fpcalc.",
   "fuzzy_suggestion": "Non c'è alcun risultato esatto. Forse intendevi: {links}?",
   "group_check": "Verificare",
   "group_local": "Locale",

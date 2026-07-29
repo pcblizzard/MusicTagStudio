@@ -293,7 +293,7 @@
   "folder_not_found_title": "Pasta não encontrada",
   "fpcalc_label": "Caminho do fpcalc:",
   "fpcalc_placeholder": "Caminho para o fpcalc (opcional – caso contrário, já incluído no PATH)",
-  "fpcalc_tip": "Caminho opcional para o arquivo binário fpcalc do Chromaprint.",
+  "fpcalc_tip": "Normalmente não é necessário – o fpcalc é incluído. Defina apenas se quiser deliberadamente usar o seu próprio binário fpcalc.",
   "fuzzy_suggestion": "Não foi exatamente isso. Você quis dizer, por acaso: {links}?",
   "group_check": "Verificar",
   "group_local": "Local",

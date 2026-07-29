@@ -36,9 +36,13 @@ ACOUSTID_USER_AGENT = f"MusicTagStudio/{__version__}"
 FPCALC_TIMEOUT_SECONDS = 120
 LOOKUP_TIMEOUT_SECONDS = 20
 
-# Mitgelieferte Werkzeuge liegen unter <app_root>/tools/ (gitignoriert, per
-# scripts/fetch_tools.py befüllt). Der Ordner wird beim Paketieren mitgeliefert.
-_TOOLS_DIR = Path(__file__).resolve().parents[3] / "tools" / "fpcalc"
+# Mitgelieferte Werkzeuge liegen unter <resource_root>/tools/ (gitignoriert, per
+# scripts/fetch_tools.py befüllt). resource_root() zeigt in Entwicklung auf das
+# Repository und als gebündelte Exe ins PyInstaller-Bundle.
+def _tools_dir() -> Path:
+    from ..diagnostics import resource_root
+
+    return resource_root() / "tools" / "fpcalc"
 
 
 class FingerprintError(RuntimeError):
@@ -66,8 +70,9 @@ def find_fpcalc(explicit_path: str = "") -> str | None:
         if candidate.is_file():
             return str(candidate)
 
+    tools_dir = _tools_dir()
     for name in ("fpcalc.exe", "fpcalc"):
-        bundled = _TOOLS_DIR / name
+        bundled = tools_dir / name
         if bundled.is_file():
             return str(bundled)
 
@@ -76,7 +81,7 @@ def find_fpcalc(explicit_path: str = "") -> str | None:
 
 def find_fpcalc_dir() -> Path:
     """Zielverzeichnis für die mitgelieferte fpcalc-Binärdatei."""
-    return _TOOLS_DIR
+    return _tools_dir()
 
 
 def resolve_api_key(settings_key: str = "") -> str:

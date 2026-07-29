@@ -293,7 +293,7 @@
   "folder_not_found_title": "Dossier introuvable",
   "fpcalc_label": "Chemin d'accès à fpcalc :",
   "fpcalc_placeholder": "Chemin d'accès à fpcalc (facultatif – sinon fourni par défaut/PATH)",
-  "fpcalc_tip": "Chemin d'accès facultatif vers le fichier binaire Chromaprint « fpcalc ».",
+  "fpcalc_tip": "Normalement inutile : fpcalc est inclus. À définir uniquement si vous souhaitez délibérément utiliser votre propre binaire fpcalc.",
   "fuzzy_suggestion": "Pas de résultat exact. Voulais-tu peut-être dire : {links} ?",
   "group_check": "Vérifier",
   "group_local": "Local",

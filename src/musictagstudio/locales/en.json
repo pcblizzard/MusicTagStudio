@@ -293,7 +293,7 @@
   "folder_not_found_title": "Folder not found",
   "fpcalc_label": "fpcalc path:",
   "fpcalc_placeholder": "Path to fpcalc (optional – otherwise bundled/PATH)",
-  "fpcalc_tip": "Optional path to the Chromaprint binary fpcalc.",
+  "fpcalc_tip": "Normally not needed – fpcalc is bundled. Only set this if you deliberately want to use your own fpcalc binary.",
   "fuzzy_suggestion": "No exact match. Did you mean: {links}?",
   "group_check": "Check",
   "group_local": "Local",

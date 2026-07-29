@@ -38,7 +38,7 @@ def test_find_fpcalc_prefers_tools_dir(tmp_path, monkeypatch):
     binary = tools / "fpcalc.exe"
     binary.write_bytes(b"x")
 
-    monkeypatch.setattr(fingerprint, "_TOOLS_DIR", tools)
+    monkeypatch.setattr(fingerprint, "_tools_dir", lambda: tools)
     monkeypatch.setattr(
         fingerprint.shutil, "which", lambda _n: "C:/system/fpcalc.exe"
     )

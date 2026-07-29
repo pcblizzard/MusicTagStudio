@@ -29,7 +29,7 @@ def test_find_fpcalc_falls_back_to_path(monkeypatch):
         fingerprint.shutil, "which", lambda name: "C:/tools/fpcalc.exe"
     )
     # Kein Bundle in diesem Test -> PATH greift.
-    monkeypatch.setattr(fingerprint, "_TOOLS_DIR", fingerprint.Path("nope"))
+    monkeypatch.setattr(fingerprint, "_tools_dir", lambda: fingerprint.Path("nope"))
 
     assert fingerprint.find_fpcalc("") == "C:/tools/fpcalc.exe"
 

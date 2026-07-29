@@ -293,7 +293,7 @@
   "folder_not_found_title": "Ordner nicht gefunden",
   "fpcalc_label": "fpcalc-Pfad:",
   "fpcalc_placeholder": "Pfad zu fpcalc (optional – sonst mitgeliefert/PATH)",
-  "fpcalc_tip": "Optionaler Pfad zur Chromaprint-Binärdatei fpcalc.",
+  "fpcalc_tip": "Normalerweise nicht nötig – fpcalc wird mitgeliefert. Nur setzen, wenn du bewusst eine eigene fpcalc-Binärdatei verwenden willst.",
   "fuzzy_suggestion": "Kein exakter Treffer. Meintest du vielleicht: {links}?",
   "group_check": "Prüfen",
   "group_local": "Lokal",

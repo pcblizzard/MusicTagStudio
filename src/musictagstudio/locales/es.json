@@ -293,7 +293,7 @@
   "folder_not_found_title": "No se ha encontrado la carpeta",
   "fpcalc_label": "Ruta de fpcalc:",
   "fpcalc_placeholder": "Ruta a fpcalc (opcional; de lo contrario, se incluye en PATH)",
-  "fpcalc_tip": "Ruta opcional al archivo binario fpcalc de Chromaprint.",
+  "fpcalc_tip": "Normalmente no es necesario: fpcalc viene incluido. Configúralo solo si quieres usar deliberadamente tu propio binario de fpcalc.",
   "fuzzy_suggestion": "No hay ninguna coincidencia exacta. ¿Quizás te referías a: {links}?",
   "group_check": "Comprobar",
   "group_local": "Local",
