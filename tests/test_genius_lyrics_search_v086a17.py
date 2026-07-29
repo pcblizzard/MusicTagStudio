@@ -83,6 +83,24 @@ def test_genius_search_without_token_does_not_contact_network(
     assert genius.search_songs_by_text("remembered line", access_token="") == []
 
 
+def test_validate_access_token_uses_search_not_account(monkeypatch) -> None:
+    # Regression: /account verlangt die OAuth-Berechtigung "me", die ein
+    # Client Access Token nicht hat -> ein gültiges Token würde abgelehnt.
+    # Die Prüfung muss gegen den tatsächlich genutzten /search-Endpunkt gehen.
+    called = {}
+
+    def fake_urlopen(request, timeout):
+        called["url"] = request.full_url
+        called["auth"] = request.headers.get("Authorization")
+        return _Response({"response": {"hits": []}})
+
+    monkeypatch.setattr(genius, "urlopen", fake_urlopen)
+    genius.validate_access_token("token-123")
+    assert "/search" in called["url"]
+    assert "/account" not in called["url"]
+    assert called["auth"] == "Bearer token-123"
+
+
 def test_genius_requests_share_one_global_pacing_lock(monkeypatch) -> None:
     starts = iter([0.25, 1.0])
     sleeps = []

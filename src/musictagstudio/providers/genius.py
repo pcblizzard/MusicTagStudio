@@ -113,8 +113,13 @@ def validate_access_token(access_token: str) -> None:
     token = access_token.strip()
     if not token:
         raise GeniusProviderError("Der Genius Client Access Token fehlt.")
+    # Gegen den tatsächlich genutzten Such-Endpunkt prüfen. Der Account-Endpunkt
+    # (/account) verlangt die OAuth-Berechtigung "me", die ein im Dashboard
+    # erzeugtes Client Access Token nicht besitzt – er würde ein gültiges Token
+    # fälschlich ablehnen. /search akzeptiert das Client Access Token so, wie es
+    # die App später verwendet.
     request = Request(
-        "https://api.genius.com/account",
+        f"{SEARCH_ENDPOINT}?{urlencode({'q': 'test'})}",
         headers={
             "Authorization": f"Bearer {token}",
             "Accept": "application/json",
