@@ -181,11 +181,16 @@ def _request_json(request: Request) -> dict:
             if error.code == 429 and attempt == 0:
                 time.sleep(_retry_after(error))
                 continue
+            detail = _error_detail(error)
             if error.code in {401, 403}:
+                suffix = f" ({detail})" if detail else ""
                 raise GeniusProviderError(
-                    "Der Genius Client Access Token wurde abgelehnt."
+                    f"Der Genius Client Access Token wurde abgelehnt{suffix}."
                 ) from error
-            raise GeniusProviderError(f"Genius meldet HTTP {error.code}.") from error
+            suffix = f": {detail}" if detail else ""
+            raise GeniusProviderError(
+                f"Genius meldet HTTP {error.code}{suffix}."
+            ) from error
         except URLError as error:
             raise GeniusProviderError(
                 f"Genius ist momentan nicht erreichbar: {error.reason}"
@@ -212,6 +217,33 @@ def _pace_request() -> None:
         if delay > 0:
             time.sleep(delay)
         _last_request_started = time.monotonic()
+
+
+def _error_detail(error: HTTPError) -> str:
+    """Liest den Grund aus der Genius-Fehlerantwort (z. B. 'invalid_token').
+
+    Genius liefert bei 4xx meist JSON wie {"error": "invalid_token",
+    "error_description": "..."} oder {"meta": {"message": "..."}}. Das macht
+    aus dem generischen "abgelehnt" einen konkreten Hinweis.
+    """
+    try:
+        body = error.read().decode("utf-8", "replace")
+    except (AttributeError, OSError):
+        return ""
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        return body.strip()[:200]
+    if not isinstance(data, dict):
+        return ""
+    for key in ("error_description", "error"):
+        value = data.get(key)
+        if value:
+            return str(value)
+    meta = data.get("meta")
+    if isinstance(meta, dict) and meta.get("message"):
+        return str(meta["message"])
+    return ""
 
 
 def _retry_after(error: HTTPError) -> float:
