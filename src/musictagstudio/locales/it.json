@@ -714,5 +714,10 @@
   "embedded_tags_group": "Tag incorporati",
   "embedded_tags_hint": "Solo i campi attivati vengono scritti nei file al salvataggio. I campi disattivati restano invariati nei file.",
   "enable_all": "Attiva tutti",
-  "disable_all": "Disattiva tutti"
+  "disable_all": "Disattiva tutti",
+  "tab_appearance": "Aspetto",
+  "tab_library": "Libreria",
+  "tab_sources": "Fonti",
+  "tab_naming": "Denominazione",
+  "tab_license": "Licenza"
 }

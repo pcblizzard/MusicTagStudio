@@ -714,5 +714,10 @@
   "embedded_tags_group": "Eingebettete Tags",
   "embedded_tags_hint": "Nur aktivierte Felder werden beim Speichern in die Dateien geschrieben. Abgeschaltete Felder bleiben in den Dateien unverändert.",
   "enable_all": "Alle aktivieren",
-  "disable_all": "Alle deaktivieren"
+  "disable_all": "Alle deaktivieren",
+  "tab_appearance": "Darstellung",
+  "tab_library": "Bibliothek",
+  "tab_sources": "Quellen",
+  "tab_naming": "Benennung",
+  "tab_license": "Lizenz"
 }

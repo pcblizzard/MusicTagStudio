@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QSpinBox,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -188,11 +189,14 @@ class SettingsDialog(QDialog):
             self.resize(740, 860)
 
         outer_layout = QVBoxLayout(self)
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
+        self.settings_tabs = QTabWidget()
 
-        content = QWidget()
-        layout = QVBoxLayout(content)
+        # Jeder Reiter ist eine eigene, scrollbare Seite.
+        appearance_page = self._add_settings_tab(tr("tab_appearance", language))
+        library_page = self._add_settings_tab(tr("tab_library", language))
+        sources_page = self._add_settings_tab(tr("tab_sources", language))
+        naming_page = self._add_settings_tab(tr("tab_naming", language))
+        license_page = self._add_settings_tab(tr("tab_license", language))
 
         appearance = QGroupBox(tr("appearance", language))
         appearance_form = QFormLayout(appearance)
@@ -268,7 +272,7 @@ class SettingsDialog(QDialog):
             tr("text_size", language),
             self.font_scale_combo,
         )
-        layout.addWidget(appearance)
+        appearance_page.addWidget(appearance)
 
         library = QGroupBox(tr("music_sources", language))
         library_layout = QVBoxLayout(library)
@@ -316,7 +320,7 @@ class SettingsDialog(QDialog):
         library_layout.addWidget(self.scan_sources_checkbox)
 
         self._populate_sources(settings.music_sources)
-        layout.addWidget(library)
+        library_page.addWidget(library)
 
         providers = QGroupBox(tr("metadata_source", language))
         provider_layout = QVBoxLayout(providers)
@@ -382,7 +386,7 @@ class SettingsDialog(QDialog):
             self.country_combo,
         )
         provider_layout.addLayout(country_form)
-        layout.addWidget(providers)
+        sources_page.addWidget(providers)
 
         covers = QGroupBox(tr("cover_sources", language))
         cover_layout = QVBoxLayout(covers)
@@ -448,7 +452,7 @@ class SettingsDialog(QDialog):
         )
 
         cover_layout.addLayout(cover_form)
-        layout.addWidget(covers)
+        sources_page.addWidget(covers)
 
         audio_analysis = QGroupBox(tr("audio_analysis_group", language))
         audio_form = QFormLayout(audio_analysis)
@@ -481,7 +485,7 @@ class SettingsDialog(QDialog):
             tr("parallel_analyses", language),
             self.parallel_jobs_combo,
         )
-        layout.addWidget(audio_analysis)
+        sources_page.addWidget(audio_analysis)
 
         online_catalogs = QGroupBox(tr("online_catalogs", language))
         online_catalogs_form = QFormLayout(online_catalogs)
@@ -652,7 +656,7 @@ class SettingsDialog(QDialog):
             online_catalogs_form.addRow(
                 tr("provider_status_row", language, provider=provider), label
             )
-        layout.addWidget(online_catalogs)
+        sources_page.addWidget(online_catalogs)
 
         normalization = QGroupBox(tr("normalization", language))
         normalization_form = QFormLayout(normalization)
@@ -686,7 +690,7 @@ class SettingsDialog(QDialog):
         )
         self.feature_combo.currentIndexChanged.connect(self._update_feature_preview)
         self._update_feature_preview()
-        layout.addWidget(normalization)
+        naming_page.addWidget(normalization)
 
         rename = QGroupBox(tr("rename_group", language))
         rename_form = QFormLayout(rename)
@@ -708,7 +712,7 @@ class SettingsDialog(QDialog):
         # Titel/Künstler (und damit den Dateinamen) verändert.
         self.feature_combo.currentIndexChanged.connect(self._update_rename_preview)
         self._update_rename_preview()
-        layout.addWidget(rename)
+        naming_page.addWidget(rename)
 
         metadata_box = QGroupBox(tr("embedded_tags_group", language))
         metadata_layout = QVBoxLayout(metadata_box)
@@ -732,7 +736,7 @@ class SettingsDialog(QDialog):
             self.tag_field_checks[field] = check
             tag_grid.addWidget(check, index // 2, index % 2)
         metadata_layout.addLayout(tag_grid)
-        layout.addWidget(metadata_box)
+        naming_page.addWidget(metadata_box)
 
         license_box = QGroupBox(tr("license_group", language))
         license_form = QFormLayout(license_box)
@@ -760,12 +764,18 @@ class SettingsDialog(QDialog):
         self.license_key_edit.editingFinished.connect(self._check_license_online)
         self._update_license_status()
         self._check_license_online()
-        layout.addWidget(license_box)
+        license_page.addWidget(license_box)
 
-        layout.addStretch()
+        for page in (
+            appearance_page,
+            library_page,
+            sources_page,
+            naming_page,
+            license_page,
+        ):
+            page.addStretch()
 
-        scroll_area.setWidget(content)
-        outer_layout.addWidget(scroll_area)
+        outer_layout.addWidget(self.settings_tabs)
 
         if self.embedded:
             button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save)
@@ -791,6 +801,16 @@ class SettingsDialog(QDialog):
         self._update_button_texts()
         self.language_combo.currentIndexChanged.connect(self._update_button_texts)
         outer_layout.addWidget(button_box)
+
+    def _add_settings_tab(self, title: str) -> QVBoxLayout:
+        """Legt einen scrollbaren Reiter an und gibt dessen Layout zurück."""
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(page)
+        self.settings_tabs.addTab(scroll, title)
+        return page_layout
 
     def _set_all_tag_fields(self, enabled: bool) -> None:
         for check in self.tag_field_checks.values():

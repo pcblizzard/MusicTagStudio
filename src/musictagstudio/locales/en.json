@@ -714,5 +714,10 @@
   "embedded_tags_group": "Embedded tags",
   "embedded_tags_hint": "Only enabled fields are written to files when saving. Disabled fields are left unchanged in the files.",
   "enable_all": "Enable all",
-  "disable_all": "Disable all"
+  "disable_all": "Disable all",
+  "tab_appearance": "Appearance",
+  "tab_library": "Library",
+  "tab_sources": "Sources",
+  "tab_naming": "Naming",
+  "tab_license": "License"
 }

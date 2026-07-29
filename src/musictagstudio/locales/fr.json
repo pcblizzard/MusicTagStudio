@@ -714,5 +714,10 @@
   "embedded_tags_group": "Balises intégrées",
   "embedded_tags_hint": "Seuls les champs activés sont écrits dans les fichiers lors de l'enregistrement. Les champs désactivés restent inchangés dans les fichiers.",
   "enable_all": "Tout activer",
-  "disable_all": "Tout désactiver"
+  "disable_all": "Tout désactiver",
+  "tab_appearance": "Apparence",
+  "tab_library": "Bibliothèque",
+  "tab_sources": "Sources",
+  "tab_naming": "Nommage",
+  "tab_license": "Licence"
 }

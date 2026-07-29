@@ -714,5 +714,10 @@
   "embedded_tags_group": "Etiquetas incorporadas",
   "embedded_tags_hint": "Apenas os campos ativados são escritos nos ficheiros ao guardar. Os campos desativados permanecem inalterados nos ficheiros.",
   "enable_all": "Ativar tudo",
-  "disable_all": "Desativar tudo"
+  "disable_all": "Desativar tudo",
+  "tab_appearance": "Aspeto",
+  "tab_library": "Biblioteca",
+  "tab_sources": "Fontes",
+  "tab_naming": "Nomes",
+  "tab_license": "Licença"
 }

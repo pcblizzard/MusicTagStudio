@@ -714,5 +714,10 @@
   "embedded_tags_group": "Etiquetas incrustadas",
   "embedded_tags_hint": "Solo los campos activados se escriben en los archivos al guardar. Los campos desactivados permanecen sin cambios en los archivos.",
   "enable_all": "Activar todo",
-  "disable_all": "Desactivar todo"
+  "disable_all": "Desactivar todo",
+  "tab_appearance": "Aspecto",
+  "tab_library": "Biblioteca",
+  "tab_sources": "Fuentes",
+  "tab_naming": "Nombres",
+  "tab_license": "Licencia"
 }
