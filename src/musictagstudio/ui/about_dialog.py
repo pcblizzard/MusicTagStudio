@@ -6,15 +6,13 @@ import sys
 from pathlib import Path
 
 import PySide6
-from PySide6.QtCore import QLibraryInfo, QSettings, QUrl, qVersion
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QLibraryInfo, QSettings, qVersion
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
     QLabel,
-    QMenu,
     QPushButton,
     QTabWidget,
     QTextBrowser,
@@ -27,7 +25,7 @@ from ..i18n import tr
 from ..settings import load_settings
 
 
-# (Anzeigename, URL) – im ❤️-Menü in dieser Reihenfolge.
+# (Anzeigename, URL) – im "Unterstützen"-Tab in dieser Reihenfolge.
 DONATION_OPTIONS = (
     ("PayPal", "https://paypal.com/donate/?hosted_button_id=GJT2FRBFEU9KJ"),
     ("Ko-fi", "https://ko-fi.com/br1984"),
@@ -63,22 +61,16 @@ class AboutDialog(QDialog):
 
         self.tabs = QTabWidget()
         self.about_browser = _browser(about_html(language))
+        self.support_browser = _browser(support_html(language))
         self.contributors_browser = _browser(contributors_html(language))
         self.debug_browser = _browser(f"<pre>{_escape_html(debug_information())}</pre>")
         self.tabs.addTab(self.about_browser, tr("tab_about", language))
+        self.tabs.addTab(self.support_browser, "❤️ " + tr("tab_support", language))
         self.tabs.addTab(self.contributors_browser, tr("tab_contributors", language))
         self.tabs.addTab(self.debug_browser, tr("tab_debug", language))
         layout.addWidget(self.tabs, 1)
 
         button_row = QHBoxLayout()
-        self.donate_button = QPushButton("❤️ " + tr("support_button", language))
-        self.donate_button.setToolTip(tr("support_tooltip", language))
-        donate_menu = QMenu(self.donate_button)
-        for name, url in DONATION_OPTIONS:
-            action = donate_menu.addAction(name)
-            action.triggered.connect(lambda _checked=False, u=url: self._open_donation(u))
-        self.donate_button.setMenu(donate_menu)
-        button_row.addWidget(self.donate_button)
         self.copy_button = QPushButton(tr("copy_debug", language))
         self.copy_button.clicked.connect(self.copy_debug_information)
         button_row.addWidget(self.copy_button)
@@ -87,9 +79,6 @@ class AboutDialog(QDialog):
         close_buttons.rejected.connect(self.reject)
         button_row.addWidget(close_buttons)
         layout.addLayout(button_row)
-
-    def _open_donation(self, url: str) -> None:
-        QDesktopServices.openUrl(QUrl(url))
 
     def copy_debug_information(self) -> None:
         clipboard = QApplication.clipboard()
@@ -105,6 +94,21 @@ def about_html(language: str = "automatic") -> str:
         version=__version__,
         license=_license_description(),
         interfaces=interfaces,
+    )
+
+
+def support_html(language: str = "automatic") -> str:
+    links = "".join(
+        f'<li style="margin-bottom:4px;">'
+        f'<a href="{url}" style="color:#e05555; text-decoration:none;">{name}</a>'
+        f"</li>"
+        for name, url in DONATION_OPTIONS
+    )
+    return (
+        f"<p>{tr('support_intro', language)}</p>"
+        f"<p>{tr('support_thanks', language)}</p>"
+        f"<p><b>{tr('support_links_heading', language)}</b></p>"
+        f'<ul style="list-style:none; padding-left:0;">{links}</ul>'
     )
 
 

@@ -38,13 +38,14 @@ def test_debug_information_contains_runtime_versions() -> None:
     assert "Client Secret" not in debug
 
 
-def test_about_dialog_has_three_tabs() -> None:
+def test_about_dialog_has_four_tabs() -> None:
     application = QApplication.instance() or QApplication([])
     dialog = AboutDialog()
 
-    assert dialog.tabs.count() == 3
-    assert [dialog.tabs.tabText(index) for index in range(3)] == [
+    assert dialog.tabs.count() == 4
+    assert [dialog.tabs.tabText(index) for index in range(4)] == [
         "Über",
+        "❤️ Unterstützen",
         "Mitwirkende",
         "Debug-Info",
     ]
