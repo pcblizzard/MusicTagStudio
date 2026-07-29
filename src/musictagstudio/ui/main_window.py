@@ -249,11 +249,21 @@ class MainWindow(QMainWindow):
         # Laufende Lizenz-Hintergrundprüfungen festhalten, damit ihr Ergebnis-
         # Signal nicht durch vorzeitiges Aufräumen verloren geht.
         self._license_workers: set = set()
+        # Kulanz-Warnung nur einmal pro Sitzung zeigen.
+        self._grace_warned = False
 
         self.create_ui()
         self.create_menu()
         self.update_history_actions()
         self._refresh_license_async(load_settings().license_key)
+        # Lizenz zusätzlich täglich im Hintergrund nachprüfen, damit die
+        # Kulanzfrist nie knapp wird und ein Widerruf zeitnah greift.
+        self._license_timer = QTimer(self)
+        self._license_timer.setInterval(24 * 60 * 60 * 1000)
+        self._license_timer.timeout.connect(
+            lambda: self._refresh_license_async(load_settings().license_key)
+        )
+        self._license_timer.start()
         QTimer.singleShot(
             0,
             self.load_configured_sources,
@@ -1848,6 +1858,19 @@ class MainWindow(QMainWindow):
     def _on_license_checked(self, premium: bool, worker) -> None:
         self._set_keygen_premium(premium)
         self._license_workers.discard(worker)
+        # Läuft Premium nur noch über die Kulanzfrist (seit >= 10 Tagen offline),
+        # einmal pro Sitzung dezent zum Online-Gehen auffordern.
+        if premium and not self._grace_warned:
+            remaining = keygen.grace_warning_days(
+                keygen.default_cache_path(), datetime.now()
+            )
+            if remaining is not None:
+                self._grace_warned = True
+                QMessageBox.information(
+                    self,
+                    tr("license_grace_title", self.language),
+                    tr("license_grace_msg", self.language, days=remaining),
+                )
 
     def _set_keygen_premium(self, premium: bool) -> None:
         self._keygen_premium = premium

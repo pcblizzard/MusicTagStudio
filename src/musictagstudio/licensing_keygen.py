@@ -36,6 +36,11 @@ KEYGEN_PUBLIC_KEY_HEX = (
 _API_BASE = "https://api.keygen.sh/v1/accounts"
 _MEDIA_TYPE = "application/vnd.api+json"
 
+# Offline-Kulanz: so viele Tage bleibt Premium nach der letzten erfolgreichen
+# Online-Prüfung aktiv; ab WARN_AFTER_DAYS wird zum Online-Gehen aufgefordert.
+GRACE_DAYS = 14
+WARN_AFTER_DAYS = 10
+
 # Fehlt die Aktivierung nur, weil die Maschine noch nicht registriert ist,
 # lässt sich das durch eine Aktivierung heilen (dann erneut validieren).
 _ACTIVATABLE_CODES = frozenset(
@@ -152,6 +157,65 @@ def check_license(
     return result
 
 
+def _find_machine_id(
+    transport: Transport, account_id: str, key: str, fingerprint: str
+) -> str:
+    import urllib.parse
+
+    query = urllib.parse.quote(fingerprint)
+    url = f"{_API_BASE}/{account_id}/machines?fingerprint={query}"
+    headers = {"Accept": _MEDIA_TYPE, "Authorization": f"License {key}"}
+    _status, payload = transport("GET", url, headers, None)
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        return str(data[0].get("id", ""))
+    return ""
+
+
+def deactivate_machine(
+    key: str,
+    fingerprint: str,
+    *,
+    account_id: str | None = None,
+    transport: Transport | None = None,
+) -> bool:
+    """Gibt die aktuelle Maschine bei Keygen frei (für legitimen PC-Wechsel).
+
+    Sucht die zum Fingerprint gehörende Maschine der Lizenz und löscht sie.
+    Danach kann der Schlüssel auf einem neuen Gerät aktiviert werden. Kann eine
+    Netzwerk-Exception werfen (Aufrufer behandelt Offline-Fall).
+    """
+    account_id = account_id if account_id is not None else KEYGEN_ACCOUNT_ID
+    send = transport or _urllib_transport
+    machine_id = _find_machine_id(send, account_id, key, fingerprint)
+    if not machine_id:
+        return False
+    url = f"{_API_BASE}/{account_id}/machines/{machine_id}"
+    headers = {"Accept": _MEDIA_TYPE, "Authorization": f"License {key}"}
+    status, _payload = send("DELETE", url, headers, None)
+    return 200 <= status < 300
+
+
+def deactivate_this_machine(
+    key: str,
+    fingerprint: str,
+    *,
+    cache_path: Path,
+    account_id: str | None = None,
+    transport: Transport | None = None,
+) -> bool:
+    """Wie :func:`deactivate_machine`, verwirft zusätzlich den lokalen Cache."""
+    ok = deactivate_machine(
+        key, fingerprint, account_id=account_id, transport=transport
+    )
+    if ok:
+        try:
+            Path(cache_path).unlink()
+        except OSError:
+            pass
+    return ok
+
+
 # --- Cache mit Kulanzfrist (reine Logik, testbar) ----------------------------
 
 
@@ -174,7 +238,7 @@ def evaluate_cache(
     key: str,
     now: datetime,
     *,
-    grace_days: int = 14,
+    grace_days: int = GRACE_DAYS,
 ) -> bool:
     """Premium noch aktiv, wenn zuletzt gültig, innerhalb Kulanz und nicht abgelaufen.
 
@@ -264,6 +328,30 @@ def cached_premium(license_key: str, *, now: datetime, cache_path: Path) -> bool
     return evaluate_cache(load_cache(cache_path), license_key, now)
 
 
+def days_since_last_valid(cache_path: Path, now: datetime) -> int | None:
+    """Ganze Tage seit der letzten erfolgreichen Online-Prüfung (oder None)."""
+    cache = load_cache(cache_path)
+    if cache is None or not cache.last_valid:
+        return None
+    try:
+        last = datetime.fromisoformat(cache.last_valid)
+    except ValueError:
+        return None
+    return max(0, (_naive(now) - _naive(last)).days)
+
+
+def grace_warning_days(cache_path: Path, now: datetime) -> int | None:
+    """Verbleibende Tage bis zur Sperre, falls im Warnfenster – sonst None.
+
+    Liefert ``GRACE_DAYS - Offline-Tage`` (z. B. 4), wenn seit der letzten
+    Online-Prüfung ``WARN_AFTER_DAYS..GRACE_DAYS-1`` Tage vergangen sind.
+    """
+    days = days_since_last_valid(cache_path, now)
+    if days is None or days < WARN_AFTER_DAYS or days >= GRACE_DAYS:
+        return None
+    return GRACE_DAYS - days
+
+
 def check_and_cache(
     license_key: str,
     fingerprint: str,
@@ -271,7 +359,7 @@ def check_and_cache(
     now: datetime,
     cache_path: Path,
     transport: Transport | None = None,
-    grace_days: int = 14,
+    grace_days: int = GRACE_DAYS,
 ) -> tuple[bool, str]:
     """Wie :func:`refresh_premium`, gibt zusätzlich den Lizenznamen zurück.
 
@@ -306,7 +394,7 @@ def refresh_premium(
     now: datetime,
     cache_path: Path,
     transport: Transport | None = None,
-    grace_days: int = 14,
+    grace_days: int = GRACE_DAYS,
 ) -> bool:
     """Prüft online und aktualisiert den Cache; nutzt bei Netzfehler die Kulanz."""
     return check_and_cache(

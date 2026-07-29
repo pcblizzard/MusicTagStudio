@@ -15,9 +15,13 @@ from musictagstudio.licensing_keygen import (  # noqa: E402
     cached_premium,
     check_and_cache,
     check_license,
+    deactivate_machine,
+    days_since_last_valid,
     evaluate_cache,
+    grace_warning_days,
     make_cache_state,
     refresh_premium,
+    save_cache,
 )
 
 
@@ -176,6 +180,48 @@ def test_check_and_cache_name_survives_offline_grace(tmp_path):
         "KEY", "fp", now=now + timedelta(days=2), cache_path=cache, transport=_raise
     )
     assert active is True and name == "James Bond"
+
+
+def test_deactivate_machine_finds_and_deletes():
+    transport = _FakeTransport(
+        [(200, {"data": [{"id": "mach_1"}]}), (204, {})]
+    )
+    assert deactivate_machine("KEY", "fp", account_id="acct", transport=transport) is True
+    # GET (Maschine suchen) -> DELETE
+    methods = [m for m, _ in transport.calls]
+    assert methods == ["GET", "DELETE"]
+    assert transport.calls[1][1].endswith("/machines/mach_1")
+
+
+def test_deactivate_machine_none_found():
+    transport = _FakeTransport([(200, {"data": []})])
+    assert deactivate_machine("KEY", "fp", account_id="acct", transport=transport) is False
+    assert [m for m, _ in transport.calls] == ["GET"]  # kein DELETE
+
+
+def test_days_since_last_valid(tmp_path):
+    now = datetime(2026, 7, 27, 12, 0, 0)
+    cache = tmp_path / "lic.json"
+    assert days_since_last_valid(cache, now) is None  # kein Cache
+    save_cache(cache, make_cache_state("KEY", KeygenResult(True, "VALID"), now - timedelta(days=5)))
+    assert days_since_last_valid(cache, now) == 5
+
+
+def test_grace_warning_window(tmp_path):
+    now = datetime(2026, 7, 27, 12, 0, 0)
+    cache = tmp_path / "lic.json"
+
+    def _set(days):
+        save_cache(cache, make_cache_state("KEY", KeygenResult(True, "VALID"), now - timedelta(days=days)))
+
+    _set(3)
+    assert grace_warning_days(cache, now) is None  # noch keine Warnung
+    _set(10)
+    assert grace_warning_days(cache, now) == 4  # 14 - 10
+    _set(13)
+    assert grace_warning_days(cache, now) == 1
+    _set(14)
+    assert grace_warning_days(cache, now) is None  # ab hier gesperrt, keine Warnung
 
 
 def test_evaluate_cache_none_is_false():

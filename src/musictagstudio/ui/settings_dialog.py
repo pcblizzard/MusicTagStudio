@@ -104,6 +104,34 @@ class _LicenseStatusCheck(QRunnable):
             pass
 
 
+class _MachineDeactivateSignals(QObject):
+    done = Signal(bool)
+
+
+class _MachineDeactivate(QRunnable):
+    """Gibt die aktuelle Maschine bei Keygen frei (Hintergrund)."""
+
+    def __init__(self, license_key: str, fingerprint: str) -> None:
+        super().__init__()
+        self._key = license_key
+        self._fingerprint = fingerprint
+        self.signals = _MachineDeactivateSignals()
+
+    def run(self) -> None:
+        try:
+            ok = keygen.deactivate_this_machine(
+                self._key,
+                self._fingerprint,
+                cache_path=keygen.default_cache_path(),
+            )
+        except OSError:
+            ok = False
+        try:
+            self.signals.done.emit(ok)
+        except RuntimeError:
+            pass
+
+
 class SettingsDialog(QDialog):
     settings_saved = Signal(object)
     tidal_login_finished = Signal(bool, str)
@@ -659,6 +687,14 @@ class SettingsDialog(QDialog):
         self.license_status_label = QLabel()
         self.license_status_label.setWordWrap(True)
         license_form.addRow(tr("license_status", language), self.license_status_label)
+        self.license_deactivate_button = QPushButton(
+            tr("license_deactivate", language)
+        )
+        self.license_deactivate_button.setToolTip(
+            tr("license_deactivate_tip", language)
+        )
+        self.license_deactivate_button.clicked.connect(self._deactivate_machine)
+        license_form.addRow("", self.license_deactivate_button)
         self._license_status_workers: set = set()
         self.license_key_edit.textChanged.connect(self._update_license_status)
         # Online-Prüfung (Netzwerk) erst, wenn die Eingabe abgeschlossen ist –
@@ -1135,6 +1171,10 @@ class SettingsDialog(QDialog):
     def _update_license_status(self) -> None:
         """Sofort-Anzeige ohne Netzwerk: Offline-Signatur bzw. Zwischenstand."""
         key = self.license_key_edit.text().strip()
+        # Deaktivieren nur sinnvoll, wenn ein Keygen-Schlüssel vorliegt.
+        self.license_deactivate_button.setEnabled(
+            bool(key) and keygen.is_configured() and load_license(key) is None
+        )
         if not key:
             self.license_status_label.setText(tr("license_inactive", self.language))
             return
@@ -1180,6 +1220,47 @@ class SettingsDialog(QDialog):
             )
         else:
             self.license_status_label.setText(tr("license_inactive", self.language))
+
+    def _deactivate_machine(self) -> None:
+        key = self.license_key_edit.text().strip()
+        if not key or not keygen.is_configured():
+            return
+        confirmed = (
+            QMessageBox.question(
+                self,
+                tr("license_deactivate", self.language),
+                tr("license_deactivate_confirm_msg", self.language),
+            )
+            == QMessageBox.StandardButton.Yes
+        )
+        if not confirmed:
+            return
+        self.license_deactivate_button.setEnabled(False)
+        self.license_status_label.setText(tr("license_checking", self.language))
+        worker = _MachineDeactivate(key, machine_fingerprint())
+        worker.setAutoDelete(False)
+        self._license_status_workers.add(worker)
+        worker.signals.done.connect(
+            lambda ok, w=worker: self._on_machine_deactivated(ok, w)
+        )
+        QThreadPool.globalInstance().start(worker)
+
+    def _on_machine_deactivated(self, ok: bool, worker) -> None:
+        self._license_status_workers.discard(worker)
+        if ok:
+            QMessageBox.information(
+                self,
+                tr("license_deactivate", self.language),
+                tr("license_deactivated_msg", self.language),
+            )
+            self.license_status_label.setText(tr("license_inactive", self.language))
+        else:
+            QMessageBox.warning(
+                self,
+                tr("license_deactivate", self.language),
+                tr("license_deactivate_failed_msg", self.language),
+            )
+        self._update_license_status()
 
     @staticmethod
     def _closest_font_scale(value: float) -> float:
