@@ -1,3 +1,46 @@
+# MusicTagStudio 0.8.6-alpha27
+
+## Audio-Analyse: Detail-Metriken & Fake-Hi-Res-Erkennung
+
+- Neuer Tab **„Titel-Details"** mit vollständiger Kennzahl-Karte: Peak, RMS,
+  Dynamischer Bereich, Clipping, Spektralschnitt, Proben – gesamt und **pro
+  Kanal** –, dazu Dekodiertes Format, Nyquist und Größe.
+- **Echtheits-Urteil**: erkennt anhand von Spektralschnitt **und Kantenform**
+  (Steilheit + Rauschboden), ob eine Datei echtes (Hi-Res-)Lossless ist oder
+  vermutlich aus MP3/hochgerechnet – mit Konfidenz und robust gegen natürlichen
+  Höhenabfall.
+- Spektrogramm mit **Kanal-Umschalter** und **fester 96-kHz-Referenzachse**,
+  die hochgerechnetes „Fake-Hi-Res" sichtbar macht.
+- **Bit-Tiefe** zeigt jetzt den echten Header-Wert (mutagen) statt des
+  Dekodier-Formats; Tabellenspalten sind verschiebbar (Reihenfolge wird
+  gespeichert).
+- **Schneller:** Loudness und Sample-Metriken laufen in einem Dekodier-
+  Durchlauf (~31 %); Album Gain/Peak lässt sich schnell aus den Track-Werten
+  ableiten (exakter Modus per Einstellung).
+
+## Duplikate & Auto-Tagging
+
+- Neuer Reiter **„Duplikate"**: findet mehrfach vorhandene Titel und empfiehlt
+  qualitätsbasiert die beste Kopie; schlechtere in den Papierkorb (Send2Trash).
+- **„Auto-Tag"**: taggt viele Titel per Klick – sichere Treffer (≥ Konfidenz-
+  Schwelle) automatisch, unsichere zur Prüfung im Vergleichsdialog.
+
+## Verlauf: Undo über Neustart + Report
+
+- Abgeschlossene Vorgänge sind **auch nach einem Neustart** rückgängig machbar
+  (Undo-Stack wird aus den Platten-Manifesten geladen).
+- Der Verlauf-Dialog zeigt jetzt einen **feldgenauen Report** (Vorher/Nachher).
+
+## Weitere Neuerungen
+
+- **AcoustID**-Identifikation aktiviert (Anwendungs-Key mitgeliefert).
+- Anbieter zeigen ihre **ungefähre Katalog-/Datenbankgröße**.
+- **Premium-Kauf-Buttons** je Laufzeit (PayPal-Festpreis) im Lizenz-Tab;
+  Lizenzstatus zeigt das Ablaufdatum.
+- Bibliotheksprüfung: klarere Meldung „Es fehlen die Track-Nummern …" (statt
+  mehrdeutiger „Lücken") plus Editions-Hinweis; kompakteres Layout.
+
+
 # MusicTagStudio 0.8.6-alpha26
 
 ## Qualitätsprüfung in der Medienbibliothek

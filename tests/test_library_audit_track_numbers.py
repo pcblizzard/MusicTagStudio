@@ -123,6 +123,6 @@ def test_track_gaps_are_checked_per_disc():
     )
     assert not any(
         "Disc 2" in message
-        and "Lücken" in message
+        and "fehl" in message
         for message in messages
     )

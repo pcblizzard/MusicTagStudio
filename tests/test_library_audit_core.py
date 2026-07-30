@@ -77,6 +77,6 @@ def test_track_number_gap():
 
     assert any(
         issue.category == "Tracknummer"
-        and "Lücken" in issue.message
+        and "fehl" in issue.message
         for issue in summary.issues
     )

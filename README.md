@@ -6,7 +6,7 @@ MusicTagStudio is a metadata editor, music catalogue and local audio player
 for Windows. It connects local audio files with MusicBrainz, Discogs,
 Apple Music, Deezer, TheAudioDB, Cover Art Archive and LRCLIB.
 
-Current development version: **v0.8.6-alpha26**
+Current development version: **v0.8.6-alpha27**
 
 ## Features
 
@@ -220,6 +220,20 @@ See the [architecture documentation](docs/ARCHITECTURE.md), the
 [changelog](docs/CHANGELOG.md) and the [roadmap](docs/ROADMAP.md).
 
 ## Version overview
+
+### v0.8.6-alpha27
+
+- Detailed per-track audio metrics (peak/RMS/dynamic range/clipping/spectral
+  cutoff, per channel) with a new "Track details" tab
+- Fake hi-res detection: authenticity verdict from spectral cutoff and edge
+  shape, plus a fixed 96 kHz spectrogram reference axis and channel toggle
+- True header bit depth; movable, persisted analysis columns
+- Faster analysis (single decode) and a fast album gain/peak mode
+- "Duplicates" view (quality-based keep-best, recycle-bin delete) and
+  "Auto-tag" (batch tagging above a confidence threshold)
+- Undo now survives a restart; history dialog shows a field-level report
+- AcoustID identification enabled; provider catalog sizes shown
+- Premium purchase buttons per duration with licence expiry display
 
 ### v0.8.6-alpha12
 

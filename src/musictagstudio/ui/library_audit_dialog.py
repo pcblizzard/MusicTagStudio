@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
+    QHBoxLayout,
     QVBoxLayout,
     QWidget,
 )
@@ -148,9 +149,6 @@ class LibraryAuditDialog(QDialog):
         self.filter_combo.currentIndexChanged.connect(
             self.refresh_table
         )
-        layout.addWidget(
-            self.filter_combo
-        )
 
         self.selected_button = QPushButton(
             tr("check_selected", language, count=len(selected_songs))
@@ -163,9 +161,6 @@ class LibraryAuditDialog(QDialog):
         )
         self.selected_button.setEnabled(
             bool(selected_songs)
-        )
-        layout.addWidget(
-            self.selected_button
         )
 
         self.all_button = QPushButton(
@@ -180,9 +175,14 @@ class LibraryAuditDialog(QDialog):
         self.all_button.setEnabled(
             bool(all_songs)
         )
-        layout.addWidget(
-            self.all_button
-        )
+
+        # Kompakte Kopfzeile: Aktions-Buttons und Filter in einer Reihe, damit
+        # oben kein hoher Leerraum entsteht und die Breite genutzt wird.
+        controls = QHBoxLayout()
+        controls.addWidget(self.selected_button, 2)
+        controls.addWidget(self.all_button, 2)
+        controls.addWidget(self.filter_combo, 1)
+        layout.addLayout(controls)
 
         splitter = QSplitter()
 
@@ -251,8 +251,11 @@ class LibraryAuditDialog(QDialog):
             [1000, 350]
         )
 
+        # Stretch=1: der Splitter (Tabelle + Details) nimmt den restlichen Platz
+        # ein und zieht die Kopfzeile nach oben (kein Leerraum mehr).
         layout.addWidget(
-            splitter
+            splitter,
+            1,
         )
 
         self.close_buttons = QDialogButtonBox(

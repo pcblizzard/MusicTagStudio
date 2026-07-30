@@ -307,18 +307,20 @@ def _check_track_numbers(
             )
 
             if missing:
+                missing_text = ", ".join(str(value) for value in missing)
+                present_text = ", ".join(str(value) for value in numbers)
+                verb = "fehlt" if len(missing) == 1 else "fehlen"
+                noun = (
+                    "Track-Nummer" if len(missing) == 1 else "Track-Nummern"
+                )
                 issues.append(
                     LibraryIssue(
                         category="Tracknummer",
                         severity="warning",
                         message=(
-                            f"Disc {disc_number}: "
-                            "Lücken in der "
-                            "Tracknummerierung: "
-                            + ", ".join(
-                                str(value)
-                                for value in missing
-                            )
+                            f"Disc {disc_number}: Es {verb} "
+                            f"{len(missing)} {noun} "
+                            f"(fehlend: {missing_text})"
                         ),
                         album_artist=(
                             first.album_artist
@@ -327,11 +329,12 @@ def _check_track_numbers(
                         album=first.album,
                         path=first.path,
                         details=(
-                            "Vorhandene Tracknummern:\n"
-                            + ", ".join(
-                                str(value)
-                                for value in numbers
-                            )
+                            f"Fehlende Track-Nummern: {missing_text}\n"
+                            f"Vorhandene Track-Nummern: {present_text}\n\n"
+                            "Hinweis: Je nach Album-Version/Edition (z. B. "
+                            "Deluxe, Bonus-Disc, Region) kann die erwartete "
+                            "Trackzahl abweichen – dann ist die Lücke evtl. "
+                            "korrekt."
                         ),
                     )
                 )
