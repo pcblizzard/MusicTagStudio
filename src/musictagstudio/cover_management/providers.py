@@ -70,6 +70,10 @@ def search_apple_cover(
         if not artwork:
             continue
 
+        # Apple liefert Cover bis ~3000 px. Die tatsächliche Auflösung steht
+        # erst nach dem Download fest (Apple skaliert kleinere Quellen hoch),
+        # daher werden width/height unten NICHT vorab behauptet (0), sondern
+        # beim Download real gemessen.
         original_url = re.sub(
             r"/\d+x\d+bb\.",
             "/3000x3000bb.",
@@ -112,8 +116,8 @@ def search_apple_cover(
                 source_label="Apple Music",
                 url=original_url,
                 preview_url=preview_url,
-                width=3000,
-                height=3000,
+                width=0,
+                height=0,
                 mime="image/jpeg",
                 release_id=str(
                     item.get(

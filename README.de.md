@@ -242,6 +242,16 @@ Weitere Hinweise stehen in der
 
 ### v0.8.6-alpha30
 
+- ISRC-Anreicherung: fehlende Tags (Genre/Jahr/Label/Komponist) exakt über die
+  ISRC bei MusicBrainz und Deezer nachschlagen, nur leere Felder werden gefüllt
+- Transcode-Erkennung: das Echtheits-Banner schätzt aus dem Frequenzschnitt die
+  Bitrate einer verlustbehafteten Ursprungsquelle
+- Fix: lokale Alben wurden als „nicht vorhanden" angezeigt, wenn sich Ordner-/
+  Tagtitel durch Editionszusatz oder führenden Artikel vom Katalogtitel
+  unterschieden – Abgleich jetzt tolerant. Anzeige vereinheitlicht zu
+  „Lokal vorhanden"/„Lokal nicht vorhanden"
+- Cover: Apple behauptet keine feste 3000×3000-Auflösung mehr vor dem Download;
+  die echte Größe wird beim Laden gemessen
 - BPM als Tag jetzt auch für WavPack, Monkey's Audio (APE) und WMA
 - BPM-Erkennung läuft komplett im Hintergrund (große Sammlungen bleiben bedienbar)
 - Knöpfe „Ergebnis abspielen"/„Anhängen" spielen das aktuelle Filterergebnis

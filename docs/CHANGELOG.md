@@ -1,5 +1,25 @@
 # MusicTagStudio 0.8.6-alpha30
 
+## Neue Werkzeuge
+
+- **ISRC-Anreicherung**: neuer Batch, der fehlende Tags (Genre/Jahr/Label/
+  Komponist …) exakt über die ISRC bei MusicBrainz und Deezer nachschlägt und
+  nur leere Felder füllt.
+- **Transcode-Erkennung**: das Echtheits-Banner schätzt bei Lossy-Verdacht die
+  Bitrate der Ursprungsquelle aus dem Frequenzschnitt („wahrscheinlich aus
+  verlustbehafteter Quelle ~192 kbit/s").
+
+## Behoben
+
+- **Lokale Alben wurden trotz Vorhandensein als „Lokal nicht vorhanden"
+  angezeigt**, wenn sich der Ordner-/Tagtitel vom Katalogtitel durch einen
+  Editionszusatz („(Premium Edition)") oder einen führenden Artikel („Die …")
+  unterschied. Der Abgleich ist jetzt tolerant.
+- Statusanzeige vereinheitlicht zu **„Lokal vorhanden" / „Lokal nicht
+  vorhanden"**.
+- Cover: Apple behauptet keine feste „3000×3000"-Auflösung mehr vor dem
+  Download – die tatsächliche Größe wird beim Laden gemessen.
+
 ## Feinschliff
 
 - **BPM als Tag jetzt auch für WavPack, Monkey's Audio (APE) und WMA** –

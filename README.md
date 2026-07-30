@@ -223,6 +223,15 @@ See the [architecture documentation](docs/ARCHITECTURE.md), the
 
 ### v0.8.6-alpha30
 
+- ISRC enrichment: look up missing tags (genre/year/label/composer) precisely by
+  ISRC at MusicBrainz and Deezer, filling only empty fields
+- Transcode detection: the authenticity banner estimates the source bitrate of a
+  lossy origin from the spectral cutoff
+- Fix: local albums shown as "not present" when the folder/tag title differed
+  from the catalogue title by an edition suffix or a leading article; matching is
+  now tolerant. Wording unified to "Locally present"/"Not present locally"
+- Cover: Apple no longer claims a fixed 3000×3000 before download; the real size
+  is measured on load
 - BPM saved as a tag now also for WavPack, Monkey's Audio (APE) and WMA
 - BPM detection runs fully in the background (large libraries stay responsive)
 - "Play results"/"Add to queue" buttons play the current filter result (e.g. all
