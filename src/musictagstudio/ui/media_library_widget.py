@@ -1394,11 +1394,18 @@ class MediaLibraryWidget(QWidget):
         group = self.current_group
         if group is None:
             return []
+        # Editions-/Artikel-tolerant (wie die Lokal-Verfügbarkeit): strikter
+        # Titel ODER toleranter Zweitschlüssel, damit z. B. lokal
+        # "Passion Whisky (Premium Edition)" zu "Die Passion Whisky" passt.
         album_key = _normalized(group.title)
+        loose_key = _album_match_key(group.title)
         songs = [
             song
             for song in self._local_songs
-            if _normalized(song.album) == album_key
+            if (
+                _normalized(song.album) == album_key
+                or (loose_key and _album_match_key(song.album) == loose_key)
+            )
             and Path(song.path).is_file()
         ]
         artist_key = _normalized(self.current_artist_name)

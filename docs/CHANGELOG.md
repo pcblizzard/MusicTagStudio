@@ -21,6 +21,9 @@
   dann, wenn es auf dem Dienst als Edition läuft („(Premium Edition)") oder der
   Titel nur durch einen führenden Artikel abweicht. Inhaltsbestimmende Zusätze
   („(Live)", „(Remix)", „(Acoustic)") bleiben bewusst getrennt.
+- Auch **„Qualität prüfen" / „Album abspielen"** finden die lokalen Dateien
+  eines Albums jetzt trotz Editions-/Artikel-Abweichung im Titel (dieselbe
+  Toleranz wie die Lokal-Verfügbarkeit).
 - Cover: Apple behauptet keine feste „3000×3000"-Auflösung mehr vor dem
   Download – die tatsächliche Größe wird beim Laden gemessen.
 

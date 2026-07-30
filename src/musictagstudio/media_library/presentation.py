@@ -17,36 +17,19 @@ def normalized(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value)
 
 
-# Führende Artikel, die für den Album-Abgleich ignoriert werden (mehrsprachig).
-_LEADING_ARTICLES = (
-    "die", "der", "das", "the", "le", "la", "les", "el", "los", "las", "un",
-    "une", "a", "an",
-)
-
-
 def album_match_key(value: str) -> str:
     """Toleranter Album-Schlüssel für den Lokal-Abgleich.
 
-    Entfernt Editions-/Klammerzusätze (``(Premium Edition)``, ``[Deluxe]`` …)
-    und einen führenden Artikel, bevor :func:`normalized` greift. Dadurch gilt
-    z. B. ``Die Passion Whisky`` als dasselbe Album wie
-    ``Passion Whisky (Premium Edition)``. Bewusst getrennt von ``normalized``,
-    damit exakte Vergleiche (z. B. Release-Group-Merge) unberührt bleiben.
+    Delegiert an :func:`providers.streaming_catalog.loose_album_key`, damit
+    Lokal- und Streaming-Abgleich **exakt dieselbe** Toleranz nutzen: reine
+    Editions-Zusätze (``(Premium Edition)``, ``(Remastered)``) und ein führender
+    Artikel entfallen, inhaltsbestimmende Zusätze (``(Live)``, ``(Remix)``)
+    bleiben erhalten. Bewusst getrennt von ``normalized``, damit exakte
+    Vergleiche (z. B. Release-Group-Merge) unberührt bleiben.
     """
-    text = str(value or "").casefold()
-    # Klammer-/Eckklammer-Zusätze entfernen.
-    text = re.sub(r"[\(\[\{].*?[\)\]\}]", " ", text)
-    # Verbreitete Editions-Schlagwörter am Ende entfernen (ohne Klammern).
-    text = re.sub(
-        r"\b(premium|deluxe|special|limited|expanded|remaster(ed)?|"
-        r"bonus|edition|version|anniversary)\b",
-        " ",
-        text,
-    )
-    words = re.sub(r"[^a-z0-9]+", " ", text).split()
-    if len(words) > 1 and words[0] in _LEADING_ARTICLES:
-        words = words[1:]
-    return normalized(" ".join(words))
+    from ..providers.streaming_catalog import loose_album_key
+
+    return loose_album_key(value)
 
 
 def merge_release_groups(
