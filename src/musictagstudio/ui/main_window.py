@@ -918,15 +918,35 @@ class MainWindow(QMainWindow):
             stretch=1,
         )
         self.player_bar = PlayerBar(self)
+        # Favoriten + Hör-Statistik (lokal persistiert) an die Engine koppeln.
+        from ..services.favorites import Favorites, default_favorites_path
+        from ..services.listening_stats import (
+            ListeningStats,
+            default_stats_path,
+        )
+
+        self.favorites = Favorites(default_favorites_path())
+        self.listening_stats = ListeningStats(default_stats_path())
+        self._listen_started: float | None = None
+        self._listen_song: Song | None = None
+        self._listen_playing = False
+        self.player_bar.engine.playback_changed.connect(
+            self._on_playback_for_stats
+        )
+        self.player_bar.engine.song_changed.connect(self._on_song_for_stats)
         # Wiedergabe-Großansicht (Cover/Infos/BPM/Steuerung) an dieselbe Engine
         # binden und als Workspace (Index 7) hinzufügen.
         self.now_playing_workspace = NowPlayingWidget(
             self.player_bar.engine,
             self,
             language=self.language,
+            favorites=self.favorites,
         )
         self.now_playing_workspace.detach_requested.connect(
             self._detach_now_playing
+        )
+        self.now_playing_workspace.stats_requested.connect(
+            self._show_listening_stats
         )
         self.workspace_stack.addWidget(self.now_playing_workspace)
         # Die untere Leiste spiegelt zusätzlich die Track-Vorschau der
@@ -3343,6 +3363,40 @@ class MainWindow(QMainWindow):
         else:
             self.filter_count_label.setText("")
 
+    def _flush_listening(self) -> None:
+        """Bisher gespielte Zeit des laufenden Titels in die Statistik buchen."""
+        import time
+
+        if self._listen_started is not None and self._listen_song is not None:
+            elapsed = time.monotonic() - self._listen_started
+            self.listening_stats.record(self._listen_song, elapsed)
+        self._listen_started = None
+
+    def _on_playback_for_stats(self, playing: bool) -> None:
+        import time
+
+        self._listen_playing = playing
+        if playing:
+            self._listen_song = self.player_bar.engine.current_song
+            self._listen_started = time.monotonic()
+        else:
+            self._flush_listening()
+
+    def _on_song_for_stats(self, song) -> None:
+        import time
+
+        self._flush_listening()  # vorherigen Titel abrechnen
+        self._listen_song = song
+        if self._listen_playing and song is not None:
+            self._listen_started = time.monotonic()
+
+    def _show_listening_stats(self) -> None:
+        from .listening_stats_dialog import ListeningStatsDialog
+
+        ListeningStatsDialog(
+            self.listening_stats, self, language=self.language
+        ).exec()
+
     def _detach_now_playing(self):
         """Öffnet die Wiedergabe-Ansicht als separates, schwebendes Fenster."""
         existing = getattr(self, "_now_playing_window", None)
@@ -3355,14 +3409,15 @@ class MainWindow(QMainWindow):
         window.resize(420, 640)
         inner = QVBoxLayout(window)
         inner.setContentsMargins(0, 0, 0, 0)
-        inner.addWidget(
-            NowPlayingWidget(
-                self.player_bar.engine,
-                window,
-                language=self.language,
-                allow_detach=False,
-            )
+        detached_view = NowPlayingWidget(
+            self.player_bar.engine,
+            window,
+            language=self.language,
+            allow_detach=False,
+            favorites=self.favorites,
         )
+        detached_view.stats_requested.connect(self._show_listening_stats)
+        inner.addWidget(detached_view)
 
         def _clear(_event=None):
             self._now_playing_window = None
@@ -3912,6 +3967,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent):
         if self.confirm_pending_changes():
+            self._flush_listening()  # laufende Hörzeit noch verbuchen
             self.player_bar.save_queue()
             self.windows_system_media.stop()
             self.windows_media_keys.stop()

@@ -860,5 +860,15 @@
   "now_playing_none": "Ninguna pista cargada",
   "now_playing_bpm": "{bpm} BPM",
   "now_playing_bpm_wait": "BPM …",
-  "now_playing_detach": "Separar"
+  "now_playing_detach": "Separar",
+  "favorite_toggle_tip": "Marcar como favorito",
+  "stats_title": "Estadísticas de escucha",
+  "stats_total": "Tiempo total de escucha: {total}",
+  "stats_tab_songs": "Pistas",
+  "stats_tab_artists": "Artistas",
+  "stats_tab_albums": "Álbumes",
+  "stats_tab_genres": "Géneros",
+  "stats_col_name": "Nombre",
+  "stats_col_time": "Tiempo",
+  "stats_empty": "Aún no hay reproducciones."
 }

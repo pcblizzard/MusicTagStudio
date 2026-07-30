@@ -860,5 +860,15 @@
   "now_playing_none": "Kein Titel geladen",
   "now_playing_bpm": "{bpm} BPM",
   "now_playing_bpm_wait": "BPM …",
-  "now_playing_detach": "Abdocken"
+  "now_playing_detach": "Abdocken",
+  "favorite_toggle_tip": "Als Favorit markieren",
+  "stats_title": "Hör-Statistik",
+  "stats_total": "Gesamte Hörzeit: {total}",
+  "stats_tab_songs": "Titel",
+  "stats_tab_artists": "Künstler",
+  "stats_tab_albums": "Alben",
+  "stats_tab_genres": "Genres",
+  "stats_col_name": "Name",
+  "stats_col_time": "Hörzeit",
+  "stats_empty": "Noch keine Wiedergaben erfasst."
 }

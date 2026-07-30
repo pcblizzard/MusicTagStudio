@@ -860,5 +860,15 @@
   "now_playing_none": "Nessun brano caricato",
   "now_playing_bpm": "{bpm} BPM",
   "now_playing_bpm_wait": "BPM …",
-  "now_playing_detach": "Stacca"
+  "now_playing_detach": "Stacca",
+  "favorite_toggle_tip": "Segna come preferito",
+  "stats_title": "Statistiche di ascolto",
+  "stats_total": "Tempo di ascolto totale: {total}",
+  "stats_tab_songs": "Brani",
+  "stats_tab_artists": "Artisti",
+  "stats_tab_albums": "Album",
+  "stats_tab_genres": "Generi",
+  "stats_col_name": "Nome",
+  "stats_col_time": "Tempo",
+  "stats_empty": "Nessuna riproduzione registrata."
 }

@@ -44,6 +44,7 @@ class NowPlayingWidget(QWidget):
     """Große Wiedergabe-Ansicht: Cover, Titel/Album/Künstler, BPM, Steuerung."""
 
     detach_requested = Signal()
+    stats_requested = Signal()
 
     def __init__(
         self,
@@ -52,10 +53,13 @@ class NowPlayingWidget(QWidget):
         *,
         language: str = "automatic",
         allow_detach: bool = True,
+        favorites=None,
     ) -> None:
         super().__init__(parent)
         self.language = language
         self.engine = engine
+        self.favorites = favorites
+        self._current_path = ""
         self._bpm_pool = QThreadPool(self)
         self._bpm_pool.setMaxThreadCount(1)
         self._bpm_path = ""
@@ -63,13 +67,24 @@ class NowPlayingWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
+        top = QHBoxLayout()
+        self.favorite_button = QPushButton("♡")
+        self.favorite_button.setToolTip(tr("favorite_toggle_tip", language))
+        self.favorite_button.setFixedWidth(44)
+        self.favorite_button.clicked.connect(self._toggle_favorite)
+        self.favorite_button.setEnabled(favorites is not None)
+        top.addWidget(self.favorite_button)
+
+        self.stats_button = QPushButton("📊 " + tr("stats_title", language))
+        self.stats_button.clicked.connect(self.stats_requested.emit)
+        top.addWidget(self.stats_button)
+
+        top.addStretch(1)
         if allow_detach:
-            top = QHBoxLayout()
-            top.addStretch(1)
             detach = QPushButton("⧉ " + tr("now_playing_detach", language))
             detach.clicked.connect(self.detach_requested.emit)
             top.addWidget(detach)
-            layout.addLayout(top)
+        layout.addLayout(top)
 
         self.cover = QLabel()
         self.cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -135,6 +150,8 @@ class NowPlayingWidget(QWidget):
     # --- Engine-Updates -----------------------------------------------------
 
     def _on_song(self, song: Song | None) -> None:
+        self._current_path = song.path if song is not None else ""
+        self._update_favorite_button()
         if song is None:
             self.title.setText(tr("now_playing_none", self.language))
             self.artist.setText("")
@@ -155,6 +172,24 @@ class NowPlayingWidget(QWidget):
 
     def _on_playback(self, playing: bool) -> None:
         self.play_button.setText("⏸" if playing else "▶")
+
+    def _toggle_favorite(self) -> None:
+        if self.favorites is None or not self._current_path:
+            return
+        self.favorites.toggle("song", self._current_path)
+        self._update_favorite_button()
+
+    def _update_favorite_button(self) -> None:
+        if self.favorites is None or not self._current_path:
+            self.favorite_button.setText("♡")
+            self.favorite_button.setEnabled(False)
+            return
+        self.favorite_button.setEnabled(True)
+        is_fav = self.favorites.is_favorite("song", self._current_path)
+        self.favorite_button.setText("♥" if is_fav else "♡")
+        self.favorite_button.setStyleSheet(
+            "color: #e53935; font-size: 16px;" if is_fav else "font-size: 16px;"
+        )
 
     def _on_position(self, position_ms: int) -> None:
         if not self.slider.isSliderDown():
