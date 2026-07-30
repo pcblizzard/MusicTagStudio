@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -10,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..i18n import tr
+from ..purchase import configured_options
 
 
 class PremiumDialog(QDialog):
@@ -51,6 +55,8 @@ class PremiumDialog(QDialog):
         hint.setStyleSheet("color: palette(mid); font-size: 11px;")
         layout.addWidget(hint)
 
+        self._add_purchase_section(layout)
+
         buttons = QHBoxLayout()
         buttons.addStretch(1)
         later = QPushButton(tr("premium_later", language))
@@ -62,3 +68,36 @@ class PremiumDialog(QDialog):
             enter.clicked.connect(self.accept)
             buttons.addWidget(enter)
         layout.addLayout(buttons)
+
+    def _add_purchase_section(self, layout: QVBoxLayout) -> None:
+        """Festpreis-Kauf-Buttons je Laufzeit (nur eingerichtete anzeigen)."""
+        options = configured_options()
+        if not options:
+            return
+
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setStyleSheet("color: palette(mid);")
+        layout.addWidget(line)
+
+        heading = QLabel(f"<b>{tr('premium_buy_heading', self.language)}</b>")
+        layout.addWidget(heading)
+
+        row = QHBoxLayout()
+        for option in options:
+            label = tr(option.label_key, self.language)
+            if option.price:
+                label = f"{label} · {option.price}"
+            button = QPushButton(label)
+            button.clicked.connect(
+                lambda _checked=False, url=option.url: QDesktopServices.openUrl(
+                    QUrl(url)
+                )
+            )
+            row.addWidget(button)
+        layout.addLayout(row)
+
+        buy_hint = QLabel(tr("premium_buy_hint", self.language))
+        buy_hint.setWordWrap(True)
+        buy_hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        layout.addWidget(buy_hint)
