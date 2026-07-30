@@ -99,5 +99,5 @@ class PremiumDialog(QDialog):
 
         buy_hint = QLabel(tr("premium_buy_hint", self.language))
         buy_hint.setWordWrap(True)
-        buy_hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        buy_hint.setStyleSheet("font-size: 12px; font-style: italic;")
         layout.addWidget(buy_hint)

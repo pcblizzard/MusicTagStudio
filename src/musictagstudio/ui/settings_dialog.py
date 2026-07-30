@@ -521,6 +521,10 @@ class SettingsDialog(QDialog):
             tr("exact_album_gain_tip", language)
         )
         audio_form.addRow("", self.exact_album_gain_check)
+        exact_hint = QLabel(tr("exact_album_gain_hint", language))
+        exact_hint.setWordWrap(True)
+        exact_hint.setStyleSheet("font-size: 12px; font-style: italic;")
+        audio_form.addRow("", exact_hint)
         sources_page.addWidget(audio_analysis)
 
         online_catalogs = QGroupBox(tr("online_catalogs", language))
@@ -929,7 +933,7 @@ class SettingsDialog(QDialog):
 
         hint = QLabel(tr("premium_buy_hint", language))
         hint.setWordWrap(True)
-        hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        hint.setStyleSheet("font-size: 12px; font-style: italic;")
         layout.addWidget(hint)
         return box
 

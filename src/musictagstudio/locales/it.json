@@ -870,5 +870,6 @@
   "stats_tab_genres": "Generi",
   "stats_col_name": "Nome",
   "stats_col_time": "Tempo",
-  "stats_empty": "Nessuna riproduzione registrata."
+  "stats_empty": "Nessuna riproduzione registrata.",
+  "exact_album_gain_hint": "Più preciso, ma molto più lento (l intero album viene inoltre misurato per intero)."
 }

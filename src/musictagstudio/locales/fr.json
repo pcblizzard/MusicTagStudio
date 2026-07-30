@@ -870,5 +870,6 @@
   "stats_tab_genres": "Genres",
   "stats_col_name": "Nom",
   "stats_col_time": "Temps",
-  "stats_empty": "Aucune lecture enregistrée."
+  "stats_empty": "Aucune lecture enregistrée.",
+  "exact_album_gain_hint": "Plus précis, mais nettement plus lent (l album entier est en plus mesuré d un seul tenant)."
 }

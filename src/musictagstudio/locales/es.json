@@ -870,5 +870,6 @@
   "stats_tab_genres": "Géneros",
   "stats_col_name": "Nombre",
   "stats_col_time": "Tiempo",
-  "stats_empty": "Aún no hay reproducciones."
+  "stats_empty": "Aún no hay reproducciones.",
+  "exact_album_gain_hint": "Más preciso, pero bastante más lento (el álbum completo se mide además de una vez)."
 }

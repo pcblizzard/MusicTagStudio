@@ -870,5 +870,6 @@
   "stats_tab_genres": "Genres",
   "stats_col_name": "Name",
   "stats_col_time": "Listening time",
-  "stats_empty": "No plays recorded yet."
+  "stats_empty": "No plays recorded yet.",
+  "exact_album_gain_hint": "More accurate, but noticeably slower (the whole album is measured as one in addition)."
 }
