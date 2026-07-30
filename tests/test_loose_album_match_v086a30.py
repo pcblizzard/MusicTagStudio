@@ -16,6 +16,30 @@ def test_remaster_aligns_with_plain():
     assert loose_album_key("Nevermind (Remastered)") == loose_album_key("Nevermind")
 
 
+def test_common_edition_keywords_align():
+    base = loose_album_key("Nevermind")
+    for variant in (
+        "Nevermind (Deluxe Edition)",
+        "Nevermind (Super Deluxe Edition)",
+        "Nevermind (Special Edition)",
+        "Nevermind (Limited Edition)",
+        "Nevermind (Collector's Edition)",
+        "Nevermind (Expanded)",
+        "Nevermind (Reissue)",
+        "Nevermind (Bonus Track Version)",
+        "Nevermind - Remastered 2011",
+        "Nevermind (2011 Remaster)",
+        "Nevermind (Anniversary Edition)",
+    ):
+        assert loose_album_key(variant) == base, variant
+
+
+def test_pure_year_title_keeps_digits():
+    # Kein Editions-Wort -> Jahr bleibt Teil des Titels.
+    assert loose_album_key("1999") == "1999"
+    assert loose_album_key("1984") != loose_album_key("1999")
+
+
 def test_live_variant_stays_distinct_from_studio():
     # Inhaltsbestimmender Zusatz -> NICHT gleich der Studio-Fassung.
     assert loose_album_key("Album (Live In Berlin)") != loose_album_key("Album")

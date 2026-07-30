@@ -58,9 +58,12 @@ _LEADING_ARTICLES = frozenset(
 )
 # Verbreitete Editions-/Varianten-Schlagwörter (auch OHNE Klammern).
 _EDITION_WORDS_RE = re.compile(
-    r"\b(premium|deluxe|special|limited|expanded|remaster(?:ed)?|bonus|"
+    r"\b(premium|deluxe|super\s+deluxe|special|collector'?s|limited|expanded|"
+    r"remaster(?:ed)?|remastered\s+version|reissue|bonus|track|tracks|"
     r"edition|version|anniversary)\b"
 )
+# 4-stellige Jahreszahl (z. B. bei „Remastered 2020" / „2020 Remaster").
+_YEAR_TOKEN_RE = re.compile(r"^(?:19|20)\d\d$")
 _BRACKET_RE = re.compile(r"[\(\[\{][^\)\]\}]*[\)\]\}]")
 
 
@@ -87,11 +90,18 @@ def loose_album_key(title: str) -> str:
         remainder = re.sub(r"[^a-z0-9]+", " ", remainder).strip()
         return " " if not remainder else inner
 
-    text = _BRACKET_RE.sub(_clean_bracket, str(title or "").casefold())
+    lowered = str(title or "").casefold()
+    had_edition = bool(_EDITION_WORDS_RE.search(lowered))
+    text = _BRACKET_RE.sub(_clean_bracket, lowered)
     text = _EDITION_WORDS_RE.sub(" ", text)  # freistehende Editions-Wörter
     words = re.sub(r"[^a-z0-9]+", " ", text).split()
     if len(words) > 1 and words[0] in _LEADING_ARTICLES:
         words = words[1:]
+    # Eine übrig gebliebene Jahreszahl (z. B. aus „Remastered 2020") entfernen –
+    # aber nur, wenn ohnehin ein Editions-Wort vorlag UND noch Text bleibt (ein
+    # reiner Jahres-Titel wie „1999" behält seine Ziffern).
+    if had_edition and any(not _YEAR_TOKEN_RE.match(word) for word in words):
+        words = [word for word in words if not _YEAR_TOKEN_RE.match(word)]
     return normalize_catalog_text(" ".join(words))
 
 
