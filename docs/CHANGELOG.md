@@ -1,3 +1,28 @@
+# MusicTagStudio 0.8.6-alpha28
+
+## Konvertierung & exakte TIDAL-Qualität
+
+- **Format-Konvertierung** (neuer „Konvertieren"-Knopf): wandelt Titel in
+  MP3/AAC/Opus/FLAC/ALAC über das gebündelte FFmpeg (PyAV). Erzeugt neue
+  Dateien, übernimmt Tags und Cover; wählbare Bitrate und Ausgabeordner.
+- **Exakte TIDAL-Qualität** (opt-in, inoffizielle tidalapi): TIDAL-Konto per
+  Geräte-Login verbinden; die Medienbibliothek zeigt dann die *tatsächliche*
+  Bit-Tiefe/Abtastrate eines Albums zusätzlich zur Tier-Angabe.
+
+## Filter, Statistik & Wiedergabe
+
+- **Genre/Künstler-Filter** im Tagger (Filterleiste über der Tabelle) plus freie
+  Suche; blendet nicht passende Zeilen aus.
+- **Bibliotheks-Qualitätsstatistik**: Verteilung über verlustfrei-Anteil,
+  Codecs, Bit-Tiefen und Abtastraten (in der Bibliotheksprüfung).
+- **BPM-Erkennung** (Onset-Fluss + Autokorrelation) – Grundlage für spätere
+  Tempo-Filter.
+- **„Wiedergabe"-Großansicht**: eigener Reiter mit großem Cover, Titel/Album/
+  Künstler, erkannter BPM und Steuerung; auf Wunsch als schwebendes Fenster.
+- **Favoriten** (Herz) und **Hör-Statistik**: erfasst die tatsächlich gespielte
+  Zeit je Titel/Künstler/Album/Genre und zeigt Bestenlisten.
+
+
 # MusicTagStudio 0.8.6-alpha27
 
 ## Audio-Analyse: Detail-Metriken & Fake-Hi-Res-Erkennung
