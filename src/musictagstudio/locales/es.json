@@ -891,7 +891,7 @@
   "analysis_multiprocess_hint": "Aviso: puede causar inestabilidad o fallos del análisis en algunos sistemas. Además, cada proceso inicia su propio intérprete (sobrecarga): con pocos archivos o archivos cortos suele ser más lento que los hilos; el beneficio solo aparece con muchos archivos grandes. Por eso los hilos son la opción predeterminada. Déjelo desactivado si no está seguro.",
   "auth_source_estimate": "probablemente de una fuente con pérdida (~{kbps} kbit/s)",
   "isrc_enrich": "Enriquecimiento por ISRC",
-  "isrc_enrich_tip": "Busca etiquetas faltantes (género, año, sello, compositor …) exactamente por ISRC en MusicBrainz y Deezer y rellena solo los campos vacíos.",
+  "isrc_enrich_tip": "Busca etiquetas faltantes (género, año, sello, compositor …) exactamente por ISRC en MusicBrainz y Deezer y rellena solo los campos vacíos. Nota: con muchas pistas puede tardar un poco (MusicBrainz permite solo 1 solicitud/segundo), pero se ejecuta en segundo plano.",
   "isrc_enriching": "Buscando etiquetas por ISRC …",
   "isrc_enriched": "{count} pistas enriquecidas mediante ISRC.",
   "isrc_no_isrc": "Ninguna de las pistas seleccionadas tiene ISRC. Sin ISRC no es posible un enriquecimiento exacto.",

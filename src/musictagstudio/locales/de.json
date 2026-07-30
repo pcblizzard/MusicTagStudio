@@ -891,7 +891,7 @@
   "analysis_multiprocess_hint": "Achtung: Kann je nach System zu Instabilität oder Abstürzen der Analyse führen. Zudem startet jeder Prozess einen eigenen Interpreter (Overhead) – bei wenigen oder kurzen Dateien ist das oft langsamer als Threads, ein Gewinn kommt erst bei vielen großen Dateien. Deshalb sind Threads der Standard. Im Zweifel deaktiviert lassen.",
   "auth_source_estimate": "wahrscheinlich aus verlustbehafteter Quelle (~{kbps} kbit/s)",
   "isrc_enrich": "ISRC-Anreicherung",
-  "isrc_enrich_tip": "Schlägt fehlende Tags (Genre, Jahr, Label, Komponist …) exakt über die ISRC bei MusicBrainz und Deezer nach und füllt nur leere Felder.",
+  "isrc_enrich_tip": "Schlägt fehlende Tags (Genre, Jahr, Label, Komponist …) exakt über die ISRC bei MusicBrainz und Deezer nach und füllt nur leere Felder. Hinweis: Bei vielen Titeln kann das etwas dauern (MusicBrainz erlaubt nur 1 Anfrage/Sekunde) – läuft aber im Hintergrund.",
   "isrc_enriching": "Tags werden über ISRC nachgeschlagen …",
   "isrc_enriched": "{count} Titel über die ISRC ergänzt.",
   "isrc_no_isrc": "Kein ausgewählter Titel hat eine ISRC hinterlegt. Ohne ISRC ist keine exakte Anreicherung möglich.",
