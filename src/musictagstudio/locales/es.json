@@ -789,5 +789,20 @@
   "exact_album_gain": "Calcular la ganancia de álbum con precisión",
   "exact_album_gain_tip": "Desactivado: la ganancia de álbum se deriva rápidamente de los valores de pista (el pico de álbum es exacto, la ganancia difiere < ~0,5 dB). Activado: el álbum completo se mide adicionalmente de una vez: máxima precisión, pero mucho más lento.",
   "catalog_size_tip": "Tamaño aproximado del catálogo/base de datos (orden de magnitud, varía con el tiempo).",
-  "online_catalog_sizes": "Discogs: ~18 mill. lanzamientos · AcoustID: ~90 mill. huellas"
+  "online_catalog_sizes": "Discogs: ~18 mill. lanzamientos · AcoustID: ~90 mill. huellas",
+  "duplicates": "Duplicados",
+  "dup_intro": "Encuentra pistas duplicadas y sugiere qué copia (mejor calidad) conservar. Eliminar mueve las demás a la papelera.",
+  "dup_scan_btn": "Buscar duplicados",
+  "dup_scanning": "Buscando duplicados …",
+  "dup_none": "No se encontraron duplicados.",
+  "dup_summary": "{groups} grupo(s) · {removable} copia(s) eliminable(s)",
+  "dup_keep": "conservar (mejor)",
+  "dup_col_file": "Archivo",
+  "dup_col_quality": "Calidad",
+  "dup_col_duration": "Duración",
+  "dup_col_status": "Estado",
+  "dup_delete_btn": "Mover seleccionados a la papelera",
+  "dup_delete_confirm": "¿Mover {count} archivo(s) a la papelera?",
+  "dup_deleted": "Se movieron {count} archivo(s) a la papelera.",
+  "dup_scan_first": "Primero escanea tu música (inicio/fuentes), luego busca duplicados aquí."
 }

@@ -789,5 +789,20 @@
   "exact_album_gain": "Calculer le gain d'album avec précision",
   "exact_album_gain_tip": "Désactivé : le gain d'album est déduit rapidement des valeurs de piste (le pic d'album reste exact, le gain diffère de < ~0,5 dB). Activé : l'album entier est en plus mesuré d'un seul tenant – le plus précis, mais nettement plus lent.",
   "catalog_size_tip": "Taille approximative du catalogue/de la base (ordre de grandeur, évolue avec le temps).",
-  "online_catalog_sizes": "Discogs : ~18 M sorties · AcoustID : ~90 M empreintes"
+  "online_catalog_sizes": "Discogs : ~18 M sorties · AcoustID : ~90 M empreintes",
+  "duplicates": "Doublons",
+  "dup_intro": "Trouve les doublons et suggère quelle copie (meilleure qualité) conserver. La suppression déplace les autres vers la corbeille.",
+  "dup_scan_btn": "Rechercher les doublons",
+  "dup_scanning": "Recherche de doublons …",
+  "dup_none": "Aucun doublon trouvé.",
+  "dup_summary": "{groups} groupe(s) · {removable} copie(s) supprimable(s)",
+  "dup_keep": "conserver (meilleure)",
+  "dup_col_file": "Fichier",
+  "dup_col_quality": "Qualité",
+  "dup_col_duration": "Durée",
+  "dup_col_status": "Statut",
+  "dup_delete_btn": "Déplacer la sélection vers la corbeille",
+  "dup_delete_confirm": "Déplacer {count} fichier(s) vers la corbeille ?",
+  "dup_deleted": "{count} fichier(s) déplacé(s) vers la corbeille.",
+  "dup_scan_first": "Analysez d'abord votre musique (accueil/sources), puis recherchez les doublons ici."
 }

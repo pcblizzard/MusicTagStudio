@@ -104,6 +104,7 @@ from .cover_dialog import (
 )
 from .direct_album_dialog import DirectAlbumDialog
 from .audio_analysis_dialog import AudioAnalysisDialog
+from .duplicates_dialog import DuplicatesDialog
 from .batch_cover_dialog import BatchCoverDialog
 from .library_audit_dialog import LibraryAuditDialog
 from .change_preview_dialog import ChangePreviewDialog
@@ -756,6 +757,19 @@ class MainWindow(QMainWindow):
             self.dashboard_workspace
         )
 
+        self.duplicates_workspace = DuplicatesDialog(
+            [],
+            self,
+            embedded=True,
+            language=self.language,
+        )
+        self.duplicates_workspace.songs_deleted.connect(
+            self._on_duplicates_deleted
+        )
+        self.workspace_stack.addWidget(
+            self.duplicates_workspace
+        )
+
         sidebar = QWidget()
         sidebar.setObjectName(
             "mainSidebar"
@@ -801,6 +815,7 @@ class MainWindow(QMainWindow):
             ("media_library", 1, "nav_library"),
             ("audio_analysis", 2, "nav_analysis"),
             ("library_audit", 3, "nav_audit"),
+            ("duplicates", 6, "nav_duplicates"),
         )
 
         nav_color = self.palette().color(
@@ -950,6 +965,9 @@ class MainWindow(QMainWindow):
                     selected_songs,
                     self.songs,
                 )
+
+        if index == 6:
+            self.duplicates_workspace.set_songs(self.songs)
 
         self.workspace_stack.setCurrentIndex(
             index
@@ -2465,6 +2483,14 @@ class MainWindow(QMainWindow):
                 self.library_index,
                 settings.music_sources,
             )
+
+    def _on_duplicates_deleted(self, deleted_paths: list) -> None:
+        """Entfernte Dubletten aus der Tagger-Liste nehmen und Ansicht neu füllen."""
+        removed = set(deleted_paths)
+        if not removed:
+            return
+        remaining = [song for song in self.songs if song.path not in removed]
+        self._apply_songs_to_tagger(remaining)
 
     def _apply_songs_to_tagger(
         self,

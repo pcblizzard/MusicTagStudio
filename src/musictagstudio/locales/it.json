@@ -789,5 +789,20 @@
   "exact_album_gain": "Calcola il guadagno dell'album con precisione",
   "exact_album_gain_tip": "Disattivato: il guadagno dell'album è derivato rapidamente dai valori delle tracce (il picco dell'album resta esatto, il guadagno differisce < ~0,5 dB). Attivato: l'intero album viene inoltre misurato per intero – massima precisione, ma molto più lento.",
   "catalog_size_tip": "Dimensione approssimativa del catalogo/database (ordine di grandezza, varia nel tempo).",
-  "online_catalog_sizes": "Discogs: ~18 mln release · AcoustID: ~90 mln impronte"
+  "online_catalog_sizes": "Discogs: ~18 mln release · AcoustID: ~90 mln impronte",
+  "duplicates": "Duplicati",
+  "dup_intro": "Trova brani duplicati e suggerisce quale copia (migliore qualità) mantenere. L'eliminazione sposta le altre nel cestino.",
+  "dup_scan_btn": "Cerca duplicati",
+  "dup_scanning": "Ricerca duplicati …",
+  "dup_none": "Nessun duplicato trovato.",
+  "dup_summary": "{groups} gruppo/i · {removable} copia/e rimovibili",
+  "dup_keep": "mantieni (migliore)",
+  "dup_col_file": "File",
+  "dup_col_quality": "Qualità",
+  "dup_col_duration": "Durata",
+  "dup_col_status": "Stato",
+  "dup_delete_btn": "Sposta selezionati nel cestino",
+  "dup_delete_confirm": "Spostare {count} file nel cestino?",
+  "dup_deleted": "{count} file spostati nel cestino.",
+  "dup_scan_first": "Prima scansiona la musica (home/sorgenti), poi cerca i duplicati qui."
 }

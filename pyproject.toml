@@ -27,6 +27,7 @@ dependencies = [
     "Pillow>=10.0",
     "keyring>=25.6",
     "cryptography>=42",
+    "Send2Trash>=1.8",
     "winrt-runtime>=3.2.1; platform_system == 'Windows'",
     "winrt-Windows.Foundation>=3.2.1; platform_system == 'Windows'",
     "winrt-Windows.Media>=3.2.1; platform_system == 'Windows'",

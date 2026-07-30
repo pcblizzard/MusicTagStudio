@@ -789,5 +789,20 @@
   "exact_album_gain": "Album Gain exakt berechnen",
   "exact_album_gain_tip": "Aus: Album Gain wird schnell aus den Track-Werten abgeleitet (Album Peak bleibt exakt, Gain-Abweichung < ~0,5 dB). Ein: das ganze Album wird zusätzlich am Stück gemessen – maximal genau, aber deutlich langsamer.",
   "catalog_size_tip": "Ungefähre Katalog-/Datenbankgröße (Größenordnung, ändert sich laufend).",
-  "online_catalog_sizes": "Discogs: ca. 18 Mio. Releases · AcoustID: ca. 90 Mio. Fingerabdrücke"
+  "online_catalog_sizes": "Discogs: ca. 18 Mio. Releases · AcoustID: ca. 90 Mio. Fingerabdrücke",
+  "duplicates": "Duplikate",
+  "dup_intro": "Findet mehrfach vorhandene Titel und schlägt vor, welche Kopie (beste Qualität) behalten wird. Löschen verschiebt die anderen in den Papierkorb.",
+  "dup_scan_btn": "Duplikate suchen",
+  "dup_scanning": "Suche Duplikate …",
+  "dup_none": "Keine Duplikate gefunden.",
+  "dup_summary": "{groups} Gruppe(n) · {removable} entfernbare Kopie(n)",
+  "dup_keep": "behalten (beste)",
+  "dup_col_file": "Datei",
+  "dup_col_quality": "Qualität",
+  "dup_col_duration": "Dauer",
+  "dup_col_status": "Status",
+  "dup_delete_btn": "Markierte in den Papierkorb",
+  "dup_delete_confirm": "{count} Datei(en) in den Papierkorb verschieben?",
+  "dup_deleted": "{count} Datei(en) in den Papierkorb verschoben.",
+  "dup_scan_first": "Zuerst Musik scannen (Startseite/Quellen), dann hier Duplikate suchen."
 }

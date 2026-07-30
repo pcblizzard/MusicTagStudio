@@ -789,5 +789,20 @@
   "exact_album_gain": "Calcular o ganho de álbum com precisão",
   "exact_album_gain_tip": "Desligado: o ganho de álbum é derivado rapidamente dos valores das faixas (o pico de álbum permanece exato, o ganho difere < ~0,5 dB). Ligado: o álbum inteiro é adicionalmente medido de uma vez – máxima precisão, mas bastante mais lento.",
   "catalog_size_tip": "Tamanho aproximado do catálogo/base de dados (ordem de grandeza, varia com o tempo).",
-  "online_catalog_sizes": "Discogs: ~18 mi. lançamentos · AcoustID: ~90 mi. impressões"
+  "online_catalog_sizes": "Discogs: ~18 mi. lançamentos · AcoustID: ~90 mi. impressões",
+  "duplicates": "Duplicados",
+  "dup_intro": "Encontra faixas duplicadas e sugere qual cópia (melhor qualidade) manter. Eliminar move as outras para a reciclagem.",
+  "dup_scan_btn": "Procurar duplicados",
+  "dup_scanning": "A procurar duplicados …",
+  "dup_none": "Nenhum duplicado encontrado.",
+  "dup_summary": "{groups} grupo(s) · {removable} cópia(s) removível(is)",
+  "dup_keep": "manter (melhor)",
+  "dup_col_file": "Ficheiro",
+  "dup_col_quality": "Qualidade",
+  "dup_col_duration": "Duração",
+  "dup_col_status": "Estado",
+  "dup_delete_btn": "Mover selecionados para a reciclagem",
+  "dup_delete_confirm": "Mover {count} ficheiro(s) para a reciclagem?",
+  "dup_deleted": "{count} ficheiro(s) movido(s) para a reciclagem.",
+  "dup_scan_first": "Primeiro digitalize a sua música (início/fontes), depois procure duplicados aqui."
 }

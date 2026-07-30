@@ -789,5 +789,20 @@
   "exact_album_gain": "Calculate album gain exactly",
   "exact_album_gain_tip": "Off: album gain is derived quickly from the track values (album peak stays exact, gain differs < ~0.5 dB). On: the whole album is additionally measured as one – most accurate, but noticeably slower.",
   "catalog_size_tip": "Approximate catalog/database size (order of magnitude, changes over time).",
-  "online_catalog_sizes": "Discogs: ~18M releases · AcoustID: ~90M fingerprints"
+  "online_catalog_sizes": "Discogs: ~18M releases · AcoustID: ~90M fingerprints",
+  "duplicates": "Duplicates",
+  "dup_intro": "Finds duplicate tracks and suggests which copy (best quality) to keep. Deleting moves the others to the recycle bin.",
+  "dup_scan_btn": "Find duplicates",
+  "dup_scanning": "Searching for duplicates …",
+  "dup_none": "No duplicates found.",
+  "dup_summary": "{groups} group(s) · {removable} removable copy(ies)",
+  "dup_keep": "keep (best)",
+  "dup_col_file": "File",
+  "dup_col_quality": "Quality",
+  "dup_col_duration": "Duration",
+  "dup_col_status": "Status",
+  "dup_delete_btn": "Move selected to recycle bin",
+  "dup_delete_confirm": "Move {count} file(s) to the recycle bin?",
+  "dup_deleted": "Moved {count} file(s) to the recycle bin.",
+  "dup_scan_first": "Scan your music first (home/sources), then search for duplicates here."
 }
