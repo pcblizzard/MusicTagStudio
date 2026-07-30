@@ -525,6 +525,15 @@ class SettingsDialog(QDialog):
         exact_hint.setWordWrap(True)
         exact_hint.setStyleSheet("font-size: 12px; font-style: italic;")
         audio_form.addRow("", exact_hint)
+
+        self.multiprocess_check = QCheckBox(tr("analysis_multiprocess", language))
+        self.multiprocess_check.setChecked(settings.audio_analysis_multiprocess)
+        self.multiprocess_check.setToolTip(tr("analysis_multiprocess_tip", language))
+        audio_form.addRow("", self.multiprocess_check)
+        mp_hint = QLabel(tr("analysis_multiprocess_hint", language))
+        mp_hint.setWordWrap(True)
+        mp_hint.setStyleSheet("font-size: 12px; font-style: italic; color: #b45309;")
+        audio_form.addRow("", mp_hint)
         sources_page.addWidget(audio_analysis)
 
         online_catalogs = QGroupBox(tr("online_catalogs", language))
@@ -876,14 +885,16 @@ class SettingsDialog(QDialog):
         form.addRow("", self.tidal_exact_check)
 
         row = QHBoxLayout()
-        self.tidal_connect_button = QPushButton(
+        # Eigenes Attribut: NICHT self.tidal_connect_button (das gehört dem
+        # offiziellen Verfügbarkeits-Login weiter unten) – sonst Namenskonflikt.
+        self.tidal_exact_connect_button = QPushButton(
             tr("tidal_connect_button", language)
         )
-        self.tidal_connect_button.setEnabled(available)
-        self.tidal_connect_button.clicked.connect(self._connect_tidal_exact)
+        self.tidal_exact_connect_button.setEnabled(available)
+        self.tidal_exact_connect_button.clicked.connect(self._connect_tidal_exact)
         self.tidal_exact_status = QLabel("")
         self.tidal_exact_status.setStyleSheet("color: palette(mid);")
-        row.addWidget(self.tidal_connect_button)
+        row.addWidget(self.tidal_exact_connect_button)
         row.addWidget(self.tidal_exact_status, 1)
         form.addRow("", row)
         self._refresh_tidal_exact_status()
@@ -1278,6 +1289,7 @@ class SettingsDialog(QDialog):
             folder_cover_quality=80,
             audio_analysis_parallel_jobs=int(self.parallel_jobs_combo.currentData()),
             audio_analysis_exact_album_gain=self.exact_album_gain_check.isChecked(),
+            audio_analysis_multiprocess=self.multiprocess_check.isChecked(),
             music_sources=self._selected_sources(),
             load_sources_on_startup=(self.load_sources_checkbox.isChecked()),
             scan_sources_on_startup=(self.scan_sources_checkbox.isChecked()),

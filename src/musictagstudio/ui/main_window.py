@@ -174,6 +174,62 @@ class _LicenseCheck(QRunnable):
             pass
 
 
+class _BpmDetectSignals(QObject):
+    progress = Signal(int)  # abgeschlossene Titel
+    finished = Signal(dict)  # {row: bpm-str}
+
+
+class _BpmDetectTask(QRunnable):
+    """Erkennt BPM für viele Titel im Hintergrund (blockiert die UI nicht).
+
+    Die eigentliche Erkennung läuft in einem internen Thread-Pool; die
+    Ergebnisse werden per Signal an den Hauptthread zurückgegeben, der die
+    Tags schreibt.
+    """
+
+    def __init__(self, targets: list[tuple[int, str]], max_workers: int = 4) -> None:
+        super().__init__()
+        self._targets = targets
+        self._max_workers = max_workers
+        self._cancelled = False
+        self.signals = _BpmDetectSignals()
+
+    def cancel(self) -> None:
+        self._cancelled = True
+
+    def run(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        from ..audio_analysis.bpm import detect_bpm
+
+        results: dict[int, str] = {}
+        done = 0
+        with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
+            futures = {
+                pool.submit(detect_bpm, path): row for row, path in self._targets
+            }
+            for future in as_completed(futures):
+                if self._cancelled:
+                    break
+                row = futures[future]
+                try:
+                    bpm = future.result()
+                except Exception:  # noqa: BLE001
+                    bpm = None
+                if bpm:
+                    results[row] = str(int(round(bpm)))
+                done += 1
+                try:
+                    self.signals.progress.emit(done)
+                except RuntimeError:
+                    return
+        try:
+            self.signals.finished.emit(results)
+        except RuntimeError:
+            # Fenster wurde geschlossen -> Ergebnis verwerfen.
+            pass
+
+
 def _save_songs_in_parallel(
     items: list[tuple[int, Song]],
 ) -> list[tuple[int, Song, Exception | None]]:
@@ -3337,6 +3393,14 @@ class MainWindow(QMainWindow):
         self.filter_count_label = QLabel("")
         self.filter_count_label.setStyleSheet("color: palette(mid);")
 
+        # Aktuelles Filterergebnis direkt abspielen bzw. anhängen.
+        self.filter_play_button = QPushButton(tr("filter_play", self.language))
+        self.filter_play_button.setToolTip(tr("filter_play_tip", self.language))
+        self.filter_play_button.clicked.connect(self.play_filtered_results)
+        self.filter_enqueue_button = QPushButton(tr("filter_enqueue", self.language))
+        self.filter_enqueue_button.setToolTip(tr("filter_enqueue_tip", self.language))
+        self.filter_enqueue_button.clicked.connect(self.enqueue_filtered_results)
+
         row.addWidget(self.filter_search, 3)
         row.addWidget(QLabel(tr("filter_genre_label", self.language)))
         row.addWidget(self.filter_genre, 2)
@@ -3345,8 +3409,40 @@ class MainWindow(QMainWindow):
         row.addWidget(QLabel("BPM:"))
         row.addWidget(self.filter_bpm)
         row.addWidget(self.filter_favorites)
+        row.addWidget(self.filter_play_button)
+        row.addWidget(self.filter_enqueue_button)
         row.addWidget(self.filter_count_label)
         return row
+
+    def _visible_songs(self) -> list[Song]:
+        """Titel in aktueller Filter-/Sichtreihenfolge (nicht ausgeblendet)."""
+        return [
+            self.songs[row]
+            for row in range(len(self.songs))
+            if not self.table.isRowHidden(row)
+        ]
+
+    def play_filtered_results(self) -> None:
+        """Spielt das aktuelle Filterergebnis als neue Warteschlange ab."""
+        songs = self._visible_songs()
+        if not songs:
+            return
+        if not self.player_bar.play_songs(songs, 0):
+            self.statusBar().showMessage(tr("audio_unreachable", self.language), 5000)
+            return
+        self.statusBar().showMessage(
+            tr("filter_playing", self.language, count=len(songs)), 4000
+        )
+
+    def enqueue_filtered_results(self) -> None:
+        """Hängt das aktuelle Filterergebnis an die Warteschlange an."""
+        songs = self._visible_songs()
+        if not songs:
+            return
+        count = self.player_bar.engine.enqueue_songs(songs)
+        self.statusBar().showMessage(
+            tr("enqueued", self.language, count=count), 4000
+        )
 
     def _populate_filter_combos(self):
         """Genre-/Künstler-Auswahl aus den geladenen Titeln neu befüllen."""
@@ -3459,14 +3555,15 @@ class MainWindow(QMainWindow):
         window.show()
 
     def detect_bpm_selected(self):
-        """Erkennt die BPM der markierten (oder aller) Titel und speichert sie."""
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+        """Erkennt die BPM der markierten (oder aller) Titel und speichert sie.
 
-        from ..audio_analysis.bpm import detect_bpm
-
+        Läuft im Hintergrund (QThreadPool), damit die UI auch bei großen
+        Sammlungen bedienbar bleibt; geschrieben wird erst am Ende im
+        Hauptthread.
+        """
         rows = self.selected_rows() or list(range(len(self.songs)))
         targets = [
-            (row, self.songs[row])
+            (row, self.songs[row].path)
             for row in rows
             if 0 <= row < len(self.songs)
             and self.songs[row].path
@@ -3483,29 +3580,27 @@ class MainWindow(QMainWindow):
             self,
         )
         progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setValue(0)
 
-        results: dict[int, str] = {}
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            futures = {
-                pool.submit(detect_bpm, song.path): row for row, song in targets
-            }
-            done = 0
-            for future in as_completed(futures):
-                if progress.wasCanceled():
-                    break
-                row = futures[future]
-                try:
-                    bpm = future.result()
-                except Exception:  # noqa: BLE001
-                    bpm = None
-                if bpm:
-                    results[row] = str(int(round(bpm)))
-                done += 1
-                progress.setValue(done)
-                QApplication.processEvents()
+        task = _BpmDetectTask(targets)
+        # Referenz halten, damit der Task nicht vorzeitig gesammelt wird.
+        self._bpm_task = task
+        task.signals.progress.connect(progress.setValue)
+        progress.canceled.connect(task.cancel)
+        task.signals.finished.connect(
+            lambda results: self._on_bpm_detected(results, progress)
+        )
+        QThreadPool.globalInstance().start(task)
 
+    def _on_bpm_detected(self, results: dict, progress) -> None:
+        """Schreibt die im Hintergrund erkannten BPM-Werte (Hauptthread)."""
+        progress.close()
+        self._bpm_task = None
         update_items = [
-            (row, replace(self.songs[row], bpm=bpm)) for row, bpm in results.items()
+            (row, replace(self.songs[row], bpm=bpm))
+            for row, bpm in results.items()
+            if 0 <= row < len(self.songs)
         ]
         saved, failed = (
             self._write_song_updates("hist_bpm_detect", update_items)

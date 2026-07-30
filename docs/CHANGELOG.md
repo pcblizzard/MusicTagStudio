@@ -1,3 +1,21 @@
+# MusicTagStudio 0.8.6-alpha30
+
+## Feinschliff
+
+- **BPM als Tag jetzt auch für WavPack, Monkey's Audio (APE) und WMA** –
+  zusätzlich zu FLAC/Vorbis/MP3/MP4.
+- **BPM-Erkennung läuft komplett im Hintergrund** (eigener Thread-Pool statt
+  UI-blockierender Schleife) – auch große Sammlungen bleiben bedienbar.
+- **Filterergebnis abspielen**: neue Knöpfe „Ergebnis abspielen" und „Anhängen"
+  in der Tagger-Filterleiste – das aktuelle Filterergebnis (z. B. alle Favoriten
+  oder alle Titel um 95 BPM) direkt als Warteschlange starten oder anhängen.
+- **Optionales Multiprocessing für die Audio-Analyse** (experimentell, in den
+  Einstellungen) – nutzt echte Prozesse statt Threads für mehr CPU-Auslastung,
+  mit deutlichem Instabilitäts-Hinweis.
+- **TIDAL-Einstellungen entwirrt**: der Verfügbarkeits-Login und der Login für
+  die exakte Qualität sind jetzt klar getrennt beschriftet (interner
+  Attribut-Namenskonflikt behoben).
+
 # MusicTagStudio 0.8.6-alpha29
 
 ## BPM & Favoriten

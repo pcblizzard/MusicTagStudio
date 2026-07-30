@@ -75,6 +75,10 @@ class AppSettings:
     # Album Gain exakt (ganzes Album am Stück dekodieren) statt schnell aus den
     # Track-Werten ableiten. Standard: schnell.
     audio_analysis_exact_album_gain: bool = False
+    # Audio-Analyse über echte Prozesse (ProcessPoolExecutor) statt Threads.
+    # Umgeht die GIL für mehr CPU-Auslastung, kann aber je nach System zu
+    # Instabilität führen -> bewusst opt-in, Standard: aus (Threads).
+    audio_analysis_multiprocess: bool = False
     # Base64-kodierter Header-Zustand der Titelanalyse-Tabelle (Spaltenreihen-
     # folge/-breiten), damit die vom Nutzer sortierten Spalten erhalten bleiben.
     audio_analysis_column_state: str = ""
@@ -265,6 +269,12 @@ def load_settings(
             False,
         )
     )
+    multiprocess = bool(
+        audio_analysis.get(
+            "multiprocess",
+            False,
+        )
+    )
     column_state = str(
         audio_analysis.get(
             "column_state",
@@ -420,6 +430,7 @@ def load_settings(
         ),
         audio_analysis_parallel_jobs=parallel_jobs,
         audio_analysis_exact_album_gain=exact_album_gain,
+        audio_analysis_multiprocess=multiprocess,
         audio_analysis_column_state=column_state,
         music_sources=tuple(music_sources),
         load_sources_on_startup=bool(
@@ -538,6 +549,10 @@ def save_settings(
         (
             "exact_album_gain = "
             f"{str(settings.audio_analysis_exact_album_gain).lower()}"
+        ),
+        (
+            "multiprocess = "
+            f"{str(settings.audio_analysis_multiprocess).lower()}"
         ),
         (
             "column_state = "

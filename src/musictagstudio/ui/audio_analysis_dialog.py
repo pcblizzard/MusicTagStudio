@@ -4,6 +4,7 @@ import os
 import time
 from collections import defaultdict
 from concurrent.futures import (
+    ProcessPoolExecutor,
     ThreadPoolExecutor,
     as_completed,
 )
@@ -126,6 +127,7 @@ class AnalysisWorker(QObject):
         force_refresh: bool,
         language: str = "automatic",
         exact_album_gain: bool = False,
+        use_multiprocess: bool = False,
     ):
         super().__init__()
 
@@ -136,6 +138,7 @@ class AnalysisWorker(QObject):
             calculate_album_gain
         )
         self.exact_album_gain = exact_album_gain
+        self.use_multiprocess = use_multiprocess
         self.max_workers = max(
             1,
             max_workers,
@@ -204,7 +207,14 @@ class AnalysisWorker(QObject):
                 uncached_songs
                 and not self.cancel_event.is_set()
             ):
-                with ThreadPoolExecutor(
+                # Optional echte Prozesse (umgeht die GIL, aber je nach System
+                # instabiler); Standard bleibt der Thread-Pool.
+                executor_cls = (
+                    ProcessPoolExecutor
+                    if self.use_multiprocess
+                    else ThreadPoolExecutor
+                )
+                with executor_cls(
                     max_workers=self.max_workers
                 ) as executor:
                     futures = {
@@ -1185,6 +1195,7 @@ class AudioAnalysisDialog(QDialog):
         self.all_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
 
+        _settings = load_settings()
         self.thread = QThread(self)
         self.worker = AnalysisWorker(
             songs,
@@ -1193,7 +1204,8 @@ class AudioAnalysisDialog(QDialog):
             self.max_workers,
             self.force_refresh_checkbox.isChecked(),
             self.language,
-            exact_album_gain=load_settings().audio_analysis_exact_album_gain,
+            exact_album_gain=_settings.audio_analysis_exact_album_gain,
+            use_multiprocess=_settings.audio_analysis_multiprocess,
         )
         self.worker.moveToThread(
             self.thread

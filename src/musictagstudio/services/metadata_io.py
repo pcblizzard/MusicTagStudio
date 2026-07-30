@@ -705,6 +705,10 @@ def _read_asf(
             "Description",
             "WM/Comments",
         ),
+        bpm=_asf_first(
+            tags,
+            "WM/BeatsPerMinute",
+        ),
         path=str(path),
     )
 
@@ -736,6 +740,7 @@ def _write_asf(
         "Copyright": song.copyright,
         "WM/Composer": song.composer,
         "Description": song.comment,
+        "WM/BeatsPerMinute": song.bpm,
     }
 
     for key, value in values.items():
@@ -862,6 +867,11 @@ def _read_apev2(
             "Commentary",
             "Description",
         ),
+        bpm=_ape_first(
+            tags,
+            "BPM",
+            "Tempo",
+        ),
         path=str(path),
     )
 
@@ -892,6 +902,7 @@ def _write_apev2(
         "Copyright": song.copyright,
         "Composer": song.composer,
         "Comment": song.comment,
+        "BPM": song.bpm,
     }
 
     aliases = {

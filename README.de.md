@@ -6,7 +6,7 @@ MusicTagStudio ist ein Metadaten-Editor, Musikkatalog und lokaler Audioplayer
 für Windows. Die Anwendung verbindet lokale Audiodateien mit MusicBrainz,
 Discogs, Apple Music, Deezer, TheAudioDB, Cover Art Archive und LRCLIB.
 
-Aktueller Entwicklungsstand: **v0.8.6-alpha29**
+Aktueller Entwicklungsstand: **v0.8.6-alpha30**
 
 ## Funktionsumfang
 
@@ -239,6 +239,17 @@ Weitere Hinweise stehen in der
 [Entwicklungsrichtlinien](docs/CODING_GUIDELINES.md).
 
 ## Versionsstand
+
+### v0.8.6-alpha30
+
+- BPM als Tag jetzt auch für WavPack, Monkey's Audio (APE) und WMA
+- BPM-Erkennung läuft komplett im Hintergrund (große Sammlungen bleiben bedienbar)
+- Knöpfe „Ergebnis abspielen"/„Anhängen" spielen das aktuelle Filterergebnis
+  (z. B. alle Favoriten oder alle Titel um 95 BPM) direkt als Warteschlange
+- Optionales Multiprocessing für die Audio-Analyse (experimentell, mit
+  deutlichem Instabilitäts-Hinweis)
+- Übersichtlichere TIDAL-Einstellungen: Verfügbarkeits-Login und Login für die
+  exakte Qualität sind getrennt beschriftet (interner Namenskonflikt behoben)
 
 ### v0.8.6-alpha29
 

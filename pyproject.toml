@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "musictagstudio"
-version = "0.8.6a29"
+version = "0.8.6a30"
 description = "A safe, preview-first audio metadata editor"
 license = { text = "GPL-3.0-or-later" }
 authors = [

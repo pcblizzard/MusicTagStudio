@@ -831,7 +831,7 @@
   "convert_pick_output": "Elige una carpeta de salida.",
   "tidal_exact_label": "Calidad exacta de TIDAL (no oficial)",
   "tidal_exact_tip": "Usa la tidalapi no oficial para mostrar la profundidad de bits/frecuencia real de un álbum de TIDAL. Requiere una cuenta de TIDAL conectada. Opcional, por ser no oficial.",
-  "tidal_connect_button": "Conectar TIDAL …",
+  "tidal_connect_button": "Conectar TIDAL para calidad exacta …",
   "tidal_exact_unavailable": "tidalapi no instalado (pip install tidalapi).",
   "tidal_exact_connected": "✓ Conectado",
   "tidal_exact_disconnected": "No conectado",
@@ -880,5 +880,13 @@
   "filter_bpm_placeholder": "p. ej. 95",
   "filter_bpm_tip": "Mostrar solo pistas con este BPM (±3). Requiere etiquetas BPM guardadas (\"Detectar BPM\").",
   "filter_favorites": "solo favoritos",
-  "filter_favorites_tip": "Mostrar solo pistas marcadas como favoritas (corazón en la vista de reproducción)."
+  "filter_favorites_tip": "Mostrar solo pistas marcadas como favoritas (corazón en la vista de reproducción).",
+  "filter_play": "Reproducir resultados",
+  "filter_play_tip": "Reproducir el resultado actual del filtro como nueva cola.",
+  "filter_enqueue": "Añadir a la cola",
+  "filter_enqueue_tip": "Añadir el resultado actual del filtro a la cola.",
+  "filter_playing": "Reproduciendo {count} pistas.",
+  "analysis_multiprocess": "Analizar con varios procesos (experimental)",
+  "analysis_multiprocess_tip": "Usa procesos reales del sistema operativo en lugar de hilos, evitando el GIL de Python para un mayor uso de CPU.",
+  "analysis_multiprocess_hint": "Aviso: puede causar inestabilidad o fallos del análisis en algunos sistemas. Déjelo desactivado si no está seguro."
 }
