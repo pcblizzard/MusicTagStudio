@@ -888,5 +888,5 @@
   "filter_playing": "Reproduciendo {count} pistas.",
   "analysis_multiprocess": "Analizar con varios procesos (experimental)",
   "analysis_multiprocess_tip": "Usa procesos reales del sistema operativo en lugar de hilos, evitando el GIL de Python para un mayor uso de CPU.",
-  "analysis_multiprocess_hint": "Aviso: puede causar inestabilidad o fallos del análisis en algunos sistemas. Déjelo desactivado si no está seguro."
+  "analysis_multiprocess_hint": "Aviso: puede causar inestabilidad o fallos del análisis en algunos sistemas. Además, cada proceso inicia su propio intérprete (sobrecarga): con pocos archivos o archivos cortos suele ser más lento que los hilos; el beneficio solo aparece con muchos archivos grandes. Por eso los hilos son la opción predeterminada. Déjelo desactivado si no está seguro."
 }

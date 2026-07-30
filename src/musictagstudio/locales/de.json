@@ -888,5 +888,5 @@
   "filter_playing": "{count} Titel werden abgespielt.",
   "analysis_multiprocess": "Analyse über mehrere Prozesse (experimentell)",
   "analysis_multiprocess_tip": "Nutzt echte Betriebssystem-Prozesse statt Threads und umgeht so die Python-GIL für höhere CPU-Auslastung.",
-  "analysis_multiprocess_hint": "Achtung: Kann je nach System zu Instabilität oder Abstürzen der Analyse führen. Im Zweifel deaktiviert lassen."
+  "analysis_multiprocess_hint": "Achtung: Kann je nach System zu Instabilität oder Abstürzen der Analyse führen. Zudem startet jeder Prozess einen eigenen Interpreter (Overhead) – bei wenigen oder kurzen Dateien ist das oft langsamer als Threads, ein Gewinn kommt erst bei vielen großen Dateien. Deshalb sind Threads der Standard. Im Zweifel deaktiviert lassen."
 }

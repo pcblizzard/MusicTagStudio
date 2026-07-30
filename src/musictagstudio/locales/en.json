@@ -888,5 +888,5 @@
   "filter_playing": "Playing {count} tracks.",
   "analysis_multiprocess": "Analyse across multiple processes (experimental)",
   "analysis_multiprocess_tip": "Uses real operating-system processes instead of threads, bypassing Python's GIL for higher CPU utilisation.",
-  "analysis_multiprocess_hint": "Warning: may cause instability or analysis crashes on some systems. Leave off if unsure."
+  "analysis_multiprocess_hint": "Warning: may cause instability or analysis crashes on some systems. Each process also starts its own interpreter (overhead) – for few or short files this is often slower than threads; a benefit only appears with many large files. That is why threads are the default. Leave off if unsure."
 }
