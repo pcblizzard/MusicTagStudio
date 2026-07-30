@@ -52,6 +52,49 @@ def core_album_key(title: str) -> str:
     return normalize_catalog_text(album_core_title(title))
 
 
+# Führende Artikel (mehrsprachig), die für den toleranten Abgleich entfallen.
+_LEADING_ARTICLES = frozenset(
+    {"die", "der", "das", "the", "le", "la", "les", "el", "los", "las"}
+)
+# Verbreitete Editions-/Varianten-Schlagwörter (auch OHNE Klammern).
+_EDITION_WORDS_RE = re.compile(
+    r"\b(premium|deluxe|special|limited|expanded|remaster(?:ed)?|bonus|"
+    r"edition|version|anniversary)\b"
+)
+_BRACKET_RE = re.compile(r"[\(\[\{][^\)\]\}]*[\)\]\}]")
+
+
+def loose_album_key(title: str) -> str:
+    """Editions-/Artikel-toleranter Album-Schlüssel für den Streaming-Abgleich.
+
+    Entfernt Klammerzusätze, die **nur** Editions-/Varianten-Wörter enthalten
+    („(Premium Edition)", „(Remastered)"), verbreitete Editions-Wörter ohne
+    Klammern sowie einen führenden Artikel. **Inhaltsbestimmende** Zusätze wie
+    „(Live In Berlin)", „(Acoustic)" oder „(Remix)" bleiben erhalten, damit
+    Studio-/Live-/Remix-Fassungen NICHT verwechselt werden.
+
+    Dadurch gilt „Die Passion Whisky" als dasselbe Album wie
+    „Passion Whisky (Premium Edition)", aber ein Studio-Titel bleibt von seiner
+    „(Live …)"-Fassung getrennt. Bewusst großzügiger als :func:`core_album_key`
+    (dort müssen beide Seiten einen Zusatz tragen).
+    """
+
+    def _clean_bracket(match: re.Match) -> str:
+        inner = match.group(0)
+        # Nur Editions-Wörter im Zusatz -> Zusatz fällt weg. Bleibt sonstiger
+        # Inhalt (z. B. „Live"), bleibt der ganze Zusatz erhalten.
+        remainder = _EDITION_WORDS_RE.sub(" ", inner)
+        remainder = re.sub(r"[^a-z0-9]+", " ", remainder).strip()
+        return " " if not remainder else inner
+
+    text = _BRACKET_RE.sub(_clean_bracket, str(title or "").casefold())
+    text = _EDITION_WORDS_RE.sub(" ", text)  # freistehende Editions-Wörter
+    words = re.sub(r"[^a-z0-9]+", " ", text).split()
+    if len(words) > 1 and words[0] in _LEADING_ARTICLES:
+        words = words[1:]
+    return normalize_catalog_text(" ".join(words))
+
+
 def album_confidence(
     *,
     wanted_album: str,
@@ -68,6 +111,7 @@ def album_confidence(
     wanted_artist_key = normalize_catalog_text(wanted_artist)
     artist_key = normalize_catalog_text(artist)
     wanted_core = core_album_key(wanted_album)
+    wanted_loose = loose_album_key(wanted_album)
 
     score = 0
     if wanted_album_key and wanted_album_key == album_key:
@@ -82,6 +126,11 @@ def album_confidence(
         # Varianten desselben Live-Albums). Beide müssen einen Zusatz haben,
         # damit nicht Studio- und Live-Version verwechselt werden.
         score += 50
+    elif wanted_loose and wanted_loose == loose_album_key(album):
+        # Editions-/Artikel-tolerant: „Die Passion Whisky" ==
+        # „Passion Whisky (Premium Edition)". Etwas unter dem Kern-Match, da
+        # großzügiger (auch einseitiger Zusatz / führender Artikel zählt).
+        score += 48
     elif wanted_album_key and (
         wanted_album_key in album_key or album_key in wanted_album_key
     ):

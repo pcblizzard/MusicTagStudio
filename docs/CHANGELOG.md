@@ -17,6 +17,10 @@
   unterschied. Der Abgleich ist jetzt tolerant.
 - Statusanzeige vereinheitlicht zu **„Lokal vorhanden" / „Lokal nicht
   vorhanden"**.
+- **Streaming-Prüfung** (Apple/TIDAL/Spotify/Deezer) findet ein Album jetzt auch
+  dann, wenn es auf dem Dienst als Edition läuft („(Premium Edition)") oder der
+  Titel nur durch einen führenden Artikel abweicht. Inhaltsbestimmende Zusätze
+  („(Live)", „(Remix)", „(Acoustic)") bleiben bewusst getrennt.
 - Cover: Apple behauptet keine feste „3000×3000"-Auflösung mehr vor dem
   Download – die tatsächliche Größe wird beim Laden gemessen.
 

@@ -384,12 +384,30 @@ def _album_confidence(
     artist: str,
     track_count: int,
 ) -> int:
-    score = _field_score(wanted_album, album, exact=65, contains=38)
+    from .streaming_catalog import loose_album_key
+
+    # Editions-/Artikel-toleranter Titel-Abgleich (global, s. streaming_catalog):
+    # „Die Passion Whisky" == „Passion Whisky (Premium Edition)".
+    loose_match = bool(
+        loose_album_key(wanted_album)
+        and loose_album_key(wanted_album) == loose_album_key(album)
+    )
+    if loose_match:
+        score = 60
+    else:
+        score = _field_score(wanted_album, album, exact=65, contains=38)
     score += _field_score(wanted_artist, artist, exact=25, contains=14)
 
     if expected_track_count is not None and track_count > 0:
         difference = abs(expected_track_count - track_count)
-        score += 15 if difference == 0 else -min(18, difference * 3)
+        if difference == 0:
+            score += 15
+        elif loose_match:
+            # Gleiches Album, andere Edition -> Trackzahl darf abweichen,
+            # nur milde dämpfen statt hart bestrafen.
+            score -= min(6, difference)
+        else:
+            score -= min(18, difference * 3)
 
     return max(0, min(100, score))
 

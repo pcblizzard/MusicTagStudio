@@ -498,12 +498,22 @@ def _album_match_score(
     track_count: int,
     year: str,
 ) -> int:
-    score = _field_score(
-        wanted_album,
-        album,
-        exact=65,
-        contains=38,
+    from .streaming_catalog import loose_album_key
+
+    # Editions-/Artikel-toleranter Titel-Abgleich (global, s. streaming_catalog).
+    loose_match = bool(
+        loose_album_key(wanted_album)
+        and loose_album_key(wanted_album) == loose_album_key(album)
     )
+    if loose_match:
+        score = 60
+    else:
+        score = _field_score(
+            wanted_album,
+            album,
+            exact=65,
+            contains=38,
+        )
     score += _field_score(
         wanted_artist,
         artist,
@@ -522,6 +532,9 @@ def _album_match_score(
 
         if difference == 0:
             score += 15
+        elif loose_match:
+            # Gleiches Album, andere Edition -> Trackzahl darf abweichen.
+            score -= min(6, difference)
         else:
             score -= min(
                 18,
