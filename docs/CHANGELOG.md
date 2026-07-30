@@ -6,8 +6,10 @@
   mit Deeplink-Suche nach „Künstler + Album" bei **Bandcamp, Qobuz, 7digital,
   iTunes Store, eBay** und **Kleinanzeigen** (offizieller Kauf verlustfrei/
   hochauflösend bzw. gebrauchte Tonträger) – ergänzt „Auf Dienst öffnen"/Amazon.
-  eBay/Amazon nutzen die Länderdomain aus der Einstellung „Apple-Music-Land";
-  ein Hinweis macht klar, dass die Suche keine Verfügbarkeit garantiert.
+  eBay/Amazon nutzen die Länderdomain aus der Einstellung „Apple-Music-Land",
+  daneben ein **Land-Dropdown** zum schnellen Umstellen der Shop-Domain pro
+  Suche (ohne Ortung); ein Hinweis macht klar, dass die Suche keine
+  Verfügbarkeit garantiert.
   Zusätzlich **„Ordner öffnen"** (öffnet den lokalen Album-Ordner im
   Dateimanager), aktiv bei lokal vorhandenen Alben.
 - **Streaming-Anbieter als zusätzliche Editionen**: „Streaming prüfen" trägt

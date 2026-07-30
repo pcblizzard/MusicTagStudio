@@ -902,5 +902,7 @@
   "purchase_search_tip": "Bei {store} nach Künstler + Album suchen (offizieller Kauf, verlustfrei/hochauflösend).",
   "open_folder": "Ordner öffnen",
   "open_folder_tip": "Den lokalen Album-Ordner im Dateimanager öffnen.",
-  "purchase_hint": "Öffnet nur eine Suche – das Album muss beim jeweiligen Anbieter nicht verfügbar sein. eBay/Kleinanzeigen zeigen auch gebrauchte Tonträger."
+  "purchase_hint": "Öffnet nur eine Suche – das Album muss beim jeweiligen Anbieter nicht verfügbar sein. eBay/Kleinanzeigen zeigen auch gebrauchte Tonträger.",
+  "purchase_country_label": "Land:",
+  "purchase_country_tip": "Shop-Länderdomain für die Kauf-Suche (z. B. amazon.de/eBay.de). Standard aus der Einstellung „Apple-Music-Land“; hier pro Suche umstellbar – ohne Ortung."
 }

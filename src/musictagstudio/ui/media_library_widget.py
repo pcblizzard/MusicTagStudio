@@ -263,6 +263,21 @@ _PURCHASE_STORES: tuple[tuple[str, str], ...] = (
     ("kleinanzeigen", "Kleinanzeigen"),
 )
 
+# Auswahl für das schnelle Umstellen der Shop-Länderdomain neben den Buttons.
+_PURCHASE_COUNTRIES: tuple[tuple[str, str], ...] = (
+    ("DE", "DE · Deutschland"),
+    ("AT", "AT · Österreich"),
+    ("CH", "CH · Schweiz"),
+    ("GB", "GB · UK"),
+    ("US", "US · USA"),
+    ("FR", "FR · France"),
+    ("IT", "IT · Italia"),
+    ("ES", "ES · España"),
+    ("NL", "NL · Nederland"),
+    ("CA", "CA · Canada"),
+    ("AU", "AU · Australia"),
+)
+
 # eBay-Länderdomains (analog zu Amazon). Standard: .com.
 _EBAY_TLDS: dict[str, str] = {
     "de": "de", "at": "at", "ch": "ch", "us": "com", "gb": "co.uk",
@@ -1093,6 +1108,19 @@ class MediaLibraryWidget(QWidget):
         purchase_outer = QVBoxLayout(purchase_group)
         purchase_outer.setContentsMargins(8, 4, 8, 8)
         purchase_row = QHBoxLayout()
+        # Länder-Dropdown: überschreibt die Shop-Domain pro Suche (Default aus
+        # der Einstellung „Apple-Music-Land"), ohne Ortung.
+        purchase_row.addWidget(QLabel(tr("purchase_country_label", self.language)))
+        self.purchase_country_combo = QComboBox()
+        self.purchase_country_combo.setToolTip(
+            tr("purchase_country_tip", self.language)
+        )
+        for code, label in _PURCHASE_COUNTRIES:
+            self.purchase_country_combo.addItem(label, code)
+        default_country = str(load_settings().apple_country or "DE").upper()
+        default_index = self.purchase_country_combo.findData(default_country)
+        self.purchase_country_combo.setCurrentIndex(max(0, default_index))
+        purchase_row.addWidget(self.purchase_country_combo)
         for store_id, _ in _PURCHASE_STORES:
             purchase_row.addWidget(self.purchase_buttons[store_id])
         purchase_outer.addLayout(purchase_row)
@@ -4187,9 +4215,16 @@ class MediaLibraryWidget(QWidget):
         ).strip()
         if not terms:
             return
-        tld = _amazon_tld(load_settings().apple_country)
+        tld = _amazon_tld(self._purchase_country())
         url = f"https://www.amazon.{tld}/s?" + urlencode({"k": terms})
         webbrowser.open(url)
+
+    def _purchase_country(self) -> str:
+        """Aktuell gewähltes Shop-Land (Dropdown) mit Rückfall auf die Einstellung."""
+        combo = getattr(self, "purchase_country_combo", None)
+        if combo is not None and combo.currentData():
+            return str(combo.currentData())
+        return str(load_settings().apple_country or "DE")
 
     def _search_store(self, store: str) -> None:
         """Öffnet die Deeplink-Suche eines legalen Kauf-Stores nach Künstler+Album."""
@@ -4198,7 +4233,7 @@ class MediaLibraryWidget(QWidget):
             return
         artist = group.artist or self.current_artist_name
         terms = " ".join(part for part in (artist, group.title) if part).strip()
-        url = store_search_url(store, terms, load_settings().apple_country)
+        url = store_search_url(store, terms, self._purchase_country())
         if url:
             webbrowser.open(url)
 

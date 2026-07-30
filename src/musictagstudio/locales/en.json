@@ -902,5 +902,7 @@
   "purchase_search_tip": "Search {store} for artist + album (official purchase, lossless/hi-res).",
   "open_folder": "Open folder",
   "open_folder_tip": "Open the local album folder in the file manager.",
-  "purchase_hint": "Opens a search only – the album may not be available at each provider. eBay/Kleinanzeigen also list used media."
+  "purchase_hint": "Opens a search only – the album may not be available at each provider. eBay/Kleinanzeigen also list used media.",
+  "purchase_country_label": "Country:",
+  "purchase_country_tip": "Shop country domain for the purchase search (e.g. amazon.de/eBay.de). Default from the “Apple Music country” setting; switch per search here – no location tracking."
 }

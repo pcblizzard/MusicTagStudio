@@ -902,5 +902,7 @@
   "purchase_search_tip": "Pesquisar no {store} por artista + álbum (compra oficial, lossless/alta resolução).",
   "open_folder": "Abrir pasta",
   "open_folder_tip": "Abrir a pasta local do álbum no gerenciador de arquivos.",
-  "purchase_hint": "Apenas abre uma busca – o álbum pode não estar disponível em cada provedor. eBay/Kleinanzeigen também listam mídias usadas."
+  "purchase_hint": "Apenas abre uma busca – o álbum pode não estar disponível em cada provedor. eBay/Kleinanzeigen também listam mídias usadas.",
+  "purchase_country_label": "País:",
+  "purchase_country_tip": "Domínio de país da loja para a busca de compra (ex.: amazon.de/eBay.de). Padrão da configuração “País do Apple Music”; alterável por busca aqui, sem geolocalização."
 }
