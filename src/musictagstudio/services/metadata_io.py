@@ -10,6 +10,7 @@ from mutagen.id3 import (
     ID3,
     ID3NoHeaderError,
     TALB,
+    TBPM,
     TCOM,
     TCON,
     TCOP,
@@ -327,6 +328,10 @@ def _read_vorbis(
             "comment",
             "description",
         ),
+        bpm=_first(
+            audio,
+            "bpm",
+        ),
         path=str(path),
     )
 
@@ -357,6 +362,7 @@ def _write_vorbis(
         "copyright": song.copyright,
         "composer": song.composer,
         "comment": song.comment,
+        "bpm": song.bpm,
     }
 
     for key, value in values.items():
@@ -1003,6 +1009,7 @@ def _read_mp3(
             )
             else ""
         ),
+        bpm=text("TBPM"),
         path=str(path),
     )
 
@@ -1073,6 +1080,10 @@ def _write_mp3(
         "TCOM": TCOM(
             encoding=3,
             text=[song.composer],
+        ),
+        "TBPM": TBPM(
+            encoding=3,
+            text=[song.bpm],
         ),
     }
 
@@ -1186,6 +1197,7 @@ def _read_mp4(
         copyright=val("cprt"),
         composer=val("\xa9wrt"),
         comment=val("\xa9cmt"),
+        bpm=str((tags.get("tmpo") or [""])[0] or ""),
         path=str(path),
     )
 
@@ -1244,6 +1256,12 @@ def _write_mp4(
             ),
         )
     ]
+
+    # BPM als iTunes-Tempo-Atom (Integer).
+    if str(song.bpm or "").strip().isdigit():
+        tags["tmpo"] = [int(song.bpm)]
+    elif "tmpo" in tags:
+        del tags["tmpo"]
 
     for key, value in (
         (

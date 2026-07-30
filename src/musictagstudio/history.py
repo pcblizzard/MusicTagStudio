@@ -32,6 +32,7 @@ _TAG_FIELDS: tuple[str, ...] = (
     "copyright",
     "composer",
     "comment",
+    "bpm",
 )
 
 # (Tags als dict, Cover-Bytes oder None)
@@ -478,6 +479,7 @@ def _default_write_state(
         copyright=tags.get("copyright", ""),
         composer=tags.get("composer", ""),
         comment=tags.get("comment", ""),
+        bpm=tags.get("bpm", ""),
     )
     save_song_metadata(path, song)
 

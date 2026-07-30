@@ -18,5 +18,6 @@ class Song:
     copyright: str = ""
     composer: str = ""
     comment: str = ""
+    bpm: str = ""
     path: str = ""
     cover: bytes | None = None
