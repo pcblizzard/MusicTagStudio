@@ -28,6 +28,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
+    QComboBox,
     QFileDialog,
     QFormLayout,
     QGridLayout,
@@ -542,6 +543,7 @@ class MainWindow(QMainWindow):
         self._layout_provider_buttons(
         )
         left_layout.addLayout(history_buttons)
+        left_layout.addLayout(self._build_filter_bar())
         left_layout.addWidget(self.table)
 
         right_widget = QWidget()
@@ -2555,6 +2557,9 @@ class MainWindow(QMainWindow):
             False
         )
         self.update_optional_columns()
+        if hasattr(self, "filter_genre"):
+            self._populate_filter_combos()
+            self._apply_song_filter()
 
         enabled = bool(
             self.songs
@@ -3262,6 +3267,68 @@ class MainWindow(QMainWindow):
         )
 
         self.refresh_active_editor()
+
+    def _build_filter_bar(self):
+        """Filterleiste über der Tabelle: freie Suche + Genre + Künstler."""
+        row = QHBoxLayout()
+        self.filter_search = QLineEdit()
+        self.filter_search.setClearButtonEnabled(True)
+        self.filter_search.setPlaceholderText(tr("filter_search_placeholder", self.language))
+        self.filter_search.textChanged.connect(self._apply_song_filter)
+
+        self.filter_genre = QComboBox()
+        self.filter_genre.currentIndexChanged.connect(self._apply_song_filter)
+        self.filter_artist = QComboBox()
+        self.filter_artist.currentIndexChanged.connect(self._apply_song_filter)
+
+        self.filter_count_label = QLabel("")
+        self.filter_count_label.setStyleSheet("color: palette(mid);")
+
+        row.addWidget(self.filter_search, 3)
+        row.addWidget(QLabel(tr("filter_genre_label", self.language)))
+        row.addWidget(self.filter_genre, 2)
+        row.addWidget(QLabel(tr("filter_artist_label", self.language)))
+        row.addWidget(self.filter_artist, 2)
+        row.addWidget(self.filter_count_label)
+        return row
+
+    def _populate_filter_combos(self):
+        """Genre-/Künstler-Auswahl aus den geladenen Titeln neu befüllen."""
+        from ..services.song_filter import distinct_values
+
+        for combo, field, all_key in (
+            (self.filter_genre, "genre", "filter_all_genres"),
+            (self.filter_artist, "artist", "filter_all_artists"),
+        ):
+            previous = combo.currentData()
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem(tr(all_key, self.language), "")
+            for value in distinct_values(self.songs, field):
+                combo.addItem(value, value)
+            index = combo.findData(previous) if previous else 0
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            combo.blockSignals(False)
+
+    def _apply_song_filter(self, *_args):
+        """Blendet Zeilen aus, die nicht zu Suche/Genre/Künstler passen."""
+        from ..services.song_filter import matches
+
+        text = self.filter_search.text() if hasattr(self, "filter_search") else ""
+        genre = self.filter_genre.currentData() or ""
+        artist = self.filter_artist.currentData() or ""
+        visible = 0
+        for row, song in enumerate(self.songs):
+            ok = matches(song, text=text, genre=genre, artist=artist)
+            self.table.setRowHidden(row, not ok)
+            if ok:
+                visible += 1
+        if text or genre or artist:
+            self.filter_count_label.setText(
+                tr("filter_count", self.language, shown=visible, total=len(self.songs))
+            )
+        else:
+            self.filter_count_label.setText("")
 
     def convert_selected(self):
         """Öffnet den Konvertierungsdialog für die ausgewählten (oder alle) Titel."""

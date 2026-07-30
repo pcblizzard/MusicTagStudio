@@ -843,5 +843,17 @@
   "tidal_connect_waiting": "Waiting for authorization in the browser …",
   "tidal_connect_success": "✓ Connected! You can close this window.",
   "tidal_connect_failed": "Connection failed or cancelled.",
-  "tidal_exact_quality_label": "TIDAL quality (exact)"
+  "tidal_exact_quality_label": "TIDAL quality (exact)",
+  "filter_search_placeholder": "Filter (title/artist/album/genre) …",
+  "filter_genre_label": "Genre:",
+  "filter_artist_label": "Artist:",
+  "filter_all_genres": "All genres",
+  "filter_all_artists": "All artists",
+  "filter_count": "{shown}/{total} shown",
+  "quality_stats": "Quality statistics",
+  "quality_stats_computing": "Computing statistics …",
+  "quality_stats_summary": "{readable} of {total} readable · {lossless} lossless ({percent}%) · {lossy} lossy",
+  "quality_stats_codecs": "Codecs",
+  "quality_stats_bitdepth": "Bit depths",
+  "quality_stats_rates": "Sample rates"
 }

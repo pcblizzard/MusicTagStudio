@@ -176,11 +176,15 @@ class LibraryAuditDialog(QDialog):
             bool(all_songs)
         )
 
+        self.stats_button = QPushButton(tr("quality_stats", language))
+        self.stats_button.clicked.connect(self._open_quality_stats)
+
         # Kompakte Kopfzeile: Aktions-Buttons und Filter in einer Reihe, damit
         # oben kein hoher Leerraum entsteht und die Breite genutzt wird.
         controls = QHBoxLayout()
         controls.addWidget(self.selected_button, 2)
         controls.addWidget(self.all_button, 2)
+        controls.addWidget(self.stats_button, 1)
         controls.addWidget(self.filter_combo, 1)
         layout.addLayout(controls)
 
@@ -268,6 +272,12 @@ class LibraryAuditDialog(QDialog):
         layout.addWidget(
             buttons
         )
+
+    def _open_quality_stats(self) -> None:
+        from .quality_stats_dialog import QualityStatsDialog
+
+        paths = [s.path for s in (self.all_songs or []) if s.path]
+        QualityStatsDialog(paths, self, language=self.language).exec()
 
     def set_songs(
         self,
