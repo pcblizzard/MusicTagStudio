@@ -2,6 +2,11 @@
 
 ## Neue Werkzeuge
 
+- **Legale Kauf-/Download-Links** in der Medienbibliothek: neue Gruppe „Kaufen"
+  mit Deeplink-Suche nach „Künstler + Album" bei **Bandcamp, Qobuz, 7digital**
+  und **iTunes Store** (offizieller Kauf, verlustfrei/hochauflösend) – ergänzt
+  „Auf Dienst öffnen"/Amazon. Zusätzlich **„Ordner öffnen"** (öffnet den lokalen
+  Album-Ordner im Dateimanager), aktiv bei lokal vorhandenen Alben.
 - **Streaming-Anbieter als zusätzliche Editionen**: „Streaming prüfen" trägt
   gefundene Alben von Deezer, Apple Music, TIDAL und Spotify jetzt zusätzlich in
   die Editionsliste ein (mit Anbieter-Kennzeichnung, Trackzahl und – wo geliefert

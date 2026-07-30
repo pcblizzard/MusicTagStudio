@@ -897,5 +897,9 @@
   "isrc_no_isrc": "Kein ausgewählter Titel hat eine ISRC hinterlegt. Ohne ISRC ist keine exakte Anreicherung möglich.",
   "hist_isrc_enrich": "ISRC-Anreicherung",
   "edition_digital": "Digital",
-  "edition_streaming_hint": "Streaming-Edition ({provider}). Trackliste über „Auf Dienst öffnen“."
+  "edition_streaming_hint": "Streaming-Edition ({provider}). Trackliste über „Auf Dienst öffnen“.",
+  "group_purchase": "Kaufen",
+  "purchase_search_tip": "Bei {store} nach Künstler + Album suchen (offizieller Kauf, verlustfrei/hochauflösend).",
+  "open_folder": "Ordner öffnen",
+  "open_folder_tip": "Den lokalen Album-Ordner im Dateimanager öffnen."
 }

@@ -897,5 +897,9 @@
   "isrc_no_isrc": "Ninguna de las pistas seleccionadas tiene ISRC. Sin ISRC no es posible un enriquecimiento exacto.",
   "hist_isrc_enrich": "Enriquecimiento por ISRC",
   "edition_digital": "Digital",
-  "edition_streaming_hint": "Edición de streaming ({provider}). Lista de pistas mediante «Abrir en el servicio»."
+  "edition_streaming_hint": "Edición de streaming ({provider}). Lista de pistas mediante «Abrir en el servicio».",
+  "group_purchase": "Comprar",
+  "purchase_search_tip": "Buscar en {store} por artista + álbum (compra oficial, sin pérdida/alta resolución).",
+  "open_folder": "Abrir carpeta",
+  "open_folder_tip": "Abrir la carpeta local del álbum en el explorador de archivos."
 }

@@ -897,5 +897,9 @@
   "isrc_no_isrc": "None of the selected tracks has an ISRC. Without an ISRC no exact enrichment is possible.",
   "hist_isrc_enrich": "ISRC enrichment",
   "edition_digital": "Digital",
-  "edition_streaming_hint": "Streaming edition ({provider}). Tracklist via “Open on service”."
+  "edition_streaming_hint": "Streaming edition ({provider}). Tracklist via “Open on service”.",
+  "group_purchase": "Buy",
+  "purchase_search_tip": "Search {store} for artist + album (official purchase, lossless/hi-res).",
+  "open_folder": "Open folder",
+  "open_folder_tip": "Open the local album folder in the file manager."
 }

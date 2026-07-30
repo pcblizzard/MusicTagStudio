@@ -17,12 +17,14 @@ from PySide6.QtCore import (
     QRunnable,
     QThreadPool,
     QTimer,
+    QUrl,
     Signal,
     Slot,
     Qt,
 )
 from PySide6.QtGui import (
     QColor,
+    QDesktopServices,
     QIcon,
     QPalette,
     QPixmap,
@@ -248,6 +250,51 @@ _STREAMING_EDITION_LABELS: dict[str, str] = {
     "tidal": "TIDAL",
     "spotify": "Spotify",
 }
+
+
+# Legale Kauf-/Download-Stores: Suche nach „Künstler Album" per Deeplink
+# (kein API-Key, kein Login). Reihenfolge = Anzeigereihenfolge der Buttons.
+_PURCHASE_STORES: tuple[tuple[str, str], ...] = (
+    ("bandcamp", "Bandcamp"),
+    ("qobuz", "Qobuz"),
+    ("7digital", "7digital"),
+    ("itunes", "iTunes Store"),
+)
+
+
+def _qobuz_locale(country: str) -> str:
+    mapping = {
+        "de": "de-de", "at": "de-de", "ch": "de-de", "fr": "fr-fr",
+        "it": "it-it", "es": "es-es", "gb": "gb-en", "uk": "gb-en",
+        "us": "us-en", "nl": "nl-nl",
+    }
+    return mapping.get((country or "").lower(), "us-en")
+
+
+def store_search_url(store: str, terms: str, country: str = "us") -> str:
+    """Deeplink-Suche eines legalen Kauf-Stores nach ``terms`` („Künstler Album").
+
+    Reine Funktion (ohne UI/Netzwerk) -> testbar. Leerer String bei
+    unbekanntem Store oder leeren Begriffen.
+    """
+    query = " ".join(str(terms or "").split())
+    if not query:
+        return ""
+    cc = (country or "us").lower()
+    if store == "bandcamp":
+        return "https://bandcamp.com/search?" + urlencode({"q": query})
+    if store == "qobuz":
+        return (
+            f"https://www.qobuz.com/{_qobuz_locale(cc)}/search?"
+            + urlencode({"q": query})
+        )
+    if store == "7digital":
+        return "https://www.7digital.com/search?" + urlencode({"q": query})
+    if store == "itunes":
+        return (
+            f"https://music.apple.com/{cc}/search?" + urlencode({"term": query})
+        )
+    return ""
 
 
 def build_streaming_editions(
@@ -991,6 +1038,21 @@ class MediaLibraryWidget(QWidget):
         )
         self.amazon_button.setEnabled(False)
         self.amazon_button.clicked.connect(self._search_amazon)
+        # Legale Kauf-/Download-Stores (Deeplink-Suche „Künstler Album").
+        self.purchase_buttons: dict[str, QPushButton] = {}
+        for store_id, store_label in _PURCHASE_STORES:
+            button = QPushButton(store_label)
+            button.setToolTip(tr("purchase_search_tip", self.language, store=store_label))
+            button.setEnabled(False)
+            button.clicked.connect(
+                lambda _checked=False, s=store_id: self._search_store(s)
+            )
+            self.purchase_buttons[store_id] = button
+        # Generisch: lokalen Album-Ordner im Dateimanager öffnen (kein Ripper).
+        self.open_folder_button = QPushButton(tr("open_folder", self.language))
+        self.open_folder_button.setToolTip(tr("open_folder_tip", self.language))
+        self.open_folder_button.setEnabled(False)
+        self.open_folder_button.clicked.connect(self._open_album_folder)
         # Gruppe "Prüfen": Streaming-/Qualitätsabfragen.
         check_group = QGroupBox(tr("group_check", self.language))
         check_layout = QHBoxLayout(check_group)
@@ -1007,7 +1069,16 @@ class MediaLibraryWidget(QWidget):
         service_layout.addWidget(self.tidal_button)
         service_layout.addWidget(self.spotify_button)
         service_layout.addWidget(self.amazon_button)
+        service_layout.addWidget(self.open_folder_button)
         detail_layout.addWidget(service_group)
+
+        # Gruppe "Kaufen": legale Kauf-/Download-Stores (verlustfrei/Hi-Res).
+        purchase_group = QGroupBox(tr("group_purchase", self.language))
+        purchase_layout = QHBoxLayout(purchase_group)
+        purchase_layout.setContentsMargins(8, 4, 8, 8)
+        for store_id, _ in _PURCHASE_STORES:
+            purchase_layout.addWidget(self.purchase_buttons[store_id])
+        detail_layout.addWidget(purchase_group)
 
         self.streaming_status = QLabel(
             tr("streaming_not_checked", self.language)
@@ -2573,6 +2644,13 @@ class MediaLibraryWidget(QWidget):
         self.spotify_button.setEnabled(False)
         # Amazon-Suche braucht keinen Check und ist bei gewähltem Album stets nutzbar.
         self.amazon_button.setEnabled(True)
+        # Kauf-Store-Suchen ebenso (Deeplinks, kein Check nötig).
+        for button in self.purchase_buttons.values():
+            button.setEnabled(True)
+        # „Ordner öffnen" nur, wenn das Album lokal vorhanden ist.
+        self.open_folder_button.setEnabled(
+            bool(self._local_folder_for(group.title))
+        )
         cached_streaming = self._streaming_results.get(group.release_group_id)
         if group.release_group_id not in self._streaming_results:
             cached_streaming = self._load_saved_streaming_result(group)
@@ -4090,6 +4168,26 @@ class MediaLibraryWidget(QWidget):
         tld = _amazon_tld(load_settings().apple_country)
         url = f"https://www.amazon.{tld}/s?" + urlencode({"k": terms})
         webbrowser.open(url)
+
+    def _search_store(self, store: str) -> None:
+        """Öffnet die Deeplink-Suche eines legalen Kauf-Stores nach Künstler+Album."""
+        group = self.current_group
+        if group is None:
+            return
+        artist = group.artist or self.current_artist_name
+        terms = " ".join(part for part in (artist, group.title) if part).strip()
+        url = store_search_url(store, terms, load_settings().apple_country)
+        if url:
+            webbrowser.open(url)
+
+    def _open_album_folder(self) -> None:
+        """Öffnet den lokalen Album-Ordner im Dateimanager (generisch)."""
+        group = self.current_group
+        if group is None:
+            return
+        folder = self._local_folder_for(group.title)
+        if folder:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
 
     def _open_local(
         self,
