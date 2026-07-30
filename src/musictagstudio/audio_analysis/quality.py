@@ -77,15 +77,20 @@ class TrackQuality:
         return (self.codec.casefold(), self.sample_rate, self.bit_depth, self.channels)
 
     def summary(self) -> str:
-        """Kompakte Einzeilen-Beschreibung, z. B. 'FLAC · 44.1 kHz · 16 Bit · Stereo'."""
+        """Kompakte Einzeilen-Beschreibung, z. B. 'FLAC · 16 Bit · 44.1 kHz · Stereo'.
+
+        Reihenfolge bewusst **Format · Bit-Tiefe · Abtastrate** – gleich wie die
+        TIDAL-Qualität (Tier-Label „… 16 Bit/44.1 kHz" bzw. exakte tidalapi-
+        Werte), damit beide Zeilen direkt vergleichbar sind.
+        """
         if self.error:
             return self.error
-        # Verlustfrei: Bit-Tiefe betonen; verlustbehaftet: Bitrate betonen.
+        # Verlustfrei: Bit-Tiefe betonen (vor der Rate); verlustbehaftet: Bitrate.
         parts = [self.codec or "?"]
-        if self.sample_rate_text:
-            parts.append(self.sample_rate_text)
         if self.lossless and self.bit_depth_text:
             parts.append(self.bit_depth_text)
+        if self.sample_rate_text:
+            parts.append(self.sample_rate_text)
         if not self.lossless and self.bitrate_text:
             parts.append(self.bitrate_text)
         if self.channels_text:

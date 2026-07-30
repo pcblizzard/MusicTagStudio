@@ -170,15 +170,15 @@ def search_albums(
 # "max." ist in allen Ziel-Sprachen als Abkürzung verständlich; die
 # Zahlen-/Einheitenschreibweise entspricht der lokalen Qualitätsanzeige.
 _QUALITY_LABELS: tuple[tuple[str, str], ...] = (
-    ("HIRES_LOSSLESS", "Hi-Res Lossless (max. 24 Bit/192 kHz)"),
-    ("HI_RES_LOSSLESS", "Hi-Res Lossless (max. 24 Bit/192 kHz)"),
-    ("HI_RES", "Hi-Res (max. 24 Bit/192 kHz)"),
-    ("LOSSLESS", "Lossless (16 Bit/44.1 kHz)"),
+    ("HIRES_LOSSLESS", "Hi-Res Lossless · max. 24 Bit · 192 kHz"),
+    ("HI_RES_LOSSLESS", "Hi-Res Lossless · max. 24 Bit · 192 kHz"),
+    ("HI_RES", "Hi-Res · max. 24 Bit · 192 kHz"),
+    ("LOSSLESS", "Lossless · 16 Bit · 44.1 kHz"),
     ("DOLBY_ATMOS", "Dolby Atmos"),
     ("SONY_360RA", "360 Reality Audio"),
     ("MQA", "MQA"),
-    ("HIGH", "AAC 320 kbit/s"),
-    ("LOW", "AAC 96 kbit/s"),
+    ("HIGH", "AAC · 320 kbit/s"),
+    ("LOW", "AAC · 96 kbit/s"),
 )
 
 

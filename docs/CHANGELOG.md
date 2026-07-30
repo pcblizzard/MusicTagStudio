@@ -27,6 +27,11 @@
 
 ## Behoben
 
+- **Qualitätszeilen einheitlich**: Lokale und TIDAL-Qualität verwenden jetzt
+  dieselbe Reihenfolge und Schreibweise **Format · Bit-Tiefe · Abtastrate**
+  (z. B. „FLAC · 16 Bit · 44.1 kHz · Stereo" bzw. „Lossless · 16 Bit ·
+  44.1 kHz"). Vorher stand lokal die kHz vor der Bit-Tiefe – jetzt direkt
+  vergleichbar.
 - **Lokale Alben wurden trotz Vorhandensein als „Lokal nicht vorhanden"
   angezeigt**, wenn sich der Ordner-/Tagtitel vom Katalogtitel durch einen
   Editionszusatz („(Premium Edition)") oder einen führenden Artikel („Die …")

@@ -59,7 +59,7 @@ def test_lossless_summary_emphasizes_bit_depth():
         bitrate=900000,
         lossless=True,
     )
-    assert q.summary() == "FLAC · 44.1 kHz · 16 Bit · Stereo"
+    assert q.summary() == "FLAC · 16 Bit · 44.1 kHz · Stereo"
 
 
 def test_lossy_summary_emphasizes_bitrate_not_bit_depth():
@@ -80,7 +80,7 @@ def test_album_summary_uniform(tmp_path: Path):
     album = summarize_album(paths)
     assert album.all_lossless is True
     assert album.is_mixed is False
-    assert album.summary() == "WAV · 44.1 kHz · 16 Bit · Stereo"
+    assert album.summary() == "WAV · 16 Bit · 44.1 kHz · Stereo"
 
 
 def test_album_summary_flags_mixed():
