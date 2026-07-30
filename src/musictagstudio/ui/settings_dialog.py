@@ -368,6 +368,7 @@ class SettingsDialog(QDialog):
                 item.status_text,
                 item.tooltip,
                 item.selectable,
+                item.catalog_size,
             )
 
         self.provider_buttons.get(
@@ -539,6 +540,12 @@ class SettingsDialog(QDialog):
         )
         discogs_info.setWordWrap(True)
         online_catalogs_form.addRow(discogs_info)
+
+        catalog_sizes = QLabel(tr("online_catalog_sizes", language))
+        catalog_sizes.setWordWrap(True)
+        catalog_sizes.setStyleSheet("color: palette(mid); font-size: 11px;")
+        catalog_sizes.setToolTip(tr("catalog_size_tip", language))
+        online_catalogs_form.addRow(catalog_sizes)
 
         self.acoustid_key_edit = QLineEdit(settings.acoustid_api_key)
         self.acoustid_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
@@ -1141,6 +1148,7 @@ class SettingsDialog(QDialog):
         status_text,
         tooltip,
         selectable,
+        catalog_size="",
     ):
         row = QWidget()
         row_layout = QHBoxLayout(row)
@@ -1164,6 +1172,11 @@ class SettingsDialog(QDialog):
         storage[item_id] = button
 
         row_layout.addWidget(button)
+        if catalog_size:
+            size_label = QLabel(catalog_size)
+            size_label.setStyleSheet("color: palette(mid); font-size: 11px;")
+            size_label.setToolTip(tr("catalog_size_tip", self.language))
+            row_layout.addWidget(size_label)
         row_layout.addStretch()
         row_layout.addWidget(status_label)
         layout.addWidget(row)

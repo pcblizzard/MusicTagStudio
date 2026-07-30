@@ -787,5 +787,7 @@
   "auth_conf_medium": "media",
   "auth_conf_low": "bassa",
   "exact_album_gain": "Calcola il guadagno dell'album con precisione",
-  "exact_album_gain_tip": "Disattivato: il guadagno dell'album è derivato rapidamente dai valori delle tracce (il picco dell'album resta esatto, il guadagno differisce < ~0,5 dB). Attivato: l'intero album viene inoltre misurato per intero – massima precisione, ma molto più lento."
+  "exact_album_gain_tip": "Disattivato: il guadagno dell'album è derivato rapidamente dai valori delle tracce (il picco dell'album resta esatto, il guadagno differisce < ~0,5 dB). Attivato: l'intero album viene inoltre misurato per intero – massima precisione, ma molto più lento.",
+  "catalog_size_tip": "Dimensione approssimativa del catalogo/database (ordine di grandezza, varia nel tempo).",
+  "online_catalog_sizes": "Discogs: ~18 mln release · AcoustID: ~90 mln impronte"
 }

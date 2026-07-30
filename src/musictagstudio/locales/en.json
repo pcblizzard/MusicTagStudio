@@ -787,5 +787,7 @@
   "auth_conf_medium": "medium",
   "auth_conf_low": "low",
   "exact_album_gain": "Calculate album gain exactly",
-  "exact_album_gain_tip": "Off: album gain is derived quickly from the track values (album peak stays exact, gain differs < ~0.5 dB). On: the whole album is additionally measured as one – most accurate, but noticeably slower."
+  "exact_album_gain_tip": "Off: album gain is derived quickly from the track values (album peak stays exact, gain differs < ~0.5 dB). On: the whole album is additionally measured as one – most accurate, but noticeably slower.",
+  "catalog_size_tip": "Approximate catalog/database size (order of magnitude, changes over time).",
+  "online_catalog_sizes": "Discogs: ~18M releases · AcoustID: ~90M fingerprints"
 }

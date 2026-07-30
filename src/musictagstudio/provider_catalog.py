@@ -18,6 +18,9 @@ class ProviderDefinition:
     status: ProviderStatus
     status_text: str
     tooltip: str
+    # Grobe Katalog-/Datenbankgröße (Größenordnung, „ca."). Ändert sich langsam;
+    # dient nur zur Orientierung, welche Quelle wie umfangreich ist.
+    catalog_size: str = ""
 
     @property
     def selectable(self) -> bool:
@@ -31,6 +34,7 @@ PROVIDERS: tuple[ProviderDefinition, ...] = (
     ProviderDefinition(
         provider_id="apple_music",
         name="Apple Music",
+        catalog_size="ca. 100 Mio. Titel",
         status="supported",
         status_text="Unterstützt",
         tooltip=(
@@ -43,6 +47,7 @@ PROVIDERS: tuple[ProviderDefinition, ...] = (
     ProviderDefinition(
         provider_id="musicbrainz",
         name="MusicBrainz",
+        catalog_size="ca. 4 Mio. Releases · 40 Mio. Aufnahmen",
         status="supported",
         status_text="Unterstützt",
         tooltip=(
@@ -55,6 +60,7 @@ PROVIDERS: tuple[ProviderDefinition, ...] = (
     ProviderDefinition(
         provider_id="tidal",
         name="TIDAL",
+        catalog_size="ca. 110 Mio. Titel",
         status="unsupported",
         status_text="Aktuell nicht unterstützt",
         tooltip=(
@@ -66,6 +72,7 @@ PROVIDERS: tuple[ProviderDefinition, ...] = (
     ProviderDefinition(
         provider_id="qobuz",
         name="Qobuz",
+        catalog_size="ca. 100 Mio. Titel",
         status="unsupported",
         status_text="Aktuell nicht unterstützt",
         tooltip=(
@@ -79,6 +86,7 @@ PROVIDERS: tuple[ProviderDefinition, ...] = (
     ProviderDefinition(
         provider_id="deezer",
         name="Deezer",
+        catalog_size="ca. 90 Mio. Titel",
         status="supported",
         status_text="Unterstützt",
         tooltip=(
@@ -91,6 +99,7 @@ PROVIDERS: tuple[ProviderDefinition, ...] = (
     ProviderDefinition(
         provider_id="amazon_music",
         name="Amazon Music",
+        catalog_size="ca. 100 Mio. Titel",
         status="unsupported",
         status_text="Aktuell nicht unterstützt",
         tooltip=(
@@ -102,6 +111,7 @@ PROVIDERS: tuple[ProviderDefinition, ...] = (
     ProviderDefinition(
         provider_id="spotify",
         name="Spotify",
+        catalog_size="ca. 100 Mio. Titel",
         status="unsupported",
         status_text="Aktuell nicht unterstützt",
         tooltip=(
@@ -113,6 +123,7 @@ PROVIDERS: tuple[ProviderDefinition, ...] = (
     ProviderDefinition(
         provider_id="youtube_music",
         name="YouTube Music",
+        catalog_size="ca. 100 Mio. Titel",
         status="unsupported",
         status_text="Aktuell nicht unterstützt",
         tooltip=(

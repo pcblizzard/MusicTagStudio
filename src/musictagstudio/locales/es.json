@@ -787,5 +787,7 @@
   "auth_conf_medium": "media",
   "auth_conf_low": "baja",
   "exact_album_gain": "Calcular la ganancia de álbum con precisión",
-  "exact_album_gain_tip": "Desactivado: la ganancia de álbum se deriva rápidamente de los valores de pista (el pico de álbum es exacto, la ganancia difiere < ~0,5 dB). Activado: el álbum completo se mide adicionalmente de una vez: máxima precisión, pero mucho más lento."
+  "exact_album_gain_tip": "Desactivado: la ganancia de álbum se deriva rápidamente de los valores de pista (el pico de álbum es exacto, la ganancia difiere < ~0,5 dB). Activado: el álbum completo se mide adicionalmente de una vez: máxima precisión, pero mucho más lento.",
+  "catalog_size_tip": "Tamaño aproximado del catálogo/base de datos (orden de magnitud, varía con el tiempo).",
+  "online_catalog_sizes": "Discogs: ~18 mill. lanzamientos · AcoustID: ~90 mill. huellas"
 }
