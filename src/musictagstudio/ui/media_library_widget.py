@@ -4216,7 +4216,9 @@ class MediaLibraryWidget(QWidget):
         if not terms:
             return
         tld = _amazon_tld(self._purchase_country())
-        url = f"https://www.amazon.{tld}/s?" + urlencode({"k": terms})
+        # i=popular -> Suche auf die Musik-Abteilung (CDs/Vinyl) beschränken,
+        # sonst mischen sich fachfremde Treffer (z. B. Campingstühle) darunter.
+        url = f"https://www.amazon.{tld}/s?" + urlencode({"k": terms, "i": "popular"})
         webbrowser.open(url)
 
     def _purchase_country(self) -> str:
