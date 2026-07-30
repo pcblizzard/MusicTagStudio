@@ -1,3 +1,22 @@
+# MusicTagStudio 0.8.6-alpha29
+
+## BPM & Favoriten
+
+- **BPM-Erkennung als Tag**: neuer Knopf „BPM erkennen" ermittelt das Tempo
+  markierter (oder aller) Titel parallel und speichert es als Tag (FLAC/Vorbis,
+  MP3 `TBPM`, MP4 `tmpo`) – über den Verlauf rückgängig machbar.
+- **BPM-Filter** in der Tagger-Filterleiste: zeigt nur Titel mit einer BPM (±3),
+  z. B. „alles um 95 BPM".
+- **Favoriten-Filter** („nur Favoriten") – kombinierbar mit Text/Genre/Künstler/
+  BPM.
+
+## Kleinigkeiten
+
+- Kauf-Hinweis („Nach der Zahlung …") deutlich lesbarer.
+- Sichtbarer Hinweis unter „Album Gain exakt berechnen", dass die Option länger
+  dauert.
+
+
 # MusicTagStudio 0.8.6-alpha28
 
 ## Konvertierung & exakte TIDAL-Qualität
