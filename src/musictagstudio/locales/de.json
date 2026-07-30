@@ -895,5 +895,7 @@
   "isrc_enriching": "Tags werden über ISRC nachgeschlagen …",
   "isrc_enriched": "{count} Titel über die ISRC ergänzt.",
   "isrc_no_isrc": "Kein ausgewählter Titel hat eine ISRC hinterlegt. Ohne ISRC ist keine exakte Anreicherung möglich.",
-  "hist_isrc_enrich": "ISRC-Anreicherung"
+  "hist_isrc_enrich": "ISRC-Anreicherung",
+  "edition_digital": "Digital",
+  "edition_streaming_hint": "Streaming-Edition ({provider}). Trackliste über „Auf Dienst öffnen“."
 }

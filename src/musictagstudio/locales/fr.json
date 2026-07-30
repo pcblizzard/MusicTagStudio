@@ -895,5 +895,7 @@
   "isrc_enriching": "Recherche des tags par ISRC …",
   "isrc_enriched": "{count} titres enrichis via l'ISRC.",
   "isrc_no_isrc": "Aucun des titres sélectionnés n'a d'ISRC. Sans ISRC, aucun enrichissement exact n'est possible.",
-  "hist_isrc_enrich": "Enrichissement par ISRC"
+  "hist_isrc_enrich": "Enrichissement par ISRC",
+  "edition_digital": "Numérique",
+  "edition_streaming_hint": "Édition streaming ({provider}). Liste des titres via «Ouvrir sur le service»."
 }

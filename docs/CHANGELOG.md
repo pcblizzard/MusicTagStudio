@@ -2,6 +2,12 @@
 
 ## Neue Werkzeuge
 
+- **Streaming-Anbieter als zusätzliche Editionen**: „Streaming prüfen" trägt
+  gefundene Alben von Deezer, Apple Music, TIDAL und Spotify jetzt zusätzlich in
+  die Editionsliste ein (mit Anbieter-Kennzeichnung, Trackzahl und – wo geliefert
+  – Qualität). So erscheinen auch digitale Premium-/Deluxe-Fassungen, die
+  MusicBrainz/Discogs nicht katalogisiert haben. Dubletten zu vorhandenen
+  Editionen (gleicher Kern-Titel + Trackzahl) werden ausgelassen.
 - **ISRC-Anreicherung**: neuer Batch, der fehlende Tags (Genre/Jahr/Label/
   Komponist …) exakt über die ISRC bei MusicBrainz und Deezer nachschlägt und
   nur leere Felder füllt.

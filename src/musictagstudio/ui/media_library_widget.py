@@ -241,6 +241,61 @@ _STATUS_DOT_COLORS: dict[str, str] = {
     "Nein": "#9aa0a6",
 }
 
+# Anzeigenamen der Streaming-Anbieter für als Editionen eingeblendete Treffer.
+_STREAMING_EDITION_LABELS: dict[str, str] = {
+    "deezer": "Deezer",
+    "apple_music": "Apple Music",
+    "tidal": "TIDAL",
+    "spotify": "Spotify",
+}
+
+
+def build_streaming_editions(
+    results,
+    base_editions,
+    *,
+    fallback_title: str,
+    digital_label: str,
+) -> list[Edition]:
+    """Baut zusätzliche :class:`Edition`-Einträge aus Streaming-Treffern.
+
+    Nur AVAILABLE-Treffer bekannter Anbieter; ein Treffer wird ausgelassen, wenn
+    bereits eine (Basis-)Edition mit gleichem Kern-Titel UND gleicher Trackzahl
+    existiert (Dublette). Reine Funktion -> ohne UI testbar.
+    """
+    base_keys = {
+        (_album_match_key(edition.title), edition.track_count)
+        for edition in base_editions
+    }
+    editions: list[Edition] = []
+    seen: set[tuple] = set()
+    for provider, availability in results.items():
+        if availability.status is not AvailabilityStatus.AVAILABLE:
+            continue
+        if provider not in _STREAMING_EDITION_LABELS:
+            continue
+        key = (_album_match_key(availability.album), availability.track_count)
+        if key in base_keys or (provider, key) in seen:
+            continue
+        seen.add((provider, key))
+        editions.append(
+            Edition(
+                release_id=f"{provider}:{availability.external_id}",
+                title=availability.album or fallback_title,
+                date=str(availability.year or ""),
+                country=(
+                    availability.country.upper() if availability.country else ""
+                ),
+                format=availability.quality or digital_label,
+                medium_count=1,
+                track_count=availability.track_count,
+                source=provider,
+                external_url=availability.external_url,
+                badges=(availability.quality,) if availability.quality else (),
+            )
+        )
+    return editions
+
 
 def _status_dot_icon(status: str) -> QIcon:
     """Farbiger Statuspunkt (Ampel-Ersatz) – hell genug zum Erkennen."""
@@ -562,6 +617,11 @@ class MediaLibraryWidget(QWidget):
         ] = {}
         self._provider_streaming_errors: dict[str, dict[str, str]] = {}
         self._streaming_checked_at: dict[str, datetime] = {}
+        # Editionen aus MB/Discogs (Basis) getrennt von den zusätzlichen
+        # Streaming-Editionen (Deezer/Apple/TIDAL/Spotify), damit ein späterer
+        # Editions-Reload die Streaming-Einträge nicht wegwirft.
+        self._base_editions: list[Edition] = []
+        self._streaming_editions_by_group: dict[str, list[Edition]] = {}
         # Zuletzt ermittelte lokale Qualität (HTML) der aktuellen Veröffentlichung;
         # die Qualitätszeile kombiniert sie mit der TIDAL-Streaming-Qualität.
         self._quality_local_text = ""
@@ -2470,7 +2530,7 @@ class MediaLibraryWidget(QWidget):
 
     def _load_group(self, group: ReleaseGroup) -> None:
         self.track_panel.show()
-        self.current_group=group; self.current_tracks=[]; self.editions=[]; self.edition_combo.clear(); self.track_table.setRowCount(0)
+        self.current_group=group; self.current_tracks=[]; self.editions=[]; self._base_editions=[]; self.edition_combo.clear(); self.track_table.setRowCount(0)
         self.preview_player.stop(); self._preview_token += 1; self._playing_preview_row = -1; self.track_preview_buttons = []; self.track_preview_urls = []; self._row_is_local = []
         self._cover_generation += 1; self._show_cover(None); self.group_title.setText(group.title)
         self.prerelease_chip.hide(); self.prerelease_chip.clear()
@@ -2780,51 +2840,64 @@ class MediaLibraryWidget(QWidget):
                 or self.current_group.release_group_id != release_group_id
             ):
                 return
-        self.editions = list(
-            editions
+        self._base_editions = list(editions)
+        self._render_editions()
+
+    def _current_group_id(self) -> str:
+        return (
+            self.current_group.release_group_id
+            if self.current_group is not None
+            else ""
         )
-        self.edition_combo.blockSignals(
-            True
+
+    def _render_editions(self) -> None:
+        """Baut die Editions-Combo aus Basis- + Streaming-Editionen neu auf."""
+        streaming = self._streaming_editions_by_group.get(
+            self._current_group_id(), []
         )
+        self.editions = [*self._base_editions, *streaming]
+
+        self.edition_combo.blockSignals(True)
         self.edition_combo.clear()
 
         for edition in self.editions:
             details = [
-                edition.date
-                or tr("edition_no_date", self.language),
-                edition.country
-                or tr("edition_no_country", self.language),
+                edition.date or tr("edition_no_date", self.language),
+                edition.country or tr("edition_no_country", self.language),
                 tr("edition_cds", self.language, count=edition.medium_count),
                 tr("edition_tracks", self.language, count=edition.track_count),
             ]
-
             if edition.format:
-                details.append(
-                    edition.format
-                )
+                details.append(edition.format)
 
-            self.edition_combo.addItem(
-                f"{edition.title} · "
-                + " · ".join(
-                    details
-                )
-            )
+            label = f"{edition.title} · " + " · ".join(details)
+            # Streaming-Editionen mit Anbieter kennzeichnen (sonst nicht
+            # unterscheidbar von MB/Discogs-Editionen).
+            provider_label = _STREAMING_EDITION_LABELS.get(edition.source, "")
+            if provider_label:
+                label = f"[{provider_label}] {label}"
+            self.edition_combo.addItem(label)
 
-        self.edition_combo.blockSignals(
-            False
-        )
+        self.edition_combo.blockSignals(False)
 
         if self.editions:
-            self.edition_combo.setCurrentIndex(
-                0
-            )
-            self._edition_selected(
-                0
-            )
+            self.edition_combo.setCurrentIndex(0)
+            self._edition_selected(0)
         else:
-            self.edition_details.setText(
-                tr("no_editions", self.language)
-            )
+            self.edition_details.setText(tr("no_editions", self.language))
+
+    def _merge_streaming_editions(self, group_id: str, report) -> None:
+        """Wandelt gefundene Streaming-Alben in zusätzliche Editionen um."""
+        fallback = self.current_group.title if self.current_group else ""
+        editions = build_streaming_editions(
+            report.results,
+            self._base_editions,
+            fallback_title=fallback,
+            digital_label=tr("edition_digital", self.language),
+        )
+        self._streaming_editions_by_group[group_id] = editions
+        if group_id == self._current_group_id():
+            self._render_editions()
 
     def _edition_selected(
         self,
@@ -2862,6 +2935,19 @@ class MediaLibraryWidget(QWidget):
         self._load_edition_cover(
             edition
         )
+        # Streaming-Editionen (Deezer/Apple/TIDAL/Spotify): keine MB-Trackliste
+        # abrufen (release_id ist anbieterspezifisch). Tracks gibt es beim
+        # Anbieter selbst – Hinweis + „Auf Dienst öffnen" genügen.
+        if edition.source in _STREAMING_EDITION_LABELS:
+            self.current_tracks = []
+            self._set_status(
+                tr(
+                    "edition_streaming_hint",
+                    self.language,
+                    provider=_STREAMING_EDITION_LABELS[edition.source],
+                )
+            )
+            return
         self._set_status(
             tr("tracklist_loading", self.language)
         )
@@ -3551,6 +3637,7 @@ class MediaLibraryWidget(QWidget):
         for availability in report.results.values():
             self.streaming_cache.put(availability)
         self._apply_provider_buttons(report.results)
+        self._merge_streaming_editions(group_id, report)
         # TIDAL-Qualität (falls vorhanden) neben der lokalen Qualität zeigen.
         self._refresh_quality_status()
 

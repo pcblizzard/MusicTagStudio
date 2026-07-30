@@ -895,5 +895,7 @@
   "isrc_enriching": "Looking up tags by ISRC …",
   "isrc_enriched": "{count} tracks enriched via ISRC.",
   "isrc_no_isrc": "None of the selected tracks has an ISRC. Without an ISRC no exact enrichment is possible.",
-  "hist_isrc_enrich": "ISRC enrichment"
+  "hist_isrc_enrich": "ISRC enrichment",
+  "edition_digital": "Digital",
+  "edition_streaming_hint": "Streaming edition ({provider}). Tracklist via “Open on service”."
 }

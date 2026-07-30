@@ -895,5 +895,7 @@
   "isrc_enriching": "Buscando etiquetas por ISRC …",
   "isrc_enriched": "{count} pistas enriquecidas mediante ISRC.",
   "isrc_no_isrc": "Ninguna de las pistas seleccionadas tiene ISRC. Sin ISRC no es posible un enriquecimiento exacto.",
-  "hist_isrc_enrich": "Enriquecimiento por ISRC"
+  "hist_isrc_enrich": "Enriquecimiento por ISRC",
+  "edition_digital": "Digital",
+  "edition_streaming_hint": "Edición de streaming ({provider}). Lista de pistas mediante «Abrir en el servicio»."
 }
