@@ -44,6 +44,35 @@ class Authenticity:
     message_key: str
     cutoff_hz: float | None = None
     confidence: str = "medium"  # high | medium | low
+    # Geschätzte Bitrate der (verlustbehafteten) Ursprungsquelle in kbit/s,
+    # abgeleitet aus dem Frequenzschnitt. 0 = keine Schätzung.
+    estimated_source_kbps: int = 0
+
+
+# Typischer Lowpass gängiger MP3-/AAC-Encoder je Bitrate (LAME-Defaults):
+# (obere Schnittgrenze in Hz, geschätzte Bitrate in kbit/s). Aufsteigend.
+_LOSSY_LOWPASS_BANDS = (
+    (11_500, 96),
+    (16_000, 128),
+    (17_500, 160),
+    (19_000, 192),
+    (20_000, 256),
+    (20_500, 320),
+)
+
+
+def estimate_source_bitrate(cutoff_hz: float | None) -> int:
+    """Schätzt die Bitrate einer verlustbehafteten Quelle aus dem Schnitt.
+
+    Gibt eine gerundete kbit/s-Schätzung zurück oder 0, wenn der Schnitt für
+    eine verlustbehaftete Quelle zu hoch liegt (praktisch volles Band).
+    """
+    if cutoff_hz is None or cutoff_hz <= 0:
+        return 0
+    for edge, kbps in _LOSSY_LOWPASS_BANDS:
+        if cutoff_hz <= edge:
+            return kbps
+    return 0  # Schnitt > ~20,5 kHz -> kein typischer Lossy-Lowpass
 
 
 def is_lossless_codec(codec: str) -> bool:
@@ -95,6 +124,8 @@ def assess(
         return Authenticity("unknown", "auth_unknown", spectral_cutoff_hz, "low")
 
     confidence = _brickwall_confidence(shelf_db, steepness_db)
+    # Bitraten-Schätzung der mutmaßlichen Lossy-Quelle (0 = kein Lowpass-Muster).
+    kbps = estimate_source_bitrate(spectral_cutoff_hz)
 
     # Als Hi-Res deklariert -> es sollte Inhalt oberhalb der CD-Grenze geben.
     if sample_rate >= _HIRES_RATE:
@@ -117,22 +148,26 @@ def assess(
     if spectral_cutoff_hz <= _MP3_CUTOFF:
         if confidence in ("high", "medium"):
             return Authenticity(
-                "fake", "auth_suspect_mp3", spectral_cutoff_hz, confidence
+                "fake", "auth_suspect_mp3", spectral_cutoff_hz, confidence, kbps
             )
         return Authenticity(
-            "suspect", "auth_suspect_lossy", spectral_cutoff_hz, "low"
+            "suspect", "auth_suspect_lossy", spectral_cutoff_hz, "low", kbps
         )
     if spectral_cutoff_hz <= _LOSSY_CUTOFF:
         # Grenzbereich: nur bei klarer Brickwall überhaupt „Fake".
         if confidence == "high":
             return Authenticity(
-                "fake", "auth_suspect_mp3", spectral_cutoff_hz, "high"
+                "fake", "auth_suspect_mp3", spectral_cutoff_hz, "high", kbps
             )
         level = "suspect" if confidence == "medium" else "genuine"
         key = (
             "auth_suspect_lossy" if level == "suspect" else "auth_genuine_lossless"
         )
-        return Authenticity(level, key, spectral_cutoff_hz, confidence)
+        # Bitraten-Schätzung nur nennen, wenn wir tatsächlich Verdacht schöpfen.
+        return Authenticity(
+            level, key, spectral_cutoff_hz, confidence,
+            kbps if level == "suspect" else 0,
+        )
     return Authenticity(
         "genuine", "auth_genuine_lossless", spectral_cutoff_hz, "high"
     )

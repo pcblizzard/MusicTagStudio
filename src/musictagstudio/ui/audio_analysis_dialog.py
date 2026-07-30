@@ -1901,6 +1901,11 @@ def _authenticity_banner(result: AudioAnalysisResult, language: str) -> str:
     )
     cutoff = result.spectral_cutoff_text or "–"
     message = tr(verdict.message_key, language, cutoff=cutoff)
+    # Geschätzte Quell-Bitrate der mutmaßlichen Lossy-Quelle anhängen.
+    if verdict.estimated_source_kbps:
+        message += " · " + tr(
+            "auth_source_estimate", language, kbps=verdict.estimated_source_kbps
+        )
     # Konfidenz nur zeigen, wo eine Warnung fällt (nicht bei „unauffällig").
     if verdict.level in ("fake", "suspect"):
         confidence = tr(f"auth_conf_{verdict.confidence}", language)

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from musictagstudio.audio_analysis.authenticity import assess, is_lossless_codec
+from musictagstudio.audio_analysis.authenticity import (
+    assess,
+    estimate_source_bitrate,
+    is_lossless_codec,
+)
 
 # Kantenformen: künstliche Brickwall vs. natürlicher Abfall.
 _BRICKWALL = {"shelf_db": -110.0, "steepness_db": 80.0}  # steil + digitale Stille
@@ -105,3 +109,28 @@ def test_pcm_and_alac_are_lossless():
     assert is_lossless_codec("pcm_s24le")
     assert is_lossless_codec("alac")
     assert not is_lossless_codec("aac")
+
+
+def test_source_bitrate_bands():
+    assert estimate_source_bitrate(16000.0) == 128
+    assert estimate_source_bitrate(19000.0) == 192
+    assert estimate_source_bitrate(20500.0) == 320
+    assert estimate_source_bitrate(10000.0) == 96
+    # Voller Frequenzumfang -> kein typischer Lossy-Lowpass.
+    assert estimate_source_bitrate(21500.0) == 0
+    assert estimate_source_bitrate(None) == 0
+    assert estimate_source_bitrate(0) == 0
+
+
+def test_fake_mp3_carries_bitrate_estimate():
+    v = assess(
+        codec="flac", sample_rate=44100, spectral_cutoff_hz=16000.0, **_BRICKWALL
+    )
+    assert v.level == "fake"
+    assert v.estimated_source_kbps == 128
+
+
+def test_genuine_lossless_has_no_bitrate_estimate():
+    v = assess(codec="flac", sample_rate=44100, spectral_cutoff_hz=21500.0)
+    assert v.level == "genuine"
+    assert v.estimated_source_kbps == 0

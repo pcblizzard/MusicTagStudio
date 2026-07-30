@@ -888,5 +888,6 @@
   "filter_playing": "Reproduzindo {count} faixas.",
   "analysis_multiprocess": "Analisar em vários processos (experimental)",
   "analysis_multiprocess_tip": "Usa processos reais do sistema operacional em vez de threads, contornando o GIL do Python para maior uso da CPU.",
-  "analysis_multiprocess_hint": "Aviso: pode causar instabilidade ou falhas na análise em alguns sistemas. Além disso, cada processo inicia seu próprio interpretador (sobrecarga): com poucos arquivos ou arquivos curtos costuma ser mais lento que threads; o ganho só aparece com muitos arquivos grandes. Por isso threads são o padrão. Deixe desativado em caso de dúvida."
+  "analysis_multiprocess_hint": "Aviso: pode causar instabilidade ou falhas na análise em alguns sistemas. Além disso, cada processo inicia seu próprio interpretador (sobrecarga): com poucos arquivos ou arquivos curtos costuma ser mais lento que threads; o ganho só aparece com muitos arquivos grandes. Por isso threads são o padrão. Deixe desativado em caso de dúvida.",
+  "auth_source_estimate": "provavelmente de uma fonte com perdas (~{kbps} kbit/s)"
 }

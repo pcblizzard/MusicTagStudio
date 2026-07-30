@@ -888,5 +888,6 @@
   "filter_playing": "Lecture de {count} titres.",
   "analysis_multiprocess": "Analyser sur plusieurs processus (expérimental)",
   "analysis_multiprocess_tip": "Utilise de vrais processus du système d'exploitation au lieu de threads, contournant le GIL de Python pour une utilisation CPU accrue.",
-  "analysis_multiprocess_hint": "Attention : peut provoquer une instabilité ou des plantages de l'analyse sur certains systèmes. De plus, chaque processus démarre son propre interpréteur (surcoût) : pour peu de fichiers ou des fichiers courts, c'est souvent plus lent que les threads ; le gain n'apparaît qu'avec de nombreux gros fichiers. C'est pourquoi les threads sont la valeur par défaut. Laissez désactivé en cas de doute."
+  "analysis_multiprocess_hint": "Attention : peut provoquer une instabilité ou des plantages de l'analyse sur certains systèmes. De plus, chaque processus démarre son propre interpréteur (surcoût) : pour peu de fichiers ou des fichiers courts, c'est souvent plus lent que les threads ; le gain n'apparaît qu'avec de nombreux gros fichiers. C'est pourquoi les threads sont la valeur par défaut. Laissez désactivé en cas de doute.",
+  "auth_source_estimate": "probablement issu d'une source avec perte (~{kbps} kbit/s)"
 }
