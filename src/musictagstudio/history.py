@@ -51,6 +51,15 @@ class HistoryEntry:
     moves: tuple[tuple[str, str], ...] = ()
 
 
+@dataclass(frozen=True)
+class FileChanges:
+    """Was sich an einer Datei geändert hat – für den Report/Diff."""
+    path: str
+    field_changes: tuple[tuple[str, str, str], ...] = ()  # (Feld, alt, neu)
+    cover_changed: bool = False
+    rename: tuple[str, str] | None = None  # (alt, neu)
+
+
 class HistoryManager:
     """Undo/Redo mit schlanken Tag-/Cover-Schnappschüssen.
 
@@ -78,8 +87,85 @@ class HistoryManager:
         self.max_entries = max(1, int(max_entries))
         self.undo_stack: list[HistoryEntry] = []
         self.redo_stack: list[HistoryEntry] = []
-        # Beim Start alte Vorgänge früherer Sitzungen aufräumen.
+        # Vorgänge früherer Sitzungen von der Platte laden, damit Undo auch nach
+        # einem Neustart funktioniert, DANN aufräumen (geladene bleiben aktiv).
+        self.load_persisted()
         self._prune()
+
+    def load_persisted(self) -> None:
+        """Baut den Undo-Stack aus den auf der Platte liegenden Manifesten auf.
+
+        So bleiben abgeschlossene Vorgänge über einen Neustart hinweg
+        rückgängig machbar (die Vorher-Schnappschüsse liegen ohnehin auf Platte).
+        Chronologisch (ältester zuerst), damit die Stack-Reihenfolge stimmt.
+        """
+        if not self.root.is_dir():
+            return
+        entries: list[HistoryEntry] = []
+        for directory in sorted(
+            (p for p in self.root.iterdir() if p.is_dir() and p.name != "blobs"),
+            key=lambda p: p.name,
+        ):
+            manifest = directory / "manifest.json"
+            if not manifest.is_file():
+                continue
+            try:
+                data = json.loads(manifest.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not data.get("committed"):
+                continue  # abgebrochene/unbestätigte Vorgänge nicht laden
+            entries.append(
+                HistoryEntry(
+                    entry_id=str(data.get("entry_id", directory.name)),
+                    description=str(data.get("description", "")),
+                    created_at=str(data.get("created_at", "")),
+                    files=tuple(data.get("files", [])),
+                    committed=True,
+                    moves=tuple(tuple(pair) for pair in data.get("moves", [])),
+                )
+            )
+        self.undo_stack = entries
+
+    def describe_changes(self, entry: HistoryEntry) -> list[FileChanges]:
+        """Feldgenaue Änderungen eines Vorgangs (vorher→nachher) für den Report."""
+        if entry.moves:
+            return [
+                FileChanges(path=new, rename=(old, new))
+                for old, new in entry.moves
+            ]
+
+        before = self._read_snapshot_map(entry.entry_id, "before.json")
+        after = self._read_snapshot_map(entry.entry_id, "after.json")
+        result: list[FileChanges] = []
+        for path in entry.files:
+            b = before.get(path, {})
+            a = after.get(path, {})
+            field_changes = tuple(
+                (name, str(b.get("tags", {}).get(name, "")),
+                 str(a.get("tags", {}).get(name, "")))
+                for name in _TAG_FIELDS
+                if str(b.get("tags", {}).get(name, ""))
+                != str(a.get("tags", {}).get(name, ""))
+            )
+            cover_changed = bool(a) and b.get("cover") != a.get("cover")
+            if field_changes or cover_changed:
+                result.append(
+                    FileChanges(
+                        path=path,
+                        field_changes=field_changes,
+                        cover_changed=cover_changed,
+                    )
+                )
+        return result
+
+    def _read_snapshot_map(self, entry_id: str, name: str) -> dict[str, dict]:
+        path = self.root / entry_id / name
+        try:
+            snapshot = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return {item["path"]: item for item in snapshot if "path" in item}
 
     @property
     def can_undo(self) -> bool:

@@ -804,5 +804,12 @@
   "dup_delete_btn": "Mover seleccionados a la papelera",
   "dup_delete_confirm": "¿Mover {count} archivo(s) a la papelera?",
   "dup_deleted": "Se movieron {count} archivo(s) a la papelera.",
-  "dup_scan_first": "Primero escanea tu música (inicio/fuentes), luego busca duplicados aquí."
+  "dup_scan_first": "Primero escanea tu música (inicio/fuentes), luego busca duplicados aquí.",
+  "history_col_field": "Campo",
+  "history_col_before": "Antes",
+  "history_col_after": "Después",
+  "history_select_entry": "Selecciona una entrada a la izquierda para ver los cambios.",
+  "history_no_changes": "No se registraron cambios de campo.",
+  "history_rename": "Renombrado",
+  "history_cover": "Portada cambiada"
 }

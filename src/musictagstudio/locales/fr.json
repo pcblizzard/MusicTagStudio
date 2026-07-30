@@ -804,5 +804,12 @@
   "dup_delete_btn": "Déplacer la sélection vers la corbeille",
   "dup_delete_confirm": "Déplacer {count} fichier(s) vers la corbeille ?",
   "dup_deleted": "{count} fichier(s) déplacé(s) vers la corbeille.",
-  "dup_scan_first": "Analysez d'abord votre musique (accueil/sources), puis recherchez les doublons ici."
+  "dup_scan_first": "Analysez d'abord votre musique (accueil/sources), puis recherchez les doublons ici.",
+  "history_col_field": "Champ",
+  "history_col_before": "Avant",
+  "history_col_after": "Après",
+  "history_select_entry": "Sélectionnez une entrée à gauche pour voir les modifications.",
+  "history_no_changes": "Aucune modification de champ enregistrée.",
+  "history_rename": "Renommé",
+  "history_cover": "Pochette modifiée"
 }

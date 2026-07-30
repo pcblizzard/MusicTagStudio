@@ -804,5 +804,12 @@
   "dup_delete_btn": "Move selected to recycle bin",
   "dup_delete_confirm": "Move {count} file(s) to the recycle bin?",
   "dup_deleted": "Moved {count} file(s) to the recycle bin.",
-  "dup_scan_first": "Scan your music first (home/sources), then search for duplicates here."
+  "dup_scan_first": "Scan your music first (home/sources), then search for duplicates here.",
+  "history_col_field": "Field",
+  "history_col_before": "Before",
+  "history_col_after": "After",
+  "history_select_entry": "Select an entry on the left to see the changes.",
+  "history_no_changes": "No field changes recorded.",
+  "history_rename": "Renamed",
+  "history_cover": "Cover changed"
 }

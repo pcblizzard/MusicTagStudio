@@ -804,5 +804,12 @@
   "dup_delete_btn": "Sposta selezionati nel cestino",
   "dup_delete_confirm": "Spostare {count} file nel cestino?",
   "dup_deleted": "{count} file spostati nel cestino.",
-  "dup_scan_first": "Prima scansiona la musica (home/sorgenti), poi cerca i duplicati qui."
+  "dup_scan_first": "Prima scansiona la musica (home/sorgenti), poi cerca i duplicati qui.",
+  "history_col_field": "Campo",
+  "history_col_before": "Prima",
+  "history_col_after": "Dopo",
+  "history_select_entry": "Seleziona una voce a sinistra per vedere le modifiche.",
+  "history_no_changes": "Nessuna modifica di campo registrata.",
+  "history_rename": "Rinominato",
+  "history_cover": "Copertina modificata"
 }

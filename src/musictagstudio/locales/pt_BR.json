@@ -804,5 +804,12 @@
   "dup_delete_btn": "Mover selecionados para a lixeira",
   "dup_delete_confirm": "Mover {count} arquivo(s) para a lixeira?",
   "dup_deleted": "{count} arquivo(s) movido(s) para a lixeira.",
-  "dup_scan_first": "Primeiro escaneie sua música (início/fontes), depois procure duplicados aqui."
+  "dup_scan_first": "Primeiro escaneie sua música (início/fontes), depois procure duplicados aqui.",
+  "history_col_field": "Campo",
+  "history_col_before": "Antes",
+  "history_col_after": "Depois",
+  "history_select_entry": "Selecione uma entrada à esquerda para ver as alterações.",
+  "history_no_changes": "Nenhuma alteração de campo registrada.",
+  "history_rename": "Renomeado",
+  "history_cover": "Capa alterada"
 }

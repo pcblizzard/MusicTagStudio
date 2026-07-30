@@ -804,5 +804,12 @@
   "dup_delete_btn": "Markierte in den Papierkorb",
   "dup_delete_confirm": "{count} Datei(en) in den Papierkorb verschieben?",
   "dup_deleted": "{count} Datei(en) in den Papierkorb verschoben.",
-  "dup_scan_first": "Zuerst Musik scannen (Startseite/Quellen), dann hier Duplikate suchen."
+  "dup_scan_first": "Zuerst Musik scannen (Startseite/Quellen), dann hier Duplikate suchen.",
+  "history_col_field": "Feld",
+  "history_col_before": "Vorher",
+  "history_col_after": "Nachher",
+  "history_select_entry": "Vorgang links wählen, um die Änderungen zu sehen.",
+  "history_no_changes": "Keine Feldänderungen aufgezeichnet.",
+  "history_rename": "Umbenannt",
+  "history_cover": "Cover geändert"
 }

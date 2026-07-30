@@ -1711,6 +1711,7 @@ class MainWindow(QMainWindow):
             self.history.entries(),
             self,
             language=self.language,
+            describe=self.history.describe_changes,
         ).exec()
 
     def _preview_changes(
