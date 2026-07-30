@@ -43,10 +43,10 @@ class PurchaseOption:
 
 # ----- HIER die PayPal-Button-IDs (und optional Preise) eintragen ------------
 PURCHASE_OPTIONS: tuple[PurchaseOption, ...] = (
-    PurchaseOption("premium_buy_1m", months=1, hosted_button_id="", price=""),
-    PurchaseOption("premium_buy_6m", months=6, hosted_button_id="", price=""),
-    PurchaseOption("premium_buy_12m", months=12, hosted_button_id="", price=""),
-    PurchaseOption("premium_buy_lifetime", months=None, hosted_button_id="", price=""),
+    PurchaseOption("premium_buy_1m", months=1, hosted_button_id="9PE4JGY38MCK8", price="4,99 €"),
+    PurchaseOption("premium_buy_6m", months=6, hosted_button_id="VD8SMRYKTD8KA", price="24,99 €"),
+    PurchaseOption("premium_buy_12m", months=12, hosted_button_id="8KSWSDVA366YQ", price="39,99 €"),
+    PurchaseOption("premium_buy_lifetime", months=None, hosted_button_id="Y4KX548KAPVB4", price="149,99 €"),
 )
 
 

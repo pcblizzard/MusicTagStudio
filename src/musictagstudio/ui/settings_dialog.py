@@ -806,6 +806,10 @@ class SettingsDialog(QDialog):
         self._check_license_online()
         license_page.addWidget(license_box)
 
+        purchase_box = self._build_purchase_box(language)
+        if purchase_box is not None:
+            license_page.addWidget(purchase_box)
+
         for page in (
             appearance_page,
             library_page,
@@ -846,6 +850,37 @@ class SettingsDialog(QDialog):
         """Wechselt zum Lizenz-Reiter und fokussiert das Schlüsselfeld."""
         self.settings_tabs.setCurrentIndex(self._license_tab_index)
         self.license_key_edit.setFocus()
+
+    def _build_purchase_box(self, language: str) -> QGroupBox | None:
+        """Kauf-Buttons je Laufzeit (nur eingerichtete PayPal-Buttons)."""
+        from ..purchase import configured_options
+
+        options = configured_options()
+        if not options:
+            return None
+
+        box = QGroupBox(tr("premium_buy_heading", language))
+        layout = QVBoxLayout(box)
+
+        buttons_row = QHBoxLayout()
+        for option in options:
+            label = tr(option.label_key, language)
+            if option.price:
+                label = f"{label} · {option.price}"
+            button = QPushButton(label)
+            button.clicked.connect(
+                lambda _checked=False, url=option.url: QDesktopServices.openUrl(
+                    QUrl(url)
+                )
+            )
+            buttons_row.addWidget(button)
+        layout.addLayout(buttons_row)
+
+        hint = QLabel(tr("premium_buy_hint", language))
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        layout.addWidget(hint)
+        return box
 
     def _add_settings_tab(self, title: str) -> QVBoxLayout:
         """Legt einen scrollbaren Reiter an und gibt dessen Layout zurück."""
