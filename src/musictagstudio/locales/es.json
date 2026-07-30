@@ -855,5 +855,10 @@
   "quality_stats_summary": "{readable} de {total} legibles · {lossless} sin pérdida ({percent}%) · {lossy} con pérdida",
   "quality_stats_codecs": "Códecs",
   "quality_stats_bitdepth": "Profundidades de bits",
-  "quality_stats_rates": "Frecuencias de muestreo"
+  "quality_stats_rates": "Frecuencias de muestreo",
+  "playback": "Reproducción",
+  "now_playing_none": "Ninguna pista cargada",
+  "now_playing_bpm": "{bpm} BPM",
+  "now_playing_bpm_wait": "BPM …",
+  "now_playing_detach": "Separar"
 }

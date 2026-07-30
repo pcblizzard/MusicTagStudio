@@ -78,6 +78,12 @@ _ICONS: dict[str, str] = {
         '<path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/>'
         '<path d="m9 12 2 2 4-4"/></g>'
     ),
+    "nav_play": (
+        '<g fill="none" stroke="{color}" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<circle cx="12" cy="12" r="9"/>'
+        '<path d="M10 9v6l5-3z" fill="{color}"/></g>'
+    ),
     "nav_duplicates": (
         '<g fill="none" stroke="{color}" stroke-width="1.8" '
         'stroke-linecap="round" stroke-linejoin="round">'

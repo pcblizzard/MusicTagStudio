@@ -114,6 +114,7 @@ from .direct_album_dialog import DirectAlbumDialog
 from .audio_analysis_dialog import AudioAnalysisDialog
 from .duplicates_dialog import DuplicatesDialog
 from .convert_dialog import ConversionDialog
+from .now_playing_widget import NowPlayingWidget
 from .batch_cover_dialog import BatchCoverDialog
 from .library_audit_dialog import LibraryAuditDialog
 from .change_preview_dialog import ChangePreviewDialog
@@ -842,6 +843,7 @@ class MainWindow(QMainWindow):
             ("audio_analysis", 2, "nav_analysis"),
             ("library_audit", 3, "nav_audit"),
             ("duplicates", 6, "nav_duplicates"),
+            ("playback", 7, "nav_play"),
         )
 
         nav_color = self.palette().color(
@@ -916,6 +918,17 @@ class MainWindow(QMainWindow):
             stretch=1,
         )
         self.player_bar = PlayerBar(self)
+        # Wiedergabe-Großansicht (Cover/Infos/BPM/Steuerung) an dieselbe Engine
+        # binden und als Workspace (Index 7) hinzufügen.
+        self.now_playing_workspace = NowPlayingWidget(
+            self.player_bar.engine,
+            self,
+            language=self.language,
+        )
+        self.now_playing_workspace.detach_requested.connect(
+            self._detach_now_playing
+        )
+        self.workspace_stack.addWidget(self.now_playing_workspace)
         # Die untere Leiste spiegelt zusätzlich die Track-Vorschau der
         # Medienbibliothek (Titel, Position, ~30 Sek.), ohne die lokale
         # Wiedergabe zu verändern.
@@ -3329,6 +3342,34 @@ class MainWindow(QMainWindow):
             )
         else:
             self.filter_count_label.setText("")
+
+    def _detach_now_playing(self):
+        """Öffnet die Wiedergabe-Ansicht als separates, schwebendes Fenster."""
+        existing = getattr(self, "_now_playing_window", None)
+        if existing is not None:
+            existing.raise_()
+            existing.activateWindow()
+            return
+        window = QWidget()
+        window.setWindowTitle(tr("playback", self.language))
+        window.resize(420, 640)
+        inner = QVBoxLayout(window)
+        inner.setContentsMargins(0, 0, 0, 0)
+        inner.addWidget(
+            NowPlayingWidget(
+                self.player_bar.engine,
+                window,
+                language=self.language,
+                allow_detach=False,
+            )
+        )
+
+        def _clear(_event=None):
+            self._now_playing_window = None
+
+        window.closeEvent = lambda event: (_clear(), event.accept())
+        self._now_playing_window = window
+        window.show()
 
     def convert_selected(self):
         """Öffnet den Konvertierungsdialog für die ausgewählten (oder alle) Titel."""

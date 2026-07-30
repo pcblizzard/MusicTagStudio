@@ -855,5 +855,10 @@
   "quality_stats_summary": "{readable} of {total} readable · {lossless} lossless ({percent}%) · {lossy} lossy",
   "quality_stats_codecs": "Codecs",
   "quality_stats_bitdepth": "Bit depths",
-  "quality_stats_rates": "Sample rates"
+  "quality_stats_rates": "Sample rates",
+  "playback": "Playback",
+  "now_playing_none": "No track loaded",
+  "now_playing_bpm": "{bpm} BPM",
+  "now_playing_bpm_wait": "BPM …",
+  "now_playing_detach": "Detach"
 }
