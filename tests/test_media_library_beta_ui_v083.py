@@ -12,11 +12,11 @@ from musictagstudio.ui.media_library_widget import (
 
 
 def test_local_statuses_have_beta_symbols():
-    assert _local_status_display("Lokal verfügbar") == "🟢 Lokal verfügbar"
+    assert _local_status_display("Lokal verfügbar") == "🟢 Lokal vorhanden"
     assert _local_status_display("Externe Quelle nicht erreichbar") == (
         "🟡 Externe Quelle nicht erreichbar"
     )
-    assert _local_status_display("Nicht vorhanden") == "⚪ Lokal nicht verfügbar"
+    assert _local_status_display("Nicht vorhanden") == "⚪ Lokal nicht vorhanden"
 
 
 def test_status_dot_icons_differ_per_status():

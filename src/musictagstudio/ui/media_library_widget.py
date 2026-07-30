@@ -140,6 +140,7 @@ from ..media_library.presentation import (
     artist_text as _artist_text,
     category as _category,
     discogs_position as _discogs_position,
+    album_match_key as _album_match_key,
     duration as _duration,
     duration_ms as _duration_ms,
     label_artist_statistics as _label_artist_statistics,
@@ -534,6 +535,13 @@ class MediaLibraryWidget(QWidget):
             str,
             str
         ] = {}
+        # Rohtitel je striktem Schlüssel + toleranter Zweit-Index (Editions-/
+        # Artikel-tolerant), damit z. B. "Die Passion Whisky" und
+        # "Passion Whisky (Premium Edition)" als dasselbe Album gelten.
+        self._local_album_titles: dict[str, str] = {}
+        self._local_albums_loose: dict[str, str] = {}
+        self._local_album_files_loose: dict[str, str] = {}
+        self._local_album_status_loose: dict[str, str] = {}
         self.cover_cache_directory = (
             project_root()
             / "cache"
@@ -1125,6 +1133,7 @@ class MediaLibraryWidget(QWidget):
         folders: dict[str, str] = {}
         files: dict[str, str] = {}
         statuses: dict[str, str] = {}
+        titles: dict[str, str] = {}
 
         for album in albums:
             key = _normalized(
@@ -1133,6 +1142,8 @@ class MediaLibraryWidget(QWidget):
 
             if not key:
                 continue
+
+            titles.setdefault(key, album.album)
 
             current = statuses.get(
                 key
@@ -1158,6 +1169,8 @@ class MediaLibraryWidget(QWidget):
         self.local_albums = folders
         self.local_album_files = files
         self.local_album_status = statuses
+        self._local_album_titles = titles
+        self._rebuild_loose_local_index()
         self._refresh_local_markers()
 
     def set_local_songs(
@@ -1174,6 +1187,7 @@ class MediaLibraryWidget(QWidget):
             str
         ] = {}
 
+        titles: dict[str, str] = {}
         for song in songs:
             key = _normalized(
                 song.album
@@ -1191,6 +1205,7 @@ class MediaLibraryWidget(QWidget):
                 album_files[key] = (
                     song.path
                 )
+                titles[key] = song.album
 
         self.local_albums = albums
         self.local_album_files = (
@@ -1200,7 +1215,66 @@ class MediaLibraryWidget(QWidget):
             key: "Lokal verfügbar"
             for key in albums
         }
+        self._local_album_titles = titles
+        self._rebuild_loose_local_index()
         self._refresh_local_markers()
+
+    def _rebuild_loose_local_index(self) -> None:
+        """Zweit-Index mit tolerantem Album-Schlüssel (Editions-/Artikel-tolerant).
+
+        Die primären Dicts sind exakt (``normalized``). Für den Fall, dass sich
+        lokaler und Katalog-Titel nur durch Editionszusatz oder führenden Artikel
+        unterscheiden, spiegeln wir die Einträge zusätzlich unter
+        :func:`album_match_key`. Getrennte Dicts, damit exakte Treffer immer
+        Vorrang haben und die Primär-Dicts unverändert bleiben.
+        """
+        self._local_albums_loose = {}
+        self._local_album_files_loose = {}
+        self._local_album_status_loose = {}
+        # Rückwärts iterieren wäre egal; bei Kollision gewinnt der erste Eintrag.
+        for strict_key, folder in self.local_albums.items():
+            loose = self._loose_key_from_strict(strict_key)
+            if loose and loose not in self._local_albums_loose:
+                self._local_albums_loose[loose] = folder
+        for strict_key, path in self.local_album_files.items():
+            loose = self._loose_key_from_strict(strict_key)
+            if loose and loose not in self._local_album_files_loose:
+                self._local_album_files_loose[loose] = path
+        for strict_key, status in self.local_album_status.items():
+            loose = self._loose_key_from_strict(strict_key)
+            if loose and loose not in self._local_album_status_loose:
+                self._local_album_status_loose[loose] = status
+
+    def _loose_key_from_strict(self, strict_key: str) -> str:
+        """Merkt sich zu jedem strikten Schlüssel den zugehörigen Originaltitel.
+
+        Der strikte Schlüssel ist bereits normalisiert; wir brauchen den
+        Rohtitel, um den toleranten Schlüssel zu bilden. Er steht in
+        ``_local_album_titles``.
+        """
+        title = self._local_album_titles.get(strict_key, "")
+        return _album_match_key(title) if title else ""
+
+    def _local_status_for(self, title: str) -> str:
+        key = _normalized(title)
+        status = self.local_album_status.get(key)
+        if status is None:
+            status = self._local_album_status_loose.get(_album_match_key(title))
+        return status or "Nicht vorhanden"
+
+    def _local_folder_for(self, title: str):
+        key = _normalized(title)
+        folder = self.local_albums.get(key)
+        if folder is None:
+            folder = self._local_albums_loose.get(_album_match_key(title))
+        return folder
+
+    def _local_file_for(self, title: str) -> str:
+        key = _normalized(title)
+        path = self.local_album_files.get(key)
+        if not path:
+            path = self._local_album_files_loose.get(_album_match_key(title), "")
+        return path or ""
 
     def _match_local_index(self, track, songs: list[Song]) -> int:
         """Findet den Index der lokalen Datei zu einem Albumtrack (oder -1).
@@ -2268,10 +2342,7 @@ class MediaLibraryWidget(QWidget):
                 or tr("unknown_artist", self.language)
             )
             local = _local_status_display(
-                self.local_album_status.get(
-                    _normalized(group.title),
-                    "Nicht vorhanden",
-                ),
+                self._local_status_for(group.title),
                 self.language,
             )
             extra = " · ".join([*group.labels[:2],*group.formats[:3]])
@@ -2287,7 +2358,7 @@ class MediaLibraryWidget(QWidget):
         self.release_table.setSortingEnabled(True); self.release_table.resizeColumnsToContents(); self._view_syncing=False
 
     def _load_release_thumbnail(self, row: int, group: ReleaseGroup) -> None:
-        local_file=self.local_album_files.get(_normalized(group.title),"")
+        local_file=self._local_file_for(group.title)
         if local_file:
             try:
                 data=load_cover(local_file)
@@ -2396,7 +2467,7 @@ class MediaLibraryWidget(QWidget):
         self.preview_player.stop(); self._preview_token += 1; self._playing_preview_row = -1; self.track_preview_buttons = []; self.track_preview_urls = []; self._row_is_local = []
         self._cover_generation += 1; self._show_cover(None); self.group_title.setText(group.title)
         self.prerelease_chip.hide(); self.prerelease_chip.clear()
-        key=_normalized(group.title); local_path=self.local_albums.get(key); status=self.local_album_status.get(key,"Nicht vorhanden"); local_online=status == "Lokal verfügbar"
+        local_path=self._local_folder_for(group.title); status=self._local_status_for(group.title); local_online=status == "Lokal verfügbar"
         self._push_breadcrumb(
             "release",
             group.title,
@@ -2601,19 +2672,13 @@ class MediaLibraryWidget(QWidget):
             )
 
             for index, group in entries:
-                local_key = _normalized(
-                    group.title
-                )
                 source_text = (
                     "Discogs"
                     if group.source
                     == "discogs"
                     else "MusicBrainz"
                 )
-                raw_status = self.local_album_status.get(
-                    local_key,
-                    "Nicht vorhanden",
-                )
+                raw_status = self._local_status_for(group.title)
                 item = QTreeWidgetItem(
                     [
                         group.title,
@@ -3254,12 +3319,7 @@ class MediaLibraryWidget(QWidget):
         local_file = ""
 
         if group is not None:
-            local_file = self.local_album_files.get(
-                _normalized(
-                    group.title
-                ),
-                "",
-            )
+            local_file = self._local_file_for(group.title)
 
         if local_file:
             try:
@@ -3564,7 +3624,7 @@ class MediaLibraryWidget(QWidget):
             + checked_hint
             + self._additional_streaming_summary(group.release_group_id)
         )
-        status = self.local_album_status.get(_normalized(group.title), "Nicht vorhanden")
+        status = self._local_status_for(group.title)
         self._render_source_details(group, status, apple_music_status="found")
         self._update_prerelease_chip(getattr(best, "release_date", ""))
 
@@ -3599,7 +3659,7 @@ class MediaLibraryWidget(QWidget):
             + self._streaming_checked_hint(group.release_group_id)
             + self._additional_streaming_summary(group.release_group_id)
         )
-        status = self.local_album_status.get(_normalized(group.title), "Nicht vorhanden")
+        status = self._local_status_for(group.title)
         self._render_source_details(group, status, apple_music_status="not_found")
 
     def _streaming_checked_hint(self, group_id: str) -> str:
@@ -3981,13 +4041,7 @@ class MediaLibraryWidget(QWidget):
                         value
                     )
                 ]
-                key = _normalized(
-                    group.title
-                )
-                raw_status = self.local_album_status.get(
-                    key,
-                    "Nicht vorhanden",
-                )
+                raw_status = self._local_status_for(group.title)
                 item.setText(4, _status_label(raw_status, self.language))
                 item.setIcon(4, _status_dot_icon(raw_status))
 

@@ -22,7 +22,7 @@ def test_merged_release_lists_provider_contributions() -> None:
     assert details["MusicBrainz"] == "Stammdaten und Veröffentlichung"
     assert details["Discogs"] == "Labels, Formate, Cover"
     assert details["Apple Music"] == "Noch nicht geprüft"
-    assert details["Lokale Bibliothek"] == "🟢 Lokal verfügbar"
+    assert details["Lokale Bibliothek"] == "🟢 Lokal vorhanden"
 
 
 def test_apple_music_result_is_reflected() -> None:
@@ -44,7 +44,7 @@ def test_apple_music_result_is_reflected() -> None:
     assert "MusicBrainz" not in details
     assert details["Discogs"] == "Veröffentlichung und Editionen"
     assert details["Apple Music"] == "Verfügbarkeit bestätigt"
-    assert details["Lokale Bibliothek"] == "⚪ Lokal nicht verfügbar"
+    assert details["Lokale Bibliothek"] == "⚪ Lokal nicht vorhanden"
 
 
 def test_unknown_group_artist_falls_back_to_selected_artist() -> None:
