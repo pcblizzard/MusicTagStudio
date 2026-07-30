@@ -27,9 +27,11 @@ from ..diagnostics import get_diagnostic_logger
 
 
 # Wird beim Registrieren einer "MusicTagStudio"-App auf acoustid.org gesetzt
-# und mit der App ausgeliefert. Leer = Funktion ist deaktiviert, bis ein Key
-# (hier oder in den Einstellungen) hinterlegt wird.
-ACOUSTID_APP_KEY = ""
+# und mit der App ausgeliefert. Das ist ein Client-/Anwendungs-Key (identifiziert
+# nur die App bei AcoustID) – bewusst nicht geheim, darf im Quellcode stehen
+# (wie z. B. bei MusicBrainz Picard). Nutzer können in den Einstellungen einen
+# eigenen Key hinterlegen, der Vorrang hat.
+ACOUSTID_APP_KEY = "irmXywNJcD"
 
 ACOUSTID_ENDPOINT = "https://api.acoustid.org/v2/lookup"
 ACOUSTID_USER_AGENT = f"MusicTagStudio/{__version__}"
