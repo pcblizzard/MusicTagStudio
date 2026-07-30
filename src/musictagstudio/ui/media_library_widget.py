@@ -259,7 +259,16 @@ _PURCHASE_STORES: tuple[tuple[str, str], ...] = (
     ("qobuz", "Qobuz"),
     ("7digital", "7digital"),
     ("itunes", "iTunes Store"),
+    ("ebay", "eBay"),
+    ("kleinanzeigen", "Kleinanzeigen"),
 )
+
+# eBay-Länderdomains (analog zu Amazon). Standard: .com.
+_EBAY_TLDS: dict[str, str] = {
+    "de": "de", "at": "at", "ch": "ch", "us": "com", "gb": "co.uk",
+    "uk": "co.uk", "fr": "fr", "it": "it", "es": "es", "nl": "nl",
+    "ca": "ca", "au": "com.au", "ie": "ie", "be": "be", "pl": "pl",
+}
 
 
 def _qobuz_locale(country: str) -> str:
@@ -294,6 +303,13 @@ def store_search_url(store: str, terms: str, country: str = "us") -> str:
         return (
             f"https://music.apple.com/{cc}/search?" + urlencode({"term": query})
         )
+    if store == "ebay":
+        tld = _EBAY_TLDS.get(cc, "com")
+        return f"https://www.ebay.{tld}/sch/i.html?" + urlencode({"_nkw": query})
+    if store == "kleinanzeigen":
+        # Deutschsprachiger Kleinanzeigen-Marktplatz (nur .de). Slug-URL.
+        slug = re.sub(r"[^a-z0-9]+", "-", query.casefold()).strip("-")
+        return f"https://www.kleinanzeigen.de/s-{slug}/k0" if slug else ""
     return ""
 
 
@@ -1072,12 +1088,18 @@ class MediaLibraryWidget(QWidget):
         service_layout.addWidget(self.open_folder_button)
         detail_layout.addWidget(service_group)
 
-        # Gruppe "Kaufen": legale Kauf-/Download-Stores (verlustfrei/Hi-Res).
+        # Gruppe "Kaufen": legale Kauf-/Download-Stores + Marktplätze.
         purchase_group = QGroupBox(tr("group_purchase", self.language))
-        purchase_layout = QHBoxLayout(purchase_group)
-        purchase_layout.setContentsMargins(8, 4, 8, 8)
+        purchase_outer = QVBoxLayout(purchase_group)
+        purchase_outer.setContentsMargins(8, 4, 8, 8)
+        purchase_row = QHBoxLayout()
         for store_id, _ in _PURCHASE_STORES:
-            purchase_layout.addWidget(self.purchase_buttons[store_id])
+            purchase_row.addWidget(self.purchase_buttons[store_id])
+        purchase_outer.addLayout(purchase_row)
+        purchase_hint = QLabel(tr("purchase_hint", self.language))
+        purchase_hint.setWordWrap(True)
+        purchase_hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        purchase_outer.addWidget(purchase_hint)
         detail_layout.addWidget(purchase_group)
 
         self.streaming_status = QLabel(

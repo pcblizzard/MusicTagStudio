@@ -901,5 +901,6 @@
   "group_purchase": "Kaufen",
   "purchase_search_tip": "Bei {store} nach Künstler + Album suchen (offizieller Kauf, verlustfrei/hochauflösend).",
   "open_folder": "Ordner öffnen",
-  "open_folder_tip": "Den lokalen Album-Ordner im Dateimanager öffnen."
+  "open_folder_tip": "Den lokalen Album-Ordner im Dateimanager öffnen.",
+  "purchase_hint": "Öffnet nur eine Suche – das Album muss beim jeweiligen Anbieter nicht verfügbar sein. eBay/Kleinanzeigen zeigen auch gebrauchte Tonträger."
 }

@@ -32,9 +32,29 @@ def test_itunes_uses_country_and_term():
     assert "term=" in url
 
 
+def test_ebay_uses_country_tld():
+    assert store_search_url("ebay", "A B", "de").startswith(
+        "https://www.ebay.de/sch/i.html?"
+    )
+    assert store_search_url("ebay", "A B", "gb").startswith(
+        "https://www.ebay.co.uk/sch/i.html?"
+    )
+    # Unbekanntes Land -> .com.
+    assert store_search_url("ebay", "A B", "xx").startswith(
+        "https://www.ebay.com/sch/i.html?"
+    )
+    assert "_nkw=" in store_search_url("ebay", "A B", "de")
+
+
+def test_kleinanzeigen_is_de_slug():
+    url = store_search_url("kleinanzeigen", "Silla Schmutzige Euros", "us")
+    assert url == "https://www.kleinanzeigen.de/s-silla-schmutzige-euros/k0"
+
+
 def test_empty_terms_or_unknown_store_yield_empty():
     assert store_search_url("bandcamp", "   ") == ""
     assert store_search_url("unknown", "A B") == ""
+    assert store_search_url("kleinanzeigen", "  ") == ""
 
 
 def test_terms_are_whitespace_normalized():

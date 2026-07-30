@@ -901,5 +901,6 @@
   "group_purchase": "Acheter",
   "purchase_search_tip": "Rechercher sur {store} l'artiste + l'album (achat officiel, sans perte/haute résolution).",
   "open_folder": "Ouvrir le dossier",
-  "open_folder_tip": "Ouvrir le dossier local de l'album dans le gestionnaire de fichiers."
+  "open_folder_tip": "Ouvrir le dossier local de l'album dans le gestionnaire de fichiers.",
+  "purchase_hint": "Ouvre seulement une recherche – l'album peut ne pas être disponible chez chaque fournisseur. eBay/Kleinanzeigen proposent aussi des supports d'occasion."
 }

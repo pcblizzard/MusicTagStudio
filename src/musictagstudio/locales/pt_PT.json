@@ -901,5 +901,6 @@
   "group_purchase": "Comprar",
   "purchase_search_tip": "Pesquisar no {store} por artista + álbum (compra oficial, sem perdas/alta resolução).",
   "open_folder": "Abrir pasta",
-  "open_folder_tip": "Abrir a pasta local do álbum no gestor de ficheiros."
+  "open_folder_tip": "Abrir a pasta local do álbum no gestor de ficheiros.",
+  "purchase_hint": "Apenas abre uma pesquisa – o álbum pode não estar disponível em cada fornecedor. eBay/Kleinanzeigen também listam suportes usados."
 }

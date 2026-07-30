@@ -901,5 +901,6 @@
   "group_purchase": "Buy",
   "purchase_search_tip": "Search {store} for artist + album (official purchase, lossless/hi-res).",
   "open_folder": "Open folder",
-  "open_folder_tip": "Open the local album folder in the file manager."
+  "open_folder_tip": "Open the local album folder in the file manager.",
+  "purchase_hint": "Opens a search only – the album may not be available at each provider. eBay/Kleinanzeigen also list used media."
 }
