@@ -28,6 +28,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
@@ -3329,6 +3330,10 @@ class MainWindow(QMainWindow):
         self.filter_bpm.setToolTip(tr("filter_bpm_tip", self.language))
         self.filter_bpm.textChanged.connect(self._apply_song_filter)
 
+        self.filter_favorites = QCheckBox(tr("filter_favorites", self.language))
+        self.filter_favorites.setToolTip(tr("filter_favorites_tip", self.language))
+        self.filter_favorites.stateChanged.connect(self._apply_song_filter)
+
         self.filter_count_label = QLabel("")
         self.filter_count_label.setStyleSheet("color: palette(mid);")
 
@@ -3339,6 +3344,7 @@ class MainWindow(QMainWindow):
         row.addWidget(self.filter_artist, 2)
         row.addWidget(QLabel("BPM:"))
         row.addWidget(self.filter_bpm)
+        row.addWidget(self.filter_favorites)
         row.addWidget(self.filter_count_label)
         return row
 
@@ -3368,13 +3374,21 @@ class MainWindow(QMainWindow):
         genre = self.filter_genre.currentData() or ""
         artist = self.filter_artist.currentData() or ""
         bpm = self.filter_bpm.text().strip() if hasattr(self, "filter_bpm") else ""
+        fav_only = (
+            self.filter_favorites.isChecked()
+            if hasattr(self, "filter_favorites")
+            and getattr(self, "favorites", None) is not None
+            else False
+        )
         visible = 0
         for row, song in enumerate(self.songs):
             ok = matches(song, text=text, genre=genre, artist=artist, bpm=bpm)
+            if ok and fav_only:
+                ok = self.favorites.is_favorite("song", song.path)
             self.table.setRowHidden(row, not ok)
             if ok:
                 visible += 1
-        if text or genre or artist or bpm:
+        if text or genre or artist or bpm or fav_only:
             self.filter_count_label.setText(
                 tr("filter_count", self.language, shown=visible, total=len(self.songs))
             )

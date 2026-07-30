@@ -878,5 +878,7 @@
   "bpm_detected": "BPM saved for {count} tracks.",
   "hist_bpm_detect": "Detect BPM",
   "filter_bpm_placeholder": "e.g. 95",
-  "filter_bpm_tip": "Show only tracks with this BPM (±3). Requires saved BPM tags (\"Detect BPM\")."
+  "filter_bpm_tip": "Show only tracks with this BPM (±3). Requires saved BPM tags (\"Detect BPM\").",
+  "filter_favorites": "favorites only",
+  "filter_favorites_tip": "Show only tracks marked as favorite (heart in the playback view)."
 }

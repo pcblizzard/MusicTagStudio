@@ -878,5 +878,7 @@
   "bpm_detected": "BPM enregistré pour {count} pistes.",
   "hist_bpm_detect": "Détecter le BPM",
   "filter_bpm_placeholder": "p. ex. 95",
-  "filter_bpm_tip": "Afficher uniquement les pistes avec ce BPM (±3). Nécessite des tags BPM enregistrés (\"Détecter le BPM\")."
+  "filter_bpm_tip": "Afficher uniquement les pistes avec ce BPM (±3). Nécessite des tags BPM enregistrés (\"Détecter le BPM\").",
+  "filter_favorites": "favoris seulement",
+  "filter_favorites_tip": "Afficher uniquement les pistes marquées comme favorites (cœur dans la vue de lecture)."
 }

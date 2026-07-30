@@ -878,5 +878,7 @@
   "bpm_detected": "BPM salvato per {count} brani.",
   "hist_bpm_detect": "Rileva BPM",
   "filter_bpm_placeholder": "es. 95",
-  "filter_bpm_tip": "Mostra solo i brani con questo BPM (±3). Richiede tag BPM salvati (\"Rileva BPM\")."
+  "filter_bpm_tip": "Mostra solo i brani con questo BPM (±3). Richiede tag BPM salvati (\"Rileva BPM\").",
+  "filter_favorites": "solo preferiti",
+  "filter_favorites_tip": "Mostra solo i brani segnati come preferiti (cuore nella vista di riproduzione)."
 }

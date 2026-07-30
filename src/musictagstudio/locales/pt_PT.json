@@ -878,5 +878,7 @@
   "bpm_detected": "BPM guardado para {count} faixas.",
   "hist_bpm_detect": "Detetar BPM",
   "filter_bpm_placeholder": "ex.: 95",
-  "filter_bpm_tip": "Mostrar apenas faixas com este BPM (±3). Requer etiquetas BPM guardadas (\"Detetar BPM\")."
+  "filter_bpm_tip": "Mostrar apenas faixas com este BPM (±3). Requer etiquetas BPM guardadas (\"Detetar BPM\").",
+  "filter_favorites": "apenas favoritos",
+  "filter_favorites_tip": "Mostrar apenas faixas marcadas como favoritas (coração na vista de reprodução)."
 }

@@ -878,5 +878,7 @@
   "bpm_detected": "{count} Titel mit BPM versehen.",
   "hist_bpm_detect": "BPM erkennen",
   "filter_bpm_placeholder": "z. B. 95",
-  "filter_bpm_tip": "Nur Titel mit dieser BPM (±3) zeigen. Benötigt gespeicherte BPM-Tags („BPM erkennen“)."
+  "filter_bpm_tip": "Nur Titel mit dieser BPM (±3) zeigen. Benötigt gespeicherte BPM-Tags („BPM erkennen“).",
+  "filter_favorites": "nur Favoriten",
+  "filter_favorites_tip": "Nur als Favorit markierte Titel zeigen (Herz in der Wiedergabe-Ansicht)."
 }
