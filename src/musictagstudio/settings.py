@@ -72,6 +72,12 @@ class AppSettings:
 
     # 0 bedeutet automatische Auswahl anhand des Systems.
     audio_analysis_parallel_jobs: int = 0
+    # Album Gain exakt (ganzes Album am Stück dekodieren) statt schnell aus den
+    # Track-Werten ableiten. Standard: schnell.
+    audio_analysis_exact_album_gain: bool = False
+    # Base64-kodierter Header-Zustand der Titelanalyse-Tabelle (Spaltenreihen-
+    # folge/-breiten), damit die vom Nutzer sortierten Spalten erhalten bleiben.
+    audio_analysis_column_state: str = ""
 
     music_sources: tuple[MusicSource, ...] = ()
     load_sources_on_startup: bool = True
@@ -251,6 +257,18 @@ def load_settings(
         ),
         default=0,
     )
+    exact_album_gain = bool(
+        audio_analysis.get(
+            "exact_album_gain",
+            False,
+        )
+    )
+    column_state = str(
+        audio_analysis.get(
+            "column_state",
+            "",
+        )
+    )
 
     if parallel_jobs not in {
         0,
@@ -399,6 +417,8 @@ def load_settings(
             default=30,
         ),
         audio_analysis_parallel_jobs=parallel_jobs,
+        audio_analysis_exact_album_gain=exact_album_gain,
+        audio_analysis_column_state=column_state,
         music_sources=tuple(music_sources),
         load_sources_on_startup=bool(
             library.get(
@@ -510,6 +530,14 @@ def save_settings(
         "",
         "[audio_analysis]",
         (f"parallel_jobs = {settings.audio_analysis_parallel_jobs}"),
+        (
+            "exact_album_gain = "
+            f"{str(settings.audio_analysis_exact_album_gain).lower()}"
+        ),
+        (
+            "column_state = "
+            f'"{_toml_string(settings.audio_analysis_column_state)}"'
+        ),
         "",
         "[media_library]",
         f'discogs_token = "{_toml_string(settings.discogs_token)}"',

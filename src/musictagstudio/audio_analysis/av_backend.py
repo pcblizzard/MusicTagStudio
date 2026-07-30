@@ -108,21 +108,44 @@ def render_spectrogram_png(
     *,
     width: int,
     height: int,
+    channel: int | None = None,
+    reference_rate: int = 0,
 ) -> None:
-    """Erzeugt ein Spektrogramm-PNG via showspectrumpic (ein Videoframe)."""
+    """Erzeugt ein Spektrogramm-PNG via showspectrumpic (ein Videoframe).
+
+    ``channel=None`` nimmt alle Kanäle; ``channel=i`` extrahiert vorher genau
+    diesen Kanal (0-basiert) über einen ``pan``-Filter.
+
+    ``reference_rate`` erzwingt eine feste Frequenzachse: Liegt die Datei unter
+    dieser Rate, wird intern auf ``reference_rate`` hochgerechnet (die Achse
+    reicht dann bis ``reference_rate/2``; oberhalb der echten Nyquist-Grenze
+    bleibt sie leer). Liegt die Datei bereits höher, bleibt sie nativ, damit
+    kein echtes Material abgeschnitten wird. ``0`` = pro Datei bis Nyquist.
+    """
     import av
 
     container = av.open(str(filepath))
     try:
         stream = container.streams.audio[0]
+        source_rate = int(stream.codec_context.sample_rate or 0)
         graph = av.filter.Graph()
-        abuffer = graph.add_abuffer(template=stream)
+        # Filterkette dynamisch aufbauen: abuffer -> [pan] -> [aresample]
+        # -> showspectrumpic -> buffersink.
+        node = graph.add_abuffer(template=stream)
+        if channel is not None:
+            picker = graph.add("pan", f"mono|c0=c{channel}")
+            node.link_to(picker)
+            node = picker
+        if reference_rate and source_rate and source_rate < reference_rate:
+            resampler = graph.add("aresample", str(reference_rate))
+            node.link_to(resampler)
+            node = resampler
         spec = graph.add(
             "showspectrumpic",
             f"s={width}x{height}:legend=1:fscale=lin:color=intensity:scale=log",
         )
         sink = graph.add("buffersink")
-        abuffer.link_to(spec)
+        node.link_to(spec)
         spec.link_to(sink)
         graph.configure()
 
@@ -149,6 +172,23 @@ def format_tags(filepath: str) -> dict[str, str]:
         return {}
 
 
+def _real_bit_depth(filepath: str) -> int:
+    """Echte Bit-Tiefe aus dem Datei-Header (mutagen), nicht das Dekodier-Format.
+
+    PyAV meldet über ``codec_context.format.bits`` nur das dekodierte
+    Sample-Format (z. B. FLAC 24 Bit wird als ``s32`` -> 32 dekodiert). Die
+    wahre Bit-Tiefe steht im Header und liefert mutagen als
+    ``bits_per_sample`` – dieselbe Quelle wie die Qualitätsanzeige.
+    """
+    try:
+        from mutagen import File as MutagenFile
+
+        info = getattr(MutagenFile(str(filepath)), "info", None)
+        return int(getattr(info, "bits_per_sample", 0) or 0)
+    except Exception:
+        return 0
+
+
 def probe(filepath: str) -> dict:
     """Technische Eigenschaften (Codec/Rate/Bit-Tiefe/Kanäle/Dauer/Bitrate)."""
     import av
@@ -160,7 +200,12 @@ def probe(filepath: str) -> dict:
         stream = audio_streams[0]
         codec_context = stream.codec_context
         fmt = getattr(codec_context, "format", None)
-        bit_depth = int(getattr(fmt, "bits", 0) or 0) if fmt is not None else 0
+        # Echte Bit-Tiefe aus dem Header bevorzugen; nur wenn mutagen nichts
+        # liefert (z. B. verlustbehaftete Formate), auf das Dekodier-Format
+        # von PyAV zurückfallen.
+        bit_depth = _real_bit_depth(filepath)
+        if not bit_depth and fmt is not None:
+            bit_depth = int(getattr(fmt, "bits", 0) or 0)
         duration = 0.0
         if stream.duration is not None and stream.time_base is not None:
             duration = float(stream.duration * stream.time_base)

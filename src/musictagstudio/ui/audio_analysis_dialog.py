@@ -11,6 +11,7 @@ from pathlib import Path
 from threading import Event
 
 from PySide6.QtCore import (
+    QByteArray,
     QObject,
     QRunnable,
     QThread,
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
     QMessageBox,
@@ -47,6 +49,7 @@ from ..audio_analysis.album_check import (
 )
 from ..audio_analysis import av_backend
 from ..audio_analysis.analyzer import (
+    album_gain_peak_from_results,
     analyze_album_loudness,
     analyze_file,
 )
@@ -61,12 +64,13 @@ from ..audio_analysis.replaygain import (
     write_replaygain_tags,
 )
 from ..audio_analysis.spectrogram import (
+    REFERENCE_RATE,
     SpectrogramError,
     render_spectrogram,
 )
 from ..i18n import tr
 from ..models.song import Song
-from ..settings import load_settings
+from ..settings import load_settings, save_settings
 
 
 NORMAL_BACKGROUND = QColor(
@@ -121,6 +125,7 @@ class AnalysisWorker(QObject):
         max_workers: int,
         force_refresh: bool,
         language: str = "automatic",
+        exact_album_gain: bool = False,
     ):
         super().__init__()
 
@@ -130,6 +135,7 @@ class AnalysisWorker(QObject):
         self.calculate_album_gain = (
             calculate_album_gain
         )
+        self.exact_album_gain = exact_album_gain
         self.max_workers = max(
             1,
             max_workers,
@@ -367,14 +373,20 @@ class AnalysisWorker(QObject):
                         )
                     )
 
-                    gain, peak = (
-                        analyze_album_loudness(
-                            [
-                                song.path
-                                for song in album_songs
-                            ],
+                    if self.exact_album_gain:
+                        # Exakt: ganzes Album am Stück dekodieren (langsamer).
+                        gain, peak = analyze_album_loudness(
+                            [song.path for song in album_songs]
                         )
-                    )
+                    else:
+                        # Schnell: aus den Track-Werten ableiten (kein Decode).
+                        gain, peak = album_gain_peak_from_results(
+                            [
+                                results_by_path[song.path]
+                                for song in album_songs
+                                if song.path in results_by_path
+                            ]
+                        )
                     self.album_result_ready.emit(
                         key,
                         gain,
@@ -422,6 +434,7 @@ class _SpectrogramTask(QRunnable):
         installation: FFmpegInstallation,
         width: int,
         height: int,
+        channel: int | None = None,
     ):
         super().__init__()
         self.signals = _SpectrogramSignals()
@@ -429,6 +442,7 @@ class _SpectrogramTask(QRunnable):
         self._installation = installation
         self._width = width
         self._height = height
+        self._channel = channel
 
     @Slot()
     def run(self):
@@ -437,6 +451,7 @@ class _SpectrogramTask(QRunnable):
                 self._source_path,
                 width=self._width,
                 height=self._height,
+                channel=self._channel,
             )
         except SpectrogramError as error:
             self.signals.failed.emit(
@@ -478,6 +493,9 @@ class AudioAnalysisDialog(QDialog):
         self._ordered_result_paths: list[str] = []
         self._spectrogram_source: str | None = None
         self._spectrogram_shown_source: str | None = None
+        self._spec_channel: int | None = None
+        self._spec_shown_channel: int | None = None
+        self._spec_channel_buttons: list[QPushButton] = []
         self._spectrogram_pixmap: QPixmap | None = None
         self._spectrogram_pool = QThreadPool(self)
         self._spectrogram_pool.setMaxThreadCount(1)
@@ -634,6 +652,7 @@ class AudioAnalysisDialog(QDialog):
         )
         self.log_output = QPlainTextEdit()
         self.log_output.setReadOnly(True)
+        self.details_tab = self._create_details_tab()
         self.spectrogram_tab = self._create_spectrogram_tab()
 
         self.tabs.addTab(
@@ -643,6 +662,10 @@ class AudioAnalysisDialog(QDialog):
         self.tabs.addTab(
             self.album_table,
             tr("tab_album_compare", language),
+        )
+        self.tabs.addTab(
+            self.details_tab,
+            tr("tab_details", language),
         )
         self.tabs.addTab(
             self.spectrogram_tab,
@@ -762,6 +785,8 @@ class AudioAnalysisDialog(QDialog):
             0,
             QHeaderView.ResizeMode.Stretch,
         )
+        # Spalten per Drag & Drop umsortierbar – Reihenfolge wird gespeichert.
+        header.setSectionsMovable(True)
 
         for column in range(1, 16):
             header.setSectionResizeMode(
@@ -769,7 +794,30 @@ class AudioAnalysisDialog(QDialog):
                 QHeaderView.ResizeMode.ResizeToContents,
             )
 
+        # Erst gespeicherten Zustand wiederherstellen, DANN das Speichern
+        # verbinden – restoreState kann sonst sofort ein Speichern auslösen.
+        self._restore_column_state(header)
+        header.sectionMoved.connect(self._persist_column_state)
         return table
+
+    def _restore_column_state(self, header) -> None:
+        state = load_settings().audio_analysis_column_state
+        if not state:
+            return
+        try:
+            header.restoreState(QByteArray.fromBase64(state.encode("ascii")))
+        except Exception:
+            pass  # Beschädigter/veralteter Zustand -> Standardreihenfolge
+
+    def _persist_column_state(self, *_args) -> None:
+        from dataclasses import replace
+
+        header = self.track_table.horizontalHeader()
+        state = bytes(header.saveState().toBase64()).decode("ascii")
+        try:
+            save_settings(replace(load_settings(), audio_analysis_column_state=state))
+        except Exception:
+            pass
 
     def _create_album_table(
         self,
@@ -804,6 +852,7 @@ class AudioAnalysisDialog(QDialog):
             0,
             QHeaderView.ResizeMode.Stretch,
         )
+        header.setSectionsMovable(True)
 
         for column in range(1, 11):
             header.setSectionResizeMode(
@@ -812,6 +861,41 @@ class AudioAnalysisDialog(QDialog):
             )
 
         return table
+
+    def _create_details_tab(self) -> QWidget:
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        self.details_view = QLabel()
+        self.details_view.setTextFormat(Qt.TextFormat.RichText)
+        self.details_view.setWordWrap(True)
+        self.details_view.setAlignment(
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
+        )
+        self.details_view.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.details_view.setContentsMargins(16, 16, 16, 16)
+        self.details_view.setText(
+            f"<i>{tr('detail_hint', self.language)}</i>"
+        )
+
+        scroll_area.setWidget(self.details_view)
+        return scroll_area
+
+    def _refresh_details_for_selection(self) -> None:
+        path = self._selected_result_path()
+        result = self.results.get(path) if path is not None else None
+
+        if result is None or result.error:
+            self.details_view.setText(
+                f"<i>{tr('detail_hint', self.language)}</i>"
+            )
+            return
+
+        self.details_view.setText(
+            _details_html(result, self.language)
+        )
 
     def _create_spectrogram_tab(self) -> QWidget:
         container = QWidget()
@@ -825,6 +909,14 @@ class AudioAnalysisDialog(QDialog):
         container_layout.addWidget(
             self.spectrogram_status
         )
+
+        # Kanal-Umschalter (Alle / Ch 1 / Ch 2 …) – wird je nach gewähltem
+        # Titel dynamisch neu aufgebaut.
+        self.spectrogram_channel_bar = QWidget()
+        self._spec_channel_layout = QHBoxLayout(self.spectrogram_channel_bar)
+        self._spec_channel_layout.setContentsMargins(0, 0, 0, 0)
+        self._spec_channel_layout.addStretch(1)
+        container_layout.addWidget(self.spectrogram_channel_bar)
 
         self.spectrogram_view = QLabel()
         self.spectrogram_view.setAlignment(
@@ -842,21 +934,79 @@ class AudioAnalysisDialog(QDialog):
             scroll_area
         )
 
+        self.spectrogram_footer = QLabel("")
+        self.spectrogram_footer.setStyleSheet("color:#5a6b60;")
+        container_layout.addWidget(self.spectrogram_footer)
+
         return container
 
+    def _rebuild_channel_bar(self, result: AudioAnalysisResult | None) -> None:
+        """Baut die Kanal-Buttons passend zum gewählten Titel neu auf."""
+        for button in self._spec_channel_buttons:
+            self._spec_channel_layout.removeWidget(button)
+            button.deleteLater()
+        self._spec_channel_buttons = []
+
+        channel_count = result.channel_count if result is not None else 0
+        if channel_count <= 1:
+            self.spectrogram_channel_bar.setVisible(False)
+            self._spec_channel = None
+            return
+
+        self.spectrogram_channel_bar.setVisible(True)
+        labels = [(tr("spec_channel_all", self.language), None)]
+        for index in range(channel_count):
+            labels.append((f"Ch {index + 1}", index))
+
+        for text, channel in labels:
+            button = QPushButton(text)
+            button.setCheckable(True)
+            button.setChecked(channel == self._spec_channel)
+            button.clicked.connect(
+                lambda _checked=False, ch=channel: self._select_spec_channel(ch)
+            )
+            self._spec_channel_layout.insertWidget(
+                self._spec_channel_layout.count() - 1, button
+            )
+            self._spec_channel_buttons.append(button)
+
+    def _select_spec_channel(self, channel: int | None) -> None:
+        self._spec_channel = channel
+        for button in self._spec_channel_buttons:
+            button.setChecked(button.text() == self._channel_button_text(channel))
+        self._request_spectrogram_for_selection()
+
+    def _channel_button_text(self, channel: int | None) -> str:
+        if channel is None:
+            return tr("spec_channel_all", self.language)
+        return f"Ch {channel + 1}"
+
     def _on_tab_changed(self, _index: int) -> None:
-        if (
-            self.tabs.currentWidget()
-            is self.spectrogram_tab
-        ):
+        current = self.tabs.currentWidget()
+        if current is self.spectrogram_tab:
+            self._ensure_selection()
             self._request_spectrogram_for_selection()
+        elif current is self.details_tab:
+            self._ensure_selection()
+            self._refresh_details_for_selection()
 
     def _on_track_selection_changed(self) -> None:
-        if (
-            self.tabs.currentWidget()
-            is self.spectrogram_tab
-        ):
+        current = self.tabs.currentWidget()
+        if current is self.spectrogram_tab:
             self._request_spectrogram_for_selection()
+        elif current is self.details_tab:
+            self._refresh_details_for_selection()
+
+    def _ensure_selection(self) -> None:
+        """Ohne Auswahl den ersten Titel markieren – Details/Spektrogramm
+        hängen an der Tabellen-Auswahl, die auf anderen Reitern unsichtbar ist.
+        """
+        rows = self.track_table.selectionModel()
+        if (
+            self.track_table.rowCount() > 0
+            and (rows is None or not rows.hasSelection())
+        ):
+            self.track_table.selectRow(0)
 
     def _selected_result_path(self) -> str | None:
         rows = self.track_table.selectionModel()
@@ -873,15 +1023,35 @@ class AudioAnalysisDialog(QDialog):
 
     def _request_spectrogram_for_selection(self) -> None:
         path = self._selected_result_path()
+        result = self.results.get(path) if path is not None else None
 
         if path is None:
             self._spectrogram_source = None
             self._spectrogram_shown_source = None
+            self._rebuild_channel_bar(None)
+            self.spectrogram_footer.setText("")
             self.spectrogram_view.clear()
             self.spectrogram_status.setText(
                 tr("spectrogram_hint", self.language)
             )
             return
+
+        self._rebuild_channel_bar(result)
+        if result is not None and result.sample_rate:
+            # Achsen-Obergrenze = feste Referenz (96 kHz), bei höher aufgelöstem
+            # Material die echte Nyquist-Grenze der Datei.
+            ceiling_hz = max(REFERENCE_RATE, result.sample_rate) / 2.0
+            self.spectrogram_footer.setText(
+                tr(
+                    "spec_footer",
+                    self.language,
+                    rate=result.sample_rate,
+                    nyquist=result.nyquist_text,
+                    ceiling=f"{ceiling_hz / 1000:.0f} kHz",
+                )
+            )
+        else:
+            self.spectrogram_footer.setText("")
 
         if not self.installation.available:
             self.spectrogram_status.setText(
@@ -889,7 +1059,10 @@ class AudioAnalysisDialog(QDialog):
             )
             return
 
-        if path == self._spectrogram_shown_source:
+        if (
+            path == self._spectrogram_shown_source
+            and self._spec_channel == self._spec_shown_channel
+        ):
             return
 
         self._spectrogram_source = path
@@ -902,6 +1075,7 @@ class AudioAnalysisDialog(QDialog):
             self.installation,
             960,
             480,
+            self._spec_channel,
         )
         task.signals.finished.connect(
             self._on_spectrogram_ready
@@ -930,6 +1104,7 @@ class AudioAnalysisDialog(QDialog):
 
         self._spectrogram_pixmap = pixmap
         self._spectrogram_shown_source = source_path
+        self._spec_shown_channel = self._spec_channel
         self.spectrogram_view.setPixmap(pixmap)
         self.spectrogram_view.setMinimumSize(
             pixmap.size()
@@ -1018,6 +1193,7 @@ class AudioAnalysisDialog(QDialog):
             self.max_workers,
             self.force_refresh_checkbox.isChecked(),
             self.language,
+            exact_album_gain=load_settings().audio_analysis_exact_album_gain,
         )
         self.worker.moveToThread(
             self.thread
@@ -1143,6 +1319,9 @@ class AudioAnalysisDialog(QDialog):
         ] = result
         self._refresh_track_table()
         self._refresh_album_table()
+
+        if self.tabs.currentWidget() is self.details_tab:
+            self._refresh_details_for_selection()
 
     def receive_album_result(
         self,
@@ -1681,6 +1860,130 @@ def health_score_color(
         return ELEVATED_BACKGROUND
 
     return CRITICAL_BACKGROUND
+
+
+def _db(value: float | None, suffix: str = " dB") -> str:
+    if value is None:
+        return "–"
+    return f"{value:.2f}{suffix}"
+
+
+_AUTH_COLORS = {
+    "genuine": ("#1b5e20", "#d6f5de"),
+    "suspect": ("#7a5b00", "#ffefb8"),
+    "fake": ("#8a1c1c", "#ffcdd2"),
+    "lossy": ("#37474f", "#e3e7e9"),
+    "unknown": ("#37474f", "#e3e7e9"),
+}
+
+
+def _authenticity_banner(result: AudioAnalysisResult, language: str) -> str:
+    from ..audio_analysis.authenticity import assess
+
+    verdict = assess(
+        codec=result.codec,
+        sample_rate=result.sample_rate,
+        spectral_cutoff_hz=result.spectral_cutoff_hz,
+        shelf_db=result.spectral_shelf_db,
+        steepness_db=result.spectral_steepness_db,
+    )
+    cutoff = result.spectral_cutoff_text or "–"
+    message = tr(verdict.message_key, language, cutoff=cutoff)
+    # Konfidenz nur zeigen, wo eine Warnung fällt (nicht bei „unauffällig").
+    if verdict.level in ("fake", "suspect"):
+        confidence = tr(f"auth_conf_{verdict.confidence}", language)
+        message += f" · {tr('auth_confidence', language)}: {confidence}"
+    foreground, background = _AUTH_COLORS.get(verdict.level, _AUTH_COLORS["unknown"])
+    label = tr("auth_label", language)
+    return (
+        f"<div style='background:{background}; color:{foreground}; "
+        "padding:8px 12px; border-radius:6px; margin-bottom:12px;'>"
+        f"<b>{label}:</b> {message}</div>"
+    )
+
+
+def _details_html(result: AudioAnalysisResult, language: str) -> str:
+    """Rich-Text-Karte mit allen technischen Kennzahlen eines Titels."""
+
+    def rows(pairs: list[tuple[str, str]]) -> str:
+        cells = "".join(
+            (
+                "<tr>"
+                f"<td style='padding:2px 18px 2px 0; color:#5a6b60;'>{label}</td>"
+                f"<td style='padding:2px 0;'><b>{value or '–'}</b></td>"
+                "</tr>"
+            )
+            for label, value in pairs
+        )
+        return f"<table cellspacing='0' cellpadding='0'>{cells}</table>"
+
+    channels = result.channels or result.channel_layout
+    technical = [
+        (tr("detail_codec", language), (result.codec or "").upper()),
+        (tr("detail_sample_rate", language), result.sample_rate_text),
+        (
+            tr("detail_bit_depth", language),
+            f"{result.bit_depth}-bit" if result.bit_depth else "",
+        ),
+        (tr("detail_decoded_format", language), result.decoded_format),
+        (tr("detail_bitrate", language), result.bitrate_text),
+        (
+            tr("detail_channels", language),
+            result.channel_layout or (str(channels) if channels else ""),
+        ),
+        (tr("detail_length", language), result.duration_text),
+        (tr("detail_nyquist", language), result.nyquist_text),
+        (tr("detail_size", language), result.file_size_text),
+    ]
+
+    if result.clipped_samples > 0:
+        clipping = tr("detail_clipping_count", language, count=result.clipped_samples)
+    else:
+        clipping = tr("detail_no_clipping", language)
+
+    levels = [
+        (tr("detail_dynamic_range", language), _db(result.dynamic_range_db)),
+        (tr("detail_maximum", language), _db(result.peak_dbfs, " dBFS")),
+        (tr("detail_rms", language), _db(result.rms_dbfs, " dBFS")),
+        (tr("detail_lufs", language), _db(result.integrated_lufs, " LUFS")),
+        (tr("detail_true_peak", language), _db(result.true_peak_db, " dBTP")),
+        (tr("detail_clipping", language), clipping),
+        (tr("detail_spectral_cutoff", language), result.spectral_cutoff_text),
+        (tr("detail_samples", language), result.sample_count_text),
+    ]
+
+    channel_rows = []
+    for index in range(result.channel_count):
+        label = tr("detail_channel_label", language, index=index + 1)
+        peak = _db(result.channel_peaks_dbfs[index], "")
+        rms = _db(result.channel_rms_dbfs[index], "")
+        dyn = _db(result.channel_dynamic_range_db[index], "")
+        channel_rows.append((label, f"P {peak} / R {rms} / DR {dyn}"))
+
+    section = (
+        "<div style='margin-bottom:14px;'>"
+        "<div style='font-weight:bold; color:#2f3a34; margin-bottom:4px;'>{title}</div>"
+        "{body}</div>"
+    )
+    html = [
+        f"<div style='font-size:14px; font-weight:bold; margin-bottom:10px;'>"
+        f"{result.filename}</div>",
+        _authenticity_banner(result, language),
+        section.format(
+            title=tr("detail_section_technical", language), body=rows(technical)
+        ),
+        section.format(
+            title=tr("detail_section_levels", language), body=rows(levels)
+        ),
+    ]
+    if channel_rows:
+        html.append(
+            section.format(
+                title=tr("detail_section_channels", language),
+                body=rows(channel_rows),
+            )
+        )
+    return "".join(html)
 
 
 def _format_number(

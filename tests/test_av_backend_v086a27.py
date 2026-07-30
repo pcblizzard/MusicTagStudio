@@ -34,6 +34,30 @@ def test_probe_reads_wav(tmp_path: Path):
     assert info["duration_seconds"] == pytest.approx(3.0, abs=0.2)
 
 
+def test_probe_bit_depth_uses_header_not_decoded_format(tmp_path: Path):
+    # FLAC 24 Bit wird von PyAV nach s32 dekodiert (format.bits == 32); die
+    # echte Bit-Tiefe muss aus dem Header (mutagen) kommen, nicht 32 sein.
+    av = pytest.importorskip("av")
+    import numpy as np
+
+    flac = tmp_path / "d.flac"
+    container = av.open(str(flac), "w")
+    stream = container.add_stream("flac", rate=48000)
+    for _ in range(3):
+        arr = (np.random.rand(1, 2048) * 1000).astype("int16")
+        frame = av.AudioFrame.from_ndarray(arr, format="s16", layout="mono")
+        frame.sample_rate = 48000
+        for packet in stream.encode(frame):
+            container.mux(packet)
+    for packet in stream.encode(None):
+        container.mux(packet)
+    container.close()
+
+    mutagen = pytest.importorskip("mutagen")
+    expected = int(mutagen.File(str(flac)).info.bits_per_sample)
+    assert av_backend.probe(str(flac))["bit_depth"] == expected
+
+
 def test_loudness_matches_signal_level(tmp_path: Path):
     # -12 dBFS Sinus -> integrierte Lautheit nahe -12 LUFS.
     data = av_backend.measure_loudness_json([_make_tone(tmp_path / "b.wav")])

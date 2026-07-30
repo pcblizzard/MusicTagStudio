@@ -102,10 +102,24 @@ TAG_FIELDS: tuple[str, ...] = (
 )
 
 
+def _license_active_text(language: str, name: str, expiry: str) -> str:
+    """Statuszeile mit Ablaufdatum (oder 'Lebenslang' bei unbefristet)."""
+    display_name = name or "—"
+    if not expiry:
+        return tr("license_active_perpetual", language, name=display_name)
+    try:
+        parsed = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+        date_text = parsed.strftime("%d.%m.%Y")
+    except ValueError:
+        date_text = expiry
+    return tr("license_active_until", language, name=display_name, date=date_text)
+
+
 class _LicenseStatusSignals(QObject):
-    # (aktiv, Lizenzname, geprüfter Schlüssel) – der Schlüssel dient dazu,
-    # veraltete Antworten zu verwerfen, falls der Nutzer weitergetippt hat.
-    done = Signal(bool, str, str)
+    # (aktiv, Lizenzname, Ablaufdatum-ISO, geprüfter Schlüssel) – der Schlüssel
+    # dient dazu, veraltete Antworten zu verwerfen, falls der Nutzer
+    # weitergetippt hat. Ablaufdatum ist leer bei unbefristeten Lizenzen.
+    done = Signal(bool, str, str, str)
 
 
 class _LicenseStatusCheck(QRunnable):
@@ -118,14 +132,20 @@ class _LicenseStatusCheck(QRunnable):
         self.signals = _LicenseStatusSignals()
 
     def run(self) -> None:
+        cache_path = keygen.default_cache_path()
         active, name = keygen.check_and_cache(
             self._key,
             self._fingerprint,
             now=datetime.now(),
-            cache_path=keygen.default_cache_path(),
+            cache_path=cache_path,
         )
+        # Das Ablaufdatum steht nach der Prüfung im Cache (leer = unbefristet).
+        expiry = ""
+        if active:
+            cached = keygen.load_cache(cache_path)
+            expiry = cached.expiry if cached is not None else ""
         try:
-            self.signals.done.emit(active, name, self._key)
+            self.signals.done.emit(active, name, expiry, self._key)
         except RuntimeError:
             # Dialog wurde während der Prüfung geschlossen -> Ergebnis egal.
             pass
@@ -489,6 +509,17 @@ class SettingsDialog(QDialog):
             tr("parallel_analyses", language),
             self.parallel_jobs_combo,
         )
+
+        self.exact_album_gain_check = QCheckBox(
+            tr("exact_album_gain", language)
+        )
+        self.exact_album_gain_check.setChecked(
+            settings.audio_analysis_exact_album_gain
+        )
+        self.exact_album_gain_check.setToolTip(
+            tr("exact_album_gain_tip", language)
+        )
+        audio_form.addRow("", self.exact_album_gain_check)
         sources_page.addWidget(audio_analysis)
 
         online_catalogs = QGroupBox(tr("online_catalogs", language))
@@ -1150,6 +1181,7 @@ class SettingsDialog(QDialog):
             folder_cover_size=400,
             folder_cover_quality=80,
             audio_analysis_parallel_jobs=int(self.parallel_jobs_combo.currentData()),
+            audio_analysis_exact_album_gain=self.exact_album_gain_check.isChecked(),
             music_sources=self._selected_sources(),
             load_sources_on_startup=(self.load_sources_checkbox.isChecked()),
             scan_sources_on_startup=(self.scan_sources_checkbox.isChecked()),
@@ -1388,14 +1420,14 @@ class SettingsDialog(QDialog):
         worker.setAutoDelete(False)
         self._license_status_workers.add(worker)
         worker.signals.done.connect(
-            lambda active, name, checked, w=worker: self._on_license_checked(
-                active, name, checked, w
+            lambda active, name, expiry, checked, w=worker: self._on_license_checked(
+                active, name, expiry, checked, w
             )
         )
         QThreadPool.globalInstance().start(worker)
 
     def _on_license_checked(
-        self, active: bool, name: str, checked_key: str, worker
+        self, active: bool, name: str, expiry: str, checked_key: str, worker
     ) -> None:
         self._license_status_workers.discard(worker)
         # Veraltete Antwort verwerfen, falls der Nutzer weitergetippt hat.
@@ -1403,7 +1435,7 @@ class SettingsDialog(QDialog):
             return
         if active:
             self.license_status_label.setText(
-                tr("license_active", self.language, name=name or "—")
+                _license_active_text(self.language, name, expiry)
             )
         else:
             self.license_status_label.setText(tr("license_inactive", self.language))

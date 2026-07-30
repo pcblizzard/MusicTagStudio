@@ -5,7 +5,7 @@ import math
 import re
 from pathlib import Path
 
-from . import av_backend
+from . import av_backend, deep_metrics
 from .models import AudioAnalysisResult
 
 
@@ -26,7 +26,9 @@ def analyze_file(
 
     try:
         info = av_backend.probe(str(path))
-        loudness = _extract_loudness([str(path)])
+        # Loudness UND tiefe Sample-Metriken in EINEM Dekodier-Durchlauf.
+        deep, loud_raw = deep_metrics.analyze_full(str(path))
+        loudness = _convert_loudness(loud_raw)
     except Exception as error:  # PyAV/Container-Fehler
         return AudioAnalysisResult(
             path=str(path),
@@ -64,18 +66,81 @@ def analyze_file(
         replaygain_track_gain_db=calculate_replaygain(integrated_lufs),
         replaygain_track_peak=db_to_linear(true_peak_db),
         peak_status=classify_true_peak(true_peak_db),
+        decoded_format=deep.decoded_format,
+        sample_count=deep.sample_count,
+        peak_dbfs=deep.peak_dbfs,
+        rms_dbfs=deep.rms_dbfs,
+        dynamic_range_db=deep.dynamic_range_db,
+        clipped_samples=deep.clipped_samples,
+        spectral_cutoff_hz=deep.spectral_cutoff_hz,
+        spectral_shelf_db=deep.spectral_shelf_db,
+        spectral_steepness_db=deep.spectral_steepness_db,
+        channel_peaks_dbfs=tuple(c.peak_dbfs for c in deep.channels),
+        channel_rms_dbfs=tuple(c.rms_dbfs for c in deep.channels),
+        channel_dynamic_range_db=tuple(c.dynamic_range_db for c in deep.channels),
+        channel_clipped_samples=tuple(c.clipped_samples for c in deep.channels),
     )
 
 
-def _extract_loudness(paths: list[str]) -> dict[str, float]:
-    """loudnorm-Messwerte als float-Dict (input_i/tp/lra/thresh)."""
-    raw = av_backend.measure_loudness_json(paths)
+def _convert_loudness(raw: dict) -> dict[str, float]:
+    """Rohes loudnorm-JSON in ein float-Dict (input_i/tp/lra/thresh) wandeln."""
     result: dict[str, float] = {}
     for name in ("input_i", "input_tp", "input_lra", "input_thresh"):
         value = _as_optional_float(raw.get(name))
         if value is not None:
             result[name] = value
     return result
+
+
+def _extract_loudness(paths: list[str]) -> dict[str, float]:
+    """loudnorm-Messwerte als float-Dict (input_i/tp/lra/thresh)."""
+    return _convert_loudness(av_backend.measure_loudness_json(paths))
+
+
+def album_gain_peak_from_results(
+    results: list[AudioAnalysisResult],
+) -> tuple[float | None, float | None]:
+    """Album Gain/Peak schnell aus den bereits gemessenen Track-Werten ableiten.
+
+    Ohne zweiten Dekodier-Durchlauf:
+
+    - **Album Peak** = Maximum der Track-True-Peaks → exakt (der Spitzenwert des
+      Albums ist der höchste Track-Spitzenwert).
+    - **Album Gain** = ``-18 LUFS − Album-Lautheit``, wobei die Album-Lautheit
+      energie- und dauergewichtet aus den Track-LUFS gebildet wird (üblicher
+      ReplayGain-2.0-Weg, sehr nahe am exakten „ganzes Album am Stück"-Wert).
+    """
+    usable = [
+        result
+        for result in results
+        if not result.error and result.integrated_lufs is not None
+    ]
+    if not usable:
+        return None, None
+
+    # Energie (mittleres Quadrat) je Track, gewichtet mit der Dauer.
+    weighted_energy = 0.0
+    total_duration = 0.0
+    for result in usable:
+        duration = result.duration_seconds if result.duration_seconds > 0 else 1.0
+        weighted_energy += duration * math.pow(10.0, result.integrated_lufs / 10.0)
+        total_duration += duration
+
+    album_lufs = (
+        10.0 * math.log10(weighted_energy / total_duration)
+        if weighted_energy > 0 and total_duration > 0
+        else None
+    )
+
+    # Album Peak = größter linearer Track-Peak (exakt).
+    peaks = [
+        result.replaygain_track_peak
+        for result in usable
+        if result.replaygain_track_peak is not None
+    ]
+    album_peak = max(peaks) if peaks else None
+
+    return calculate_replaygain(album_lufs), album_peak
 
 
 def analyze_album_loudness(

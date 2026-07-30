@@ -11,7 +11,7 @@ from .models import AudioAnalysisResult
 
 
 CACHE_VERSION = 1
-ANALYSIS_VERSION = "0.6.5"
+ANALYSIS_VERSION = "0.6.7"
 
 
 class AudioAnalysisCache:
