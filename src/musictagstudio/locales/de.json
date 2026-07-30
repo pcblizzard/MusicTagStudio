@@ -817,5 +817,16 @@
   "auto_tag_threshold_prompt": "Mindestkonfidenz (%) für die automatische Übernahme:",
   "auto_tag_summary": "Auto-Tagging fertig: {applied} übernommen · {review} zu prüfen · {no_match} ohne Treffer.",
   "auto_tag_open_review": "Unsichere Treffer jetzt im Vergleich prüfen?",
-  "hist_auto_tag": "Auto-Tagging"
+  "hist_auto_tag": "Auto-Tagging",
+  "convert": "Konvertieren",
+  "convert_tip": "Ausgewählte (oder alle) Titel in ein anderes Format umwandeln (neue Dateien, Tags/Cover werden übernommen).",
+  "convert_title": "Titel konvertieren",
+  "convert_info": "{count} Titel werden konvertiert. Es entstehen neue Dateien; die Originale bleiben unangetastet.",
+  "convert_format": "Zielformat",
+  "convert_bitrate": "Bitrate",
+  "convert_output": "Ausgabeordner",
+  "convert_browse": "Durchsuchen …",
+  "convert_start": "Konvertieren",
+  "convert_done": "Fertig: {count} Datei(en) konvertiert.",
+  "convert_pick_output": "Bitte einen Ausgabeordner angeben."
 }

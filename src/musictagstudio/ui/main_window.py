@@ -112,6 +112,7 @@ from .cover_dialog import (
 from .direct_album_dialog import DirectAlbumDialog
 from .audio_analysis_dialog import AudioAnalysisDialog
 from .duplicates_dialog import DuplicatesDialog
+from .convert_dialog import ConversionDialog
 from .batch_cover_dialog import BatchCoverDialog
 from .library_audit_dialog import LibraryAuditDialog
 from .change_preview_dialog import ChangePreviewDialog
@@ -341,6 +342,13 @@ class MainWindow(QMainWindow):
         self.auto_tag_button.clicked.connect(self.auto_tag_selected)
         self.auto_tag_button.setEnabled(False)
 
+        self.convert_button = QPushButton(
+            tr("convert", self.language)
+        )
+        self.convert_button.setToolTip(tr("convert_tip", self.language))
+        self.convert_button.clicked.connect(self.convert_selected)
+        self.convert_button.setEnabled(False)
+
         self.cover_button = QPushButton(
             tr("manage_cover_selection", self.language)
         )
@@ -521,6 +529,7 @@ class MainWindow(QMainWindow):
             self.identify_button,
             self.batch_button,
             self.auto_tag_button,
+            self.convert_button,
             self.cover_button,
             self.lyrics_button,
             self.player_button,
@@ -2562,6 +2571,9 @@ class MainWindow(QMainWindow):
         self.auto_tag_button.setEnabled(
             enabled
         )
+        self.convert_button.setEnabled(
+            enabled
+        )
         self.cover_button.setEnabled(
             enabled
         )
@@ -3250,6 +3262,14 @@ class MainWindow(QMainWindow):
         )
 
         self.refresh_active_editor()
+
+    def convert_selected(self):
+        """Öffnet den Konvertierungsdialog für die ausgewählten (oder alle) Titel."""
+        rows = self.selected_rows() or list(range(len(self.songs)))
+        songs = [self.songs[row] for row in rows if 0 <= row < len(self.songs)]
+        if not songs:
+            return
+        ConversionDialog(songs, self, language=self.language).exec()
 
     def auto_tag_selected(self):
         """Batch-Auto-Tagging: hohe Konfidenz automatisch, Rest zur Prüfung."""

@@ -817,5 +817,16 @@
   "auto_tag_threshold_prompt": "Confiança mínima (%) para aplicação automática:",
   "auto_tag_summary": "Auto-etiquetagem concluída: {applied} aplicadas · {review} a revisar · {no_match} sem correspondência.",
   "auto_tag_open_review": "Revisar agora as correspondências incertas na comparação?",
-  "hist_auto_tag": "Auto-etiquetagem"
+  "hist_auto_tag": "Auto-etiquetagem",
+  "convert": "Converter",
+  "convert_tip": "Converter faixas selecionadas (ou todas) para outro formato (novos arquivos, tags/capa copiadas).",
+  "convert_title": "Converter faixas",
+  "convert_info": "{count} faixas serão convertidas. São criados novos arquivos; os originais permanecem intactos.",
+  "convert_format": "Formato de destino",
+  "convert_bitrate": "Taxa de bits",
+  "convert_output": "Pasta de saída",
+  "convert_browse": "Procurar …",
+  "convert_start": "Converter",
+  "convert_done": "Concluído: {count} arquivo(s) convertido(s).",
+  "convert_pick_output": "Escolha uma pasta de saída."
 }

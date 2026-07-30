@@ -817,5 +817,16 @@
   "auto_tag_threshold_prompt": "Confiance minimale (%) pour l'application automatique :",
   "auto_tag_summary": "Auto-tag terminé : {applied} appliqués · {review} à vérifier · {no_match} sans correspondance.",
   "auto_tag_open_review": "Vérifier maintenant les correspondances incertaines dans la comparaison ?",
-  "hist_auto_tag": "Auto-tag"
+  "hist_auto_tag": "Auto-tag",
+  "convert": "Convertir",
+  "convert_tip": "Convertir les pistes sélectionnées (ou toutes) vers un autre format (nouveaux fichiers, tags/pochette copiés).",
+  "convert_title": "Convertir des pistes",
+  "convert_info": "{count} pistes seront converties. De nouveaux fichiers sont créés ; les originaux restent intacts.",
+  "convert_format": "Format cible",
+  "convert_bitrate": "Débit",
+  "convert_output": "Dossier de sortie",
+  "convert_browse": "Parcourir …",
+  "convert_start": "Convertir",
+  "convert_done": "Terminé : {count} fichier(s) converti(s).",
+  "convert_pick_output": "Veuillez choisir un dossier de sortie."
 }

@@ -817,5 +817,16 @@
   "auto_tag_threshold_prompt": "Confidenza minima (%) per l'applicazione automatica:",
   "auto_tag_summary": "Auto-tag completato: {applied} applicati · {review} da verificare · {no_match} senza corrispondenza.",
   "auto_tag_open_review": "Verificare ora le corrispondenze incerte nel confronto?",
-  "hist_auto_tag": "Auto-tag"
+  "hist_auto_tag": "Auto-tag",
+  "convert": "Converti",
+  "convert_tip": "Converti i brani selezionati (o tutti) in un altro formato (nuovi file, tag/copertina copiati).",
+  "convert_title": "Converti brani",
+  "convert_info": "{count} brani verranno convertiti. Vengono creati nuovi file; gli originali restano intatti.",
+  "convert_format": "Formato di destinazione",
+  "convert_bitrate": "Bitrate",
+  "convert_output": "Cartella di output",
+  "convert_browse": "Sfoglia …",
+  "convert_start": "Converti",
+  "convert_done": "Fatto: {count} file convertiti.",
+  "convert_pick_output": "Scegli una cartella di output."
 }

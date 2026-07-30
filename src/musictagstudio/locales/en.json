@@ -817,5 +817,16 @@
   "auto_tag_threshold_prompt": "Minimum confidence (%) for automatic apply:",
   "auto_tag_summary": "Auto-tagging done: {applied} applied · {review} to review · {no_match} no match.",
   "auto_tag_open_review": "Review uncertain matches in the comparison now?",
-  "hist_auto_tag": "Auto-tagging"
+  "hist_auto_tag": "Auto-tagging",
+  "convert": "Convert",
+  "convert_tip": "Convert selected (or all) tracks to another format (new files, tags/cover copied).",
+  "convert_title": "Convert tracks",
+  "convert_info": "{count} tracks will be converted. New files are created; originals stay untouched.",
+  "convert_format": "Target format",
+  "convert_bitrate": "Bitrate",
+  "convert_output": "Output folder",
+  "convert_browse": "Browse …",
+  "convert_start": "Convert",
+  "convert_done": "Done: {count} file(s) converted.",
+  "convert_pick_output": "Please choose an output folder."
 }
