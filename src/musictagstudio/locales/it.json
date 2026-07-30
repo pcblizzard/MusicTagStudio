@@ -889,5 +889,11 @@
   "analysis_multiprocess": "Analizza su più processi (sperimentale)",
   "analysis_multiprocess_tip": "Usa veri processi del sistema operativo invece dei thread, aggirando il GIL di Python per un maggiore utilizzo della CPU.",
   "analysis_multiprocess_hint": "Attenzione: può causare instabilità o arresti dell'analisi su alcuni sistemi. Inoltre ogni processo avvia il proprio interprete (overhead): con pochi file o file brevi è spesso più lento dei thread; il vantaggio emerge solo con molti file di grandi dimensioni. Per questo i thread sono l'impostazione predefinita. In caso di dubbio lasciare disattivato.",
-  "auth_source_estimate": "probabilmente da una fonte con perdita (~{kbps} kbit/s)"
+  "auth_source_estimate": "probabilmente da una fonte con perdita (~{kbps} kbit/s)",
+  "isrc_enrich": "Arricchimento tramite ISRC",
+  "isrc_enrich_tip": "Cerca i tag mancanti (genere, anno, etichetta, compositore …) esattamente tramite ISRC su MusicBrainz e Deezer e riempie solo i campi vuoti.",
+  "isrc_enriching": "Ricerca dei tag tramite ISRC …",
+  "isrc_enriched": "{count} brani arricchiti tramite ISRC.",
+  "isrc_no_isrc": "Nessuno dei brani selezionati ha un ISRC. Senza ISRC non è possibile un arricchimento esatto.",
+  "hist_isrc_enrich": "Arricchimento tramite ISRC"
 }

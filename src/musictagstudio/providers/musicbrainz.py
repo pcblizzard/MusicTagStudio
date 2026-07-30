@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import re
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -318,6 +318,38 @@ def lookup_recording_by_id(recording_id: str) -> MetadataCandidate | None:
         return None
 
     return _candidate_from_recording(payload)
+
+
+def lookup_recording_by_isrc(isrc: str) -> MetadataCandidate | None:
+    """Sucht ein Recording exakt über seine ISRC (statt unsicherer Textsuche).
+
+    Nutzt den ISRC-Endpunkt ``/ws/2/isrc/{isrc}``; nimmt das Recording mit dem
+    höchsten Score. Gibt ``None`` zurück, wenn nichts gefunden wird.
+    """
+    isrc = (isrc or "").strip().upper()
+    if not isrc:
+        return None
+
+    params = {
+        "fmt": "json",
+        "inc": "artists+releases+isrcs+genres+tags+media",
+    }
+    try:
+        payload = _request_json(f"{BASE_URL}/isrc/{isrc}?{urlencode(params)}")
+    except MusicBrainzProviderError:
+        # z. B. HTTP 404: ISRC bei MusicBrainz unbekannt -> kein Treffer.
+        return None
+
+    recordings = payload.get("recordings") or []
+    if not recordings:
+        return None
+
+    best = max(recordings, key=lambda item: int(item.get("score") or 0))
+    candidate = _candidate_from_recording(best)
+    # ISRC sicher setzen (der Endpunkt liefert sie evtl. nicht pro Recording).
+    if not candidate.isrc:
+        candidate = replace(candidate, isrc=isrc)
+    return candidate
 
 
 def _candidate_from_recording(recording: dict) -> MetadataCandidate:

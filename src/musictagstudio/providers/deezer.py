@@ -315,6 +315,66 @@ def search_song(
     return sorted(results, key=lambda candidate: -candidate.confidence)
 
 
+def lookup_track_by_isrc(isrc: str):
+    """Sucht einen Track exakt über seine ISRC (``/track/isrc:{isrc}``).
+
+    Liefert einen MetadataCandidate oder ``None``. Zusätzlich wird – wenn
+    möglich – das Album für Label/Genre/Jahr nachgeladen.
+    """
+    from ..models.metadata import MetadataCandidate
+
+    isrc = (isrc or "").strip().upper()
+    if not isrc:
+        return None
+
+    try:
+        track = _get_json(f"{DEEZER_API}/track/isrc:{isrc}")
+    except DeezerProviderError:
+        return None
+    if not isinstance(track, dict) or not track.get("id"):
+        return None
+
+    album_ref = track.get("album") or {}
+    album_id = str(album_ref.get("id") or "")
+    label = ""
+    genre = ""
+    year = _year_from_date(str(track.get("release_date") or ""))
+
+    if album_id:
+        try:
+            album = _get_json(f"{DEEZER_API}/album/{album_id}")
+        except DeezerProviderError:
+            album = {}
+        if isinstance(album, dict):
+            label = str(album.get("label") or "")
+            genres = (album.get("genres") or {}).get("data") or []
+            if genres:
+                genre = str((genres[0] or {}).get("name") or "")
+            year = year or _year_from_date(str(album.get("release_date") or ""))
+
+    artist = str((track.get("artist") or {}).get("name") or "")
+    return MetadataCandidate(
+        source="deezer",
+        confidence=95,  # exakter ISRC-Treffer
+        title=str(track.get("title") or ""),
+        artist=artist,
+        album_artist=artist,
+        album=str(album_ref.get("title") or ""),
+        genre=genre,
+        year=year,
+        label=label,
+        isrc=isrc,
+        duration_ms=_duration_ms(track.get("duration")),
+        external_id=str(track.get("id") or ""),
+        release_id=album_id,
+    )
+
+
+def _year_from_date(value: str) -> str:
+    value = (value or "").strip()
+    return value[:4] if len(value) >= 4 and value[:4].isdigit() else ""
+
+
 def _album_confidence(
     *,
     wanted_album: str,

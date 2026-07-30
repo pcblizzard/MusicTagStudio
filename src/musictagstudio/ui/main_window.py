@@ -230,6 +230,60 @@ class _BpmDetectTask(QRunnable):
             pass
 
 
+class _IsrcEnrichSignals(QObject):
+    progress = Signal(int)  # abgeschlossene Titel
+    finished = Signal(dict)  # {row: {feld: wert}}
+
+
+class _IsrcEnrichTask(QRunnable):
+    """Schlägt fehlende Tags per ISRC im Hintergrund nach (blockiert die UI nicht).
+
+    Die Netzwerk-Lookups (MusicBrainz app-weit auf 1 Anfrage/Sekunde begrenzt,
+    Deezer) laufen in einem kleinen Pool; geschrieben wird im Hauptthread.
+    """
+
+    def __init__(self, targets: list[tuple[int, "Song"]], max_workers: int = 4) -> None:
+        super().__init__()
+        self._targets = targets
+        self._max_workers = max_workers
+        self._cancelled = False
+        self.signals = _IsrcEnrichSignals()
+
+    def cancel(self) -> None:
+        self._cancelled = True
+
+    def run(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        from ..services.isrc_enrich import enrich_song
+
+        results: dict[int, dict] = {}
+        done = 0
+        with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
+            futures = {
+                pool.submit(enrich_song, song): row for row, song in self._targets
+            }
+            for future in as_completed(futures):
+                if self._cancelled:
+                    break
+                row = futures[future]
+                try:
+                    result = future.result()
+                except Exception:  # noqa: BLE001
+                    result = None
+                if result is not None and result.has_changes:
+                    results[row] = result.updates
+                done += 1
+                try:
+                    self.signals.progress.emit(done)
+                except RuntimeError:
+                    return
+        try:
+            self.signals.finished.emit(results)
+        except RuntimeError:
+            pass
+
+
 def _save_songs_in_parallel(
     items: list[tuple[int, Song]],
 ) -> list[tuple[int, Song, Exception | None]]:
@@ -413,6 +467,11 @@ class MainWindow(QMainWindow):
         self.bpm_button.clicked.connect(self.detect_bpm_selected)
         self.bpm_button.setEnabled(False)
 
+        self.isrc_button = QPushButton(tr("isrc_enrich", self.language))
+        self.isrc_button.setToolTip(tr("isrc_enrich_tip", self.language))
+        self.isrc_button.clicked.connect(self.enrich_isrc_selected)
+        self.isrc_button.setEnabled(False)
+
         self.cover_button = QPushButton(
             tr("manage_cover_selection", self.language)
         )
@@ -595,6 +654,7 @@ class MainWindow(QMainWindow):
             self.auto_tag_button,
             self.convert_button,
             self.bpm_button,
+            self.isrc_button,
             self.cover_button,
             self.lyrics_button,
             self.player_button,
@@ -2678,6 +2738,9 @@ class MainWindow(QMainWindow):
         self.bpm_button.setEnabled(
             enabled
         )
+        self.isrc_button.setEnabled(
+            enabled
+        )
         self.cover_button.setEnabled(
             enabled
         )
@@ -3615,6 +3678,69 @@ class MainWindow(QMainWindow):
         if failed:
             message += tr("errors_block", self.language, errors="\n".join(failed))
         QMessageBox.information(self, tr("bpm_detect", self.language), message)
+
+    def enrich_isrc_selected(self):
+        """Ergänzt fehlende Tags der markierten Titel exakt über ihre ISRC.
+
+        Läuft im Hintergrund; nur Titel mit hinterlegter ISRC werden abgefragt,
+        und nur leere Felder werden gefüllt (bestehende Werte bleiben).
+        """
+        rows = self.selected_rows() or list(range(len(self.songs)))
+        targets = [
+            (row, self.songs[row])
+            for row in rows
+            if 0 <= row < len(self.songs) and str(self.songs[row].isrc or "").strip()
+        ]
+        if not targets:
+            QMessageBox.information(
+                self,
+                tr("isrc_enrich", self.language),
+                tr("isrc_no_isrc", self.language),
+            )
+            return
+
+        progress = QProgressDialog(
+            tr("isrc_enriching", self.language),
+            tr("cancel", self.language),
+            0,
+            len(targets),
+            self,
+        )
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setValue(0)
+
+        task = _IsrcEnrichTask(targets)
+        self._isrc_task = task  # Referenz halten
+        task.signals.progress.connect(progress.setValue)
+        progress.canceled.connect(task.cancel)
+        task.signals.finished.connect(
+            lambda results: self._on_isrc_enriched(results, progress)
+        )
+        QThreadPool.globalInstance().start(task)
+
+    def _on_isrc_enriched(self, results: dict, progress) -> None:
+        """Schreibt die per ISRC ergänzten Felder (Hauptthread)."""
+        progress.close()
+        self._isrc_task = None
+        update_items = [
+            (row, replace(self.songs[row], **updates))
+            for row, updates in results.items()
+            if 0 <= row < len(self.songs) and updates
+        ]
+        saved, failed = (
+            self._write_song_updates("hist_isrc_enrich", update_items)
+            if update_items
+            else (0, [])
+        )
+        self.update_optional_columns()
+        self._apply_song_filter()
+        self.refresh_active_editor()
+
+        message = tr("isrc_enriched", self.language, count=saved)
+        if failed:
+            message += tr("errors_block", self.language, errors="\n".join(failed))
+        QMessageBox.information(self, tr("isrc_enrich", self.language), message)
 
     def convert_selected(self):
         """Öffnet den Konvertierungsdialog für die ausgewählten (oder alle) Titel."""
