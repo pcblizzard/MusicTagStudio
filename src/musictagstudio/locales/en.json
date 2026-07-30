@@ -828,5 +828,20 @@
   "convert_browse": "Browse …",
   "convert_start": "Convert",
   "convert_done": "Done: {count} file(s) converted.",
-  "convert_pick_output": "Please choose an output folder."
+  "convert_pick_output": "Please choose an output folder.",
+  "tidal_exact_label": "Exact TIDAL quality (unofficial)",
+  "tidal_exact_tip": "Uses the unofficial tidalapi to show a TIDAL album's actual bit depth/sample rate. Requires a connected TIDAL account. Opt-in, as it is unofficial (ToS gray area).",
+  "tidal_connect_button": "Connect TIDAL …",
+  "tidal_exact_unavailable": "tidalapi not installed (pip install tidalapi).",
+  "tidal_exact_connected": "✓ Connected",
+  "tidal_exact_disconnected": "Not connected",
+  "tidal_connect_title": "Connect TIDAL",
+  "tidal_connect_intro": "Open the link, sign in to TIDAL and confirm the code. The account is then connected locally.",
+  "tidal_connect_open": "Open link in browser",
+  "tidal_connect_starting": "Preparing login …",
+  "tidal_connect_link": "Link: {uri}  ·  Code: {code}",
+  "tidal_connect_waiting": "Waiting for authorization in the browser …",
+  "tidal_connect_success": "✓ Connected! You can close this window.",
+  "tidal_connect_failed": "Connection failed or cancelled.",
+  "tidal_exact_quality_label": "TIDAL quality (exact)"
 }

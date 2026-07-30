@@ -86,6 +86,8 @@ class AppSettings:
     discogs_token: str = ""
     tidal_client_id: str = ""
     spotify_client_id: str = ""
+    # Exakte TIDAL-Qualität über tidalapi (inoffiziell, opt-in). Standard aus.
+    tidal_exact_enabled: bool = False
     # Akustischer Fingerabdruck (AcoustID). Leer = mitgelieferter App-Key.
     acoustid_api_key: str = ""
     # Optionaler Pfad zur fpcalc-Binärdatei (sonst Bundle/PATH).
@@ -438,6 +440,9 @@ def load_settings(
                 "",
             )
         ).strip(),
+        tidal_exact_enabled=bool(
+            media_library.get("tidal_exact_enabled", False)
+        ),
         tidal_client_id=str(
             media_library.get(
                 "tidal_client_id",
@@ -541,6 +546,7 @@ def save_settings(
         "",
         "[media_library]",
         f'discogs_token = "{_toml_string(settings.discogs_token)}"',
+        f"tidal_exact_enabled = {str(settings.tidal_exact_enabled).lower()}",
         f'tidal_client_id = "{_toml_string(settings.tidal_client_id)}"',
         f'spotify_client_id = "{_toml_string(settings.spotify_client_id)}"',
         f'acoustid_api_key = "{_toml_string(settings.acoustid_api_key)}"',

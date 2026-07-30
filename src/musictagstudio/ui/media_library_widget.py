@@ -464,6 +464,9 @@ class MediaLibraryWidget(QWidget):
         )
         self.thumbnail_pool = QThreadPool(self)
         self.thumbnail_pool.setMaxThreadCount(4)
+        # Exakte TIDAL-Qualität je TIDAL-Album-ID (opt-in, wird nachgeladen).
+        self._tidal_exact_cache: dict[str, str] = {}
+        self._tidal_exact_pending: set[str] = set()
         self._workers: set[
             Worker
         ] = set()
@@ -3802,10 +3805,67 @@ class MediaLibraryWidget(QWidget):
         streaming = self._streaming_quality_text()
         if streaming:
             parts.append(streaming)
+        exact = self._tidal_exact_text()
+        if exact:
+            parts.append(exact)
         if parts:
             self.quality_status.setText("<br>".join(parts))
         else:
             self.quality_status.setText(tr("quality_not_checked", self.language))
+
+    def _tidal_exact_text(self) -> str:
+        """Exakte TIDAL-Qualität (opt-in) – gecacht oder Nachladen anstoßen."""
+        group = self.current_group
+        if group is None:
+            return ""
+        results = self._provider_streaming_results.get(group.release_group_id, {})
+        tidal = results.get("tidal")
+        external_id = str(getattr(tidal, "external_id", "") or "") if tidal else ""
+        if not external_id:
+            return ""
+        from ..settings import load_settings
+
+        if not load_settings().tidal_exact_enabled:
+            return ""
+        from ..providers import tidal_exact
+
+        if not (tidal_exact.is_available() and tidal_exact.is_connected()):
+            return ""
+        if external_id in self._tidal_exact_cache:
+            text = self._tidal_exact_cache[external_id]
+            if not text:
+                return ""
+            label = html.escape(tr("tidal_exact_quality_label", self.language))
+            return f"<b>{label}:</b> {html.escape(text)}"
+        self._start_tidal_exact_fetch(external_id)
+        return ""
+
+    def _start_tidal_exact_fetch(self, external_id: str) -> None:
+        if external_id in self._tidal_exact_pending:
+            return
+        self._tidal_exact_pending.add(external_id)
+
+        def fetch():
+            from ..providers import tidal_exact
+
+            session = tidal_exact.stored_session()
+            if session is None:
+                return (external_id, "")
+            quality = tidal_exact.album_exact_quality(session, external_id)
+            return (external_id, quality.summary() if quality.ok else "")
+
+        worker = Worker(fetch)
+        worker.signals.finished.connect(self._on_tidal_exact_done)
+        worker.signals.failed.connect(
+            lambda _error, eid=external_id: self._on_tidal_exact_done((eid, ""))
+        )
+        self.thread_pool.start(worker)
+
+    def _on_tidal_exact_done(self, result) -> None:
+        external_id, text = result
+        self._tidal_exact_pending.discard(external_id)
+        self._tidal_exact_cache[external_id] = text
+        self._refresh_quality_status()
 
     def _streaming_quality_text(self) -> str:
         group = self.current_group

@@ -587,6 +587,8 @@ class SettingsDialog(QDialog):
             "TIDAL Client Secret:",
             self.tidal_client_secret_edit,
         )
+
+        self._add_tidal_exact_row(online_catalogs_form, settings, language)
         tidal_connection_layout = QHBoxLayout()
         self.tidal_connect_button = QPushButton(tr("tidal_connect", language))
         self.tidal_disconnect_button = QPushButton(tr("tidal_disconnect", language))
@@ -857,6 +859,48 @@ class SettingsDialog(QDialog):
         """Wechselt zum Lizenz-Reiter und fokussiert das Schlüsselfeld."""
         self.settings_tabs.setCurrentIndex(self._license_tab_index)
         self.license_key_edit.setFocus()
+
+    def _add_tidal_exact_row(self, form, settings, language: str) -> None:
+        """Opt-in: exakte TIDAL-Qualität (tidalapi) + Konto verbinden."""
+        from ..providers import tidal_exact
+
+        self.tidal_exact_check = QCheckBox(tr("tidal_exact_label", language))
+        self.tidal_exact_check.setChecked(settings.tidal_exact_enabled)
+        self.tidal_exact_check.setToolTip(tr("tidal_exact_tip", language))
+        available = tidal_exact.is_available()
+        self.tidal_exact_check.setEnabled(available)
+        form.addRow("", self.tidal_exact_check)
+
+        row = QHBoxLayout()
+        self.tidal_connect_button = QPushButton(
+            tr("tidal_connect_button", language)
+        )
+        self.tidal_connect_button.setEnabled(available)
+        self.tidal_connect_button.clicked.connect(self._connect_tidal_exact)
+        self.tidal_exact_status = QLabel("")
+        self.tidal_exact_status.setStyleSheet("color: palette(mid);")
+        row.addWidget(self.tidal_connect_button)
+        row.addWidget(self.tidal_exact_status, 1)
+        form.addRow("", row)
+        self._refresh_tidal_exact_status()
+
+    def _refresh_tidal_exact_status(self) -> None:
+        from ..providers import tidal_exact
+
+        if not tidal_exact.is_available():
+            self.tidal_exact_status.setText(tr("tidal_exact_unavailable", self.language))
+        elif tidal_exact.is_connected():
+            self.tidal_exact_status.setText(tr("tidal_exact_connected", self.language))
+        else:
+            self.tidal_exact_status.setText(tr("tidal_exact_disconnected", self.language))
+
+    def _connect_tidal_exact(self) -> None:
+        from .tidal_connect_dialog import TidalConnectDialog
+
+        dialog = TidalConnectDialog(self, language=self.language)
+        dialog.connected.connect(self._refresh_tidal_exact_status)
+        dialog.exec()
+        self._refresh_tidal_exact_status()
 
     def _build_purchase_box(self, language: str) -> QGroupBox | None:
         """Kauf-Buttons je Laufzeit (nur eingerichtete PayPal-Buttons)."""
@@ -1237,6 +1281,7 @@ class SettingsDialog(QDialog):
             acoustid_api_key=self.acoustid_key_edit.text().strip(),
             fpcalc_path=self.fpcalc_path_edit.text().strip(),
             tidal_client_id=self.tidal_client_id_edit.text().strip(),
+            tidal_exact_enabled=self.tidal_exact_check.isChecked(),
             spotify_client_id=self.spotify_client_id_edit.text().strip(),
             apple_request_interval_seconds=self.apple_interval_spin.value(),
             genius_request_interval_seconds=self.genius_interval_spin.value(),

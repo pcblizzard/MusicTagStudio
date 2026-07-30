@@ -828,5 +828,20 @@
   "convert_browse": "Sfoglia …",
   "convert_start": "Converti",
   "convert_done": "Fatto: {count} file convertiti.",
-  "convert_pick_output": "Scegli una cartella di output."
+  "convert_pick_output": "Scegli una cartella di output.",
+  "tidal_exact_label": "Qualità TIDAL esatta (non ufficiale)",
+  "tidal_exact_tip": "Usa la tidalapi non ufficiale per mostrare la profondità/frequenza reale di un album TIDAL. Richiede un account TIDAL collegato. Facoltativo, perché non ufficiale.",
+  "tidal_connect_button": "Collega TIDAL …",
+  "tidal_exact_unavailable": "tidalapi non installato (pip install tidalapi).",
+  "tidal_exact_connected": "✓ Collegato",
+  "tidal_exact_disconnected": "Non collegato",
+  "tidal_connect_title": "Collega TIDAL",
+  "tidal_connect_intro": "Apri il link, accedi a TIDAL e conferma il codice. L'account sarà collegato localmente.",
+  "tidal_connect_open": "Apri il link nel browser",
+  "tidal_connect_starting": "Preparazione accesso …",
+  "tidal_connect_link": "Link: {uri}  ·  Codice: {code}",
+  "tidal_connect_waiting": "In attesa dell'autorizzazione nel browser …",
+  "tidal_connect_success": "✓ Collegato! Puoi chiudere questa finestra.",
+  "tidal_connect_failed": "Connessione non riuscita o annullata.",
+  "tidal_exact_quality_label": "Qualità TIDAL (esatta)"
 }

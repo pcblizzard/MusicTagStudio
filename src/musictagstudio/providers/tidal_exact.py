@@ -191,3 +191,47 @@ def restore_session(creds: dict):
         return session if session.check_login() else None
     except Exception:
         return None
+
+# --- Lokale Speicherung der Session (opt-in) --------------------------------
+
+_SECRET_NAME = "tidal_exact_session"
+
+
+def save_credentials(creds: dict) -> None:
+    """Speichert die Session-Zugangsdaten lokal (secret_store)."""
+    import json
+
+    from .. import secret_store
+
+    secret_store.set_secret(_SECRET_NAME, json.dumps(creds))
+
+
+def load_credentials() -> dict | None:
+    import json
+
+    from .. import secret_store
+
+    raw = secret_store.get_secret(_SECRET_NAME)
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def is_connected() -> bool:
+    creds = load_credentials()
+    return bool(creds and creds.get("access_token"))
+
+
+def disconnect() -> None:
+    from .. import secret_store
+
+    secret_store.set_secret(_SECRET_NAME, "")
+
+
+def stored_session():
+    """Stellt die gespeicherte Session wieder her (oder None)."""
+    return restore_session(load_credentials() or {})
