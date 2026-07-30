@@ -871,5 +871,12 @@
   "stats_col_name": "Nom",
   "stats_col_time": "Temps",
   "stats_empty": "Aucune lecture enregistrée.",
-  "exact_album_gain_hint": "Plus précis, mais nettement plus lent (l album entier est en plus mesuré d un seul tenant)."
+  "exact_album_gain_hint": "Plus précis, mais nettement plus lent (l album entier est en plus mesuré d un seul tenant).",
+  "bpm_detect": "Détecter le BPM",
+  "bpm_detect_tip": "Détecte le tempo (BPM) des pistes sélectionnées (ou toutes) et l enregistre comme tag. Annulable via l historique.",
+  "bpm_detecting": "Détection du BPM …",
+  "bpm_detected": "BPM enregistré pour {count} pistes.",
+  "hist_bpm_detect": "Détecter le BPM",
+  "filter_bpm_placeholder": "p. ex. 95",
+  "filter_bpm_tip": "Afficher uniquement les pistes avec ce BPM (±3). Nécessite des tags BPM enregistrés (\"Détecter le BPM\")."
 }

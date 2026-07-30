@@ -871,5 +871,12 @@
   "stats_col_name": "Name",
   "stats_col_time": "Listening time",
   "stats_empty": "No plays recorded yet.",
-  "exact_album_gain_hint": "More accurate, but noticeably slower (the whole album is measured as one in addition)."
+  "exact_album_gain_hint": "More accurate, but noticeably slower (the whole album is measured as one in addition).",
+  "bpm_detect": "Detect BPM",
+  "bpm_detect_tip": "Detects the tempo (BPM) of the selected (or all) tracks and saves it as a tag. Undoable via history.",
+  "bpm_detecting": "Detecting BPM …",
+  "bpm_detected": "BPM saved for {count} tracks.",
+  "hist_bpm_detect": "Detect BPM",
+  "filter_bpm_placeholder": "e.g. 95",
+  "filter_bpm_tip": "Show only tracks with this BPM (±3). Requires saved BPM tags (\"Detect BPM\")."
 }

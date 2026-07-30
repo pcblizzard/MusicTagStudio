@@ -351,6 +351,11 @@ class MainWindow(QMainWindow):
         self.convert_button.clicked.connect(self.convert_selected)
         self.convert_button.setEnabled(False)
 
+        self.bpm_button = QPushButton(tr("bpm_detect", self.language))
+        self.bpm_button.setToolTip(tr("bpm_detect_tip", self.language))
+        self.bpm_button.clicked.connect(self.detect_bpm_selected)
+        self.bpm_button.setEnabled(False)
+
         self.cover_button = QPushButton(
             tr("manage_cover_selection", self.language)
         )
@@ -532,6 +537,7 @@ class MainWindow(QMainWindow):
             self.batch_button,
             self.auto_tag_button,
             self.convert_button,
+            self.bpm_button,
             self.cover_button,
             self.lyrics_button,
             self.player_button,
@@ -2612,6 +2618,9 @@ class MainWindow(QMainWindow):
         self.convert_button.setEnabled(
             enabled
         )
+        self.bpm_button.setEnabled(
+            enabled
+        )
         self.cover_button.setEnabled(
             enabled
         )
@@ -3314,6 +3323,12 @@ class MainWindow(QMainWindow):
         self.filter_artist = QComboBox()
         self.filter_artist.currentIndexChanged.connect(self._apply_song_filter)
 
+        self.filter_bpm = QLineEdit()
+        self.filter_bpm.setFixedWidth(70)
+        self.filter_bpm.setPlaceholderText(tr("filter_bpm_placeholder", self.language))
+        self.filter_bpm.setToolTip(tr("filter_bpm_tip", self.language))
+        self.filter_bpm.textChanged.connect(self._apply_song_filter)
+
         self.filter_count_label = QLabel("")
         self.filter_count_label.setStyleSheet("color: palette(mid);")
 
@@ -3322,6 +3337,8 @@ class MainWindow(QMainWindow):
         row.addWidget(self.filter_genre, 2)
         row.addWidget(QLabel(tr("filter_artist_label", self.language)))
         row.addWidget(self.filter_artist, 2)
+        row.addWidget(QLabel("BPM:"))
+        row.addWidget(self.filter_bpm)
         row.addWidget(self.filter_count_label)
         return row
 
@@ -3350,13 +3367,14 @@ class MainWindow(QMainWindow):
         text = self.filter_search.text() if hasattr(self, "filter_search") else ""
         genre = self.filter_genre.currentData() or ""
         artist = self.filter_artist.currentData() or ""
+        bpm = self.filter_bpm.text().strip() if hasattr(self, "filter_bpm") else ""
         visible = 0
         for row, song in enumerate(self.songs):
-            ok = matches(song, text=text, genre=genre, artist=artist)
+            ok = matches(song, text=text, genre=genre, artist=artist, bpm=bpm)
             self.table.setRowHidden(row, not ok)
             if ok:
                 visible += 1
-        if text or genre or artist:
+        if text or genre or artist or bpm:
             self.filter_count_label.setText(
                 tr("filter_count", self.language, shown=visible, total=len(self.songs))
             )
@@ -3425,6 +3443,69 @@ class MainWindow(QMainWindow):
         window.closeEvent = lambda event: (_clear(), event.accept())
         self._now_playing_window = window
         window.show()
+
+    def detect_bpm_selected(self):
+        """Erkennt die BPM der markierten (oder aller) Titel und speichert sie."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        from ..audio_analysis.bpm import detect_bpm
+
+        rows = self.selected_rows() or list(range(len(self.songs)))
+        targets = [
+            (row, self.songs[row])
+            for row in rows
+            if 0 <= row < len(self.songs)
+            and self.songs[row].path
+            and Path(self.songs[row].path).is_file()
+        ]
+        if not targets:
+            return
+
+        progress = QProgressDialog(
+            tr("bpm_detecting", self.language),
+            tr("cancel", self.language),
+            0,
+            len(targets),
+            self,
+        )
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+
+        results: dict[int, str] = {}
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = {
+                pool.submit(detect_bpm, song.path): row for row, song in targets
+            }
+            done = 0
+            for future in as_completed(futures):
+                if progress.wasCanceled():
+                    break
+                row = futures[future]
+                try:
+                    bpm = future.result()
+                except Exception:  # noqa: BLE001
+                    bpm = None
+                if bpm:
+                    results[row] = str(int(round(bpm)))
+                done += 1
+                progress.setValue(done)
+                QApplication.processEvents()
+
+        update_items = [
+            (row, replace(self.songs[row], bpm=bpm)) for row, bpm in results.items()
+        ]
+        saved, failed = (
+            self._write_song_updates("hist_bpm_detect", update_items)
+            if update_items
+            else (0, [])
+        )
+        self.update_optional_columns()
+        self._apply_song_filter()
+        self.refresh_active_editor()
+
+        message = tr("bpm_detected", self.language, count=saved)
+        if failed:
+            message += tr("errors_block", self.language, errors="\n".join(failed))
+        QMessageBox.information(self, tr("bpm_detect", self.language), message)
 
     def convert_selected(self):
         """Öffnet den Konvertierungsdialog für die ausgewählten (oder alle) Titel."""

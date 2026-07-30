@@ -37,6 +37,14 @@ def test_empty_criteria_match_all():
     assert matches(_song(title="X"))
 
 
+def test_bpm_filter_within_tolerance():
+    assert matches(_song(bpm="120"), bpm="120")
+    assert matches(_song(bpm="122"), bpm="120", bpm_tolerance=3)
+    assert not matches(_song(bpm="130"), bpm="120", bpm_tolerance=3)
+    # ohne BPM-Tag fällt der Titel bei gesetztem BPM-Filter raus
+    assert not matches(_song(bpm=""), bpm="120")
+
+
 def test_distinct_values_sorted_unique():
     songs = [_song(genre="Rock"), _song(genre="pop"), _song(genre="Rock"),
              _song(genre="")]

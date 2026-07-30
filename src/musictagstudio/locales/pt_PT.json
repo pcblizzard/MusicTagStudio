@@ -871,5 +871,12 @@
   "stats_col_name": "Nome",
   "stats_col_time": "Tempo",
   "stats_empty": "Ainda sem reproduções.",
-  "exact_album_gain_hint": "Mais preciso, mas bastante mais lento (o álbum inteiro é adicionalmente medido de uma vez)."
+  "exact_album_gain_hint": "Mais preciso, mas bastante mais lento (o álbum inteiro é adicionalmente medido de uma vez).",
+  "bpm_detect": "Detetar BPM",
+  "bpm_detect_tip": "Deteta o tempo (BPM) das faixas selecionadas (ou todas) e guarda-o como etiqueta. Reversível pelo histórico.",
+  "bpm_detecting": "A detetar BPM …",
+  "bpm_detected": "BPM guardado para {count} faixas.",
+  "hist_bpm_detect": "Detetar BPM",
+  "filter_bpm_placeholder": "ex.: 95",
+  "filter_bpm_tip": "Mostrar apenas faixas com este BPM (±3). Requer etiquetas BPM guardadas (\"Detetar BPM\")."
 }

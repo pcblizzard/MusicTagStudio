@@ -18,7 +18,13 @@ def _norm(value: str) -> str:
 
 
 def matches(
-    song: Song, *, text: str = "", genre: str = "", artist: str = ""
+    song: Song,
+    *,
+    text: str = "",
+    genre: str = "",
+    artist: str = "",
+    bpm: str = "",
+    bpm_tolerance: float = 3.0,
 ) -> bool:
     """Passt der Titel zu allen gesetzten Kriterien (leere werden ignoriert)?"""
     needle = _norm(text)
@@ -32,7 +38,19 @@ def matches(
         wanted = _norm(artist)
         if wanted not in (_norm(song.artist), _norm(song.album_artist)):
             return False
+    if str(bpm).strip():
+        target = _as_float(bpm)
+        value = _as_float(song.bpm)
+        if target is None or value is None or abs(value - target) > bpm_tolerance:
+            return False
     return True
+
+
+def _as_float(value: str) -> float | None:
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
 
 
 def distinct_values(songs: list[Song], field: str) -> list[str]:

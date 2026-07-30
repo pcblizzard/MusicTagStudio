@@ -871,5 +871,12 @@
   "stats_col_name": "Name",
   "stats_col_time": "Hörzeit",
   "stats_empty": "Noch keine Wiedergaben erfasst.",
-  "exact_album_gain_hint": "Genauer, aber deutlich langsamer (das ganze Album wird zusätzlich am Stück gemessen)."
+  "exact_album_gain_hint": "Genauer, aber deutlich langsamer (das ganze Album wird zusätzlich am Stück gemessen).",
+  "bpm_detect": "BPM erkennen",
+  "bpm_detect_tip": "Erkennt das Tempo (BPM) der markierten (oder aller) Titel und speichert es als Tag. Rückgängig über den Verlauf.",
+  "bpm_detecting": "BPM werden erkannt …",
+  "bpm_detected": "{count} Titel mit BPM versehen.",
+  "hist_bpm_detect": "BPM erkennen",
+  "filter_bpm_placeholder": "z. B. 95",
+  "filter_bpm_tip": "Nur Titel mit dieser BPM (±3) zeigen. Benötigt gespeicherte BPM-Tags („BPM erkennen“)."
 }

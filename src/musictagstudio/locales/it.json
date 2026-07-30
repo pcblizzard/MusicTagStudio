@@ -871,5 +871,12 @@
   "stats_col_name": "Nome",
   "stats_col_time": "Tempo",
   "stats_empty": "Nessuna riproduzione registrata.",
-  "exact_album_gain_hint": "Più preciso, ma molto più lento (l intero album viene inoltre misurato per intero)."
+  "exact_album_gain_hint": "Più preciso, ma molto più lento (l intero album viene inoltre misurato per intero).",
+  "bpm_detect": "Rileva BPM",
+  "bpm_detect_tip": "Rileva il tempo (BPM) dei brani selezionati (o tutti) e lo salva come tag. Annullabile dalla cronologia.",
+  "bpm_detecting": "Rilevamento BPM …",
+  "bpm_detected": "BPM salvato per {count} brani.",
+  "hist_bpm_detect": "Rileva BPM",
+  "filter_bpm_placeholder": "es. 95",
+  "filter_bpm_tip": "Mostra solo i brani con questo BPM (±3). Richiede tag BPM salvati (\"Rileva BPM\")."
 }
