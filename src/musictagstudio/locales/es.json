@@ -811,5 +811,11 @@
   "history_select_entry": "Selecciona una entrada a la izquierda para ver los cambios.",
   "history_no_changes": "No se registraron cambios de campo.",
   "history_rename": "Renombrado",
-  "history_cover": "Portada cambiada"
+  "history_cover": "Portada cambiada",
+  "auto_tag": "Auto-etiquetar",
+  "auto_tag_tip": "Auto-etiquetar pistas seleccionadas (o todas): las coincidencias seguras se aplican, las inciertas se listan para revisar. Reversible con el historial.",
+  "auto_tag_threshold_prompt": "Confianza mínima (%) para aplicar automáticamente:",
+  "auto_tag_summary": "Auto-etiquetado listo: {applied} aplicadas · {review} por revisar · {no_match} sin coincidencia.",
+  "auto_tag_open_review": "¿Revisar ahora las coincidencias inciertas en la comparación?",
+  "hist_auto_tag": "Auto-etiquetado"
 }

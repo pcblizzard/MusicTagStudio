@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QInputDialog,
     QProgressDialog,
     QPushButton,
     QScrollArea,
@@ -75,6 +76,12 @@ from ..services.rename import plan_renames
 from ..services.proposal import (
     build_batch_proposals,
     build_proposal,
+)
+from ..services.auto_tag import (
+    DEFAULT_THRESHOLD,
+    REASON_LOW_CONFIDENCE,
+    run_auto_tag,
+    summarize,
 )
 from ..providers import fingerprint
 from ..providers.musicbrainz import (
@@ -327,6 +334,13 @@ class MainWindow(QMainWindow):
         )
         self.batch_button.setEnabled(False)
 
+        self.auto_tag_button = QPushButton(
+            tr("auto_tag", self.language)
+        )
+        self.auto_tag_button.setToolTip(tr("auto_tag_tip", self.language))
+        self.auto_tag_button.clicked.connect(self.auto_tag_selected)
+        self.auto_tag_button.setEnabled(False)
+
         self.cover_button = QPushButton(
             tr("manage_cover_selection", self.language)
         )
@@ -506,6 +520,7 @@ class MainWindow(QMainWindow):
             self.proposal_button,
             self.identify_button,
             self.batch_button,
+            self.auto_tag_button,
             self.cover_button,
             self.lyrics_button,
             self.player_button,
@@ -2544,6 +2559,9 @@ class MainWindow(QMainWindow):
         self.batch_button.setEnabled(
             enabled
         )
+        self.auto_tag_button.setEnabled(
+            enabled
+        )
         self.cover_button.setEnabled(
             enabled
         )
@@ -3231,6 +3249,150 @@ class MainWindow(QMainWindow):
             message,
         )
 
+        self.refresh_active_editor()
+
+    def auto_tag_selected(self):
+        """Batch-Auto-Tagging: hohe Konfidenz automatisch, Rest zur Prüfung."""
+        if self.has_unsaved_changes and not self.confirm_pending_changes():
+            return
+
+        rows = self.selected_rows() or list(range(len(self.songs)))
+        if not rows:
+            return
+
+        threshold, ok = QInputDialog.getInt(
+            self,
+            tr("auto_tag", self.language),
+            tr("auto_tag_threshold_prompt", self.language),
+            DEFAULT_THRESHOLD,
+            50,
+            100,
+            5,
+        )
+        if not ok:
+            return
+
+        selected_songs = [self.songs[row] for row in rows]
+
+        progress = QProgressDialog(
+            tr("querying_providers", self.language),
+            tr("cancel", self.language),
+            0,
+            len(rows),
+            self,
+        )
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+
+        def update_progress(position, total, title):
+            progress.setMaximum(max(1, total))
+            progress.setValue(position)
+            progress.setLabelText(f"{min(position + 1, total)}/{total}: {title}")
+            QApplication.processEvents()
+
+        results = build_batch_proposals(
+            selected_songs,
+            progress_callback=update_progress,
+            cancel_callback=progress.wasCanceled,
+        )
+        progress.setValue(len(rows))
+
+        settings = load_settings()
+        decisions = run_auto_tag(
+            selected_songs,
+            results,
+            primary_source=settings.selected_provider,
+            threshold=threshold,
+        )
+
+        # Sichere Treffer automatisch übernehmen (mit Verlauf/Undo).
+        update_items = [
+            (rows[index], replace(self.songs[rows[index]], **decision.updates))
+            for index, decision in enumerate(decisions)
+            if decision.applied
+        ]
+        saved, failed = (
+            self._write_song_updates("hist_auto_tag", update_items)
+            if update_items
+            else (0, [])
+        )
+        self.update_optional_columns()
+
+        _applied, _review, no_match = summarize(decisions)
+        review_indices = [
+            index
+            for index, decision in enumerate(decisions)
+            if decision.reason == REASON_LOW_CONFIDENCE
+        ]
+
+        message = tr(
+            "auto_tag_summary",
+            self.language,
+            applied=saved,
+            review=len(review_indices),
+            no_match=no_match,
+        )
+        if failed:
+            message += tr(
+                "errors_block", self.language, errors="\n".join(failed)
+            )
+
+        self.refresh_active_editor()
+
+        if review_indices:
+            answer = QMessageBox.question(
+                self,
+                tr("auto_tag", self.language),
+                message + "\n\n" + tr("auto_tag_open_review", self.language),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if answer == QMessageBox.StandardButton.Yes:
+                self._open_batch_review(
+                    [rows[index] for index in review_indices],
+                    [results[index] for index in review_indices],
+                )
+        else:
+            QMessageBox.information(
+                self, tr("auto_tag", self.language), message
+            )
+
+    def _open_batch_review(self, rows, results):
+        """Öffnet den bestehenden Vergleichsdialog für die unsicheren Treffer."""
+        proposals = [
+            BatchSongProposal(
+                song_row=row,
+                song=self.songs[row],
+                candidates=result.candidates,
+                warnings=result.warnings,
+            )
+            for row, result in zip(rows, results)
+        ]
+        if not proposals:
+            return
+        settings = load_settings()
+        dialog = BatchComparisonDialog(
+            proposals,
+            primary_source=settings.selected_provider,
+            feature_handling=settings.feature_handling,
+            parent=self,
+            language=self.language,
+        )
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        update_items = [
+            (song_row, replace(self.songs[song_row], **updates))
+            for song_row, updates in dialog.selected_updates.items()
+        ]
+        saved, failed = self._write_song_updates(
+            "hist_batch_suggestions", update_items
+        )
+        self.update_optional_columns()
+        message = tr("batch_saved_msg", self.language, count=saved)
+        if failed:
+            message += tr("errors_block", self.language, errors="\n".join(failed))
+        QMessageBox.information(
+            self, tr("batch_done_title", self.language), message
+        )
         self.refresh_active_editor()
 
     def update_dirty_state(self):

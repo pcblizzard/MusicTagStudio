@@ -811,5 +811,11 @@
   "history_select_entry": "Select an entry on the left to see the changes.",
   "history_no_changes": "No field changes recorded.",
   "history_rename": "Renamed",
-  "history_cover": "Cover changed"
+  "history_cover": "Cover changed",
+  "auto_tag": "Auto-tag",
+  "auto_tag_tip": "Auto-tag selected (or all) tracks: confident matches are applied, uncertain ones listed for review. Undoable via history.",
+  "auto_tag_threshold_prompt": "Minimum confidence (%) for automatic apply:",
+  "auto_tag_summary": "Auto-tagging done: {applied} applied · {review} to review · {no_match} no match.",
+  "auto_tag_open_review": "Review uncertain matches in the comparison now?",
+  "hist_auto_tag": "Auto-tagging"
 }

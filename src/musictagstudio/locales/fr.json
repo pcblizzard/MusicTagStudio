@@ -811,5 +811,11 @@
   "history_select_entry": "Sélectionnez une entrée à gauche pour voir les modifications.",
   "history_no_changes": "Aucune modification de champ enregistrée.",
   "history_rename": "Renommé",
-  "history_cover": "Pochette modifiée"
+  "history_cover": "Pochette modifiée",
+  "auto_tag": "Auto-tag",
+  "auto_tag_tip": "Auto-taguer les pistes sélectionnées (ou toutes) : les correspondances sûres sont appliquées, les incertaines listées pour vérification. Annulable via l'historique.",
+  "auto_tag_threshold_prompt": "Confiance minimale (%) pour l'application automatique :",
+  "auto_tag_summary": "Auto-tag terminé : {applied} appliqués · {review} à vérifier · {no_match} sans correspondance.",
+  "auto_tag_open_review": "Vérifier maintenant les correspondances incertaines dans la comparaison ?",
+  "hist_auto_tag": "Auto-tag"
 }

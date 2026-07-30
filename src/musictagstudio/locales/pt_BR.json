@@ -811,5 +811,11 @@
   "history_select_entry": "Selecione uma entrada à esquerda para ver as alterações.",
   "history_no_changes": "Nenhuma alteração de campo registrada.",
   "history_rename": "Renomeado",
-  "history_cover": "Capa alterada"
+  "history_cover": "Capa alterada",
+  "auto_tag": "Auto-etiquetar",
+  "auto_tag_tip": "Auto-etiquetar faixas selecionadas (ou todas): correspondências seguras são aplicadas, as incertas listadas para revisão. Reversível pelo histórico.",
+  "auto_tag_threshold_prompt": "Confiança mínima (%) para aplicação automática:",
+  "auto_tag_summary": "Auto-etiquetagem concluída: {applied} aplicadas · {review} a revisar · {no_match} sem correspondência.",
+  "auto_tag_open_review": "Revisar agora as correspondências incertas na comparação?",
+  "hist_auto_tag": "Auto-etiquetagem"
 }

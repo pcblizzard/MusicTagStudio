@@ -811,5 +811,11 @@
   "history_select_entry": "Seleziona una voce a sinistra per vedere le modifiche.",
   "history_no_changes": "Nessuna modifica di campo registrata.",
   "history_rename": "Rinominato",
-  "history_cover": "Copertina modificata"
+  "history_cover": "Copertina modificata",
+  "auto_tag": "Auto-tag",
+  "auto_tag_tip": "Auto-tag dei brani selezionati (o tutti): le corrispondenze sicure vengono applicate, quelle incerte elencate per la verifica. Annullabile dalla cronologia.",
+  "auto_tag_threshold_prompt": "Confidenza minima (%) per l'applicazione automatica:",
+  "auto_tag_summary": "Auto-tag completato: {applied} applicati · {review} da verificare · {no_match} senza corrispondenza.",
+  "auto_tag_open_review": "Verificare ora le corrispondenze incerte nel confronto?",
+  "hist_auto_tag": "Auto-tag"
 }

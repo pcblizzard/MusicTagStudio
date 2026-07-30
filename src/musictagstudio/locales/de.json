@@ -811,5 +811,11 @@
   "history_select_entry": "Vorgang links wählen, um die Änderungen zu sehen.",
   "history_no_changes": "Keine Feldänderungen aufgezeichnet.",
   "history_rename": "Umbenannt",
-  "history_cover": "Cover geändert"
+  "history_cover": "Cover geändert",
+  "auto_tag": "Auto-Tag",
+  "auto_tag_tip": "Ausgewählte (oder alle) Titel automatisch taggen: sichere Treffer werden übernommen, unsichere zur Prüfung gelistet. Rückgängig über den Verlauf.",
+  "auto_tag_threshold_prompt": "Mindestkonfidenz (%) für die automatische Übernahme:",
+  "auto_tag_summary": "Auto-Tagging fertig: {applied} übernommen · {review} zu prüfen · {no_match} ohne Treffer.",
+  "auto_tag_open_review": "Unsichere Treffer jetzt im Vergleich prüfen?",
+  "hist_auto_tag": "Auto-Tagging"
 }
